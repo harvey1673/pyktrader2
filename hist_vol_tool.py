@@ -1,6 +1,5 @@
 import bsopt
 import copy
-import curve
 
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
@@ -10,8 +9,7 @@ YEARLY_DAYS = 365.0
 # Inside the period, Vol is constant and hedging frequency is once per ndays
 # bussinessDays is number of business days from the startD to expiryT
 
-def delta_cashflow(is_call, ts, strike, vol, expiry, rd = 0.0, rf = 0.0, rehedge_period = 10, column = 'close'):
-    # annualized days
+def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
     startD = Dates[0]
     endD = Dates[-1]
     lastPrice = ts[startD]
@@ -27,11 +25,11 @@ def delta_cashflow(is_call, ts, strike, vol, expiry, rd = 0.0, rf = 0.0, rehedge
 
         date = tenor.RDateAdd(rehedge_period,date, exceptionDateList)
 
-    CF = CF + bsopt.BSDelta(IsCall, lastPrice, strike, vol, lastTau, rd, rf) * (ts[endD] - lastPrice)
+    cashflow = cashflow + bsopt.BSDelta(IsCall, lastPrice, strike, vol, lastTau, rd, rf) * (ts[endD] - lastPrice)
     return CF
 
 
-def BSrealizedVol(IsCall, ts, strike, expiryT, rd =0.0, rf = 0.0, optPayoff=0.0, rehedge_period = "1d", exceptionDateList = [], refVol = 0.5):
+def BSrealizedVol(IsCall, ts, strike, expiryT, rd =0.0, rf = 0.0, optPayoff=0.0, rehedge_period = "1d", refVol = 0.5):
     startD = ts.Dates()[0]
     endD = ts.Dates()[-1]
 
