@@ -14,24 +14,32 @@ def cnorminv(x):
 def pnorm(x):
     scipy.stats.norm.pdf(x)
 
-def BlackSholesFormula(IsCall, S, K, Sigma, Texp, rf, rd):
-    d1 = (log(S/K) + (rf - rd + 0.5* Sigma**2) * Texp)/(Sigma*sqrt(Texp))
-    d2 = d1 - Sigma*sqrt(Texp)
-    x1 = cnorm(d1)
-    x2 = cnorm(d2)
+def d1(Spot, Strike, Vol, Texp, Rd, Rf ):
+    retrun (log(Spot/Strike) + (Rf - Rd + 0.5* Vol**2) * Texp)/(Vol*sqrt(Texp))
+
+def d2(Spot, Strike, Vol, Texp, Rd, Rf ):
+    return d1(Spot, Strike, Vol, Texp, Rd, Rf ) - Vol*sqrt(Texp)
+
+def fd1(Fwd,K,Vol,T):
+    return log(Fwd/K)/Vol/sqrt(T) + Vol*sqrt(T)/2.
+
+def fd2(Fwd,K,Vol,T):
+    return log(Fwd/K)/Vol/sqrt(T) - Vol*sqrt(T)/2.
+    
+def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rf, Rd):
+    x1 = d1(S, K, Vol, Texp, Rd, Rf )
+    x2 = d2(S, K, Vol, Texp, Rd, Rf )
     y = pnorm(d1)
     res = {}
 
     if IsCall:
         res['Price'] = S * exp(-rd*Texp)* x1 - K * exp(-rf*Texp) * x2
-        res['Delta'] = x1 * exp(-rd*Texp)
+        res['Delta'] = x1 * exp(-Rd*Texp)
     elif CallPut == 'P':
-        res['Price'] = K * exp(-rf*Texp) * (1 - x2) - S * exp(-rd*Texp) * (1 - x1)
-        res['Delta'] = (x1  - 1) * exp(-rd*Texp)
-
-    res['Vega'] = S * sqrt(Texp) * y * exp(-rd*Texp)
-    res['Gamma'] = y/(S*Sigma* sqrt(T))
-
+        res['Price'] = K * exp(-Rf*Texp) * (1 - x2) - S * exp(-Rd*Texp) * (1 - x1)
+        res['Delta'] = (x1  - 1) * exp(-Rd*Texp)
+    res['Vega'] = S * sqrt(Texp) * y * exp(-Rd*Texp)
+    res['Gamma'] = y/(S*Vol* sqrt(Texp))
     return res
 
 def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
@@ -66,7 +74,7 @@ def BSOpt( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
              - Spot   * exp( -Rf * Texp ) * cnorm( -d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
 
 
-def BSOptFwd( IsCall, Fwd, Strike, Vol, Texp ):
+def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0):
     'Standard Black-Scholes European vanilla pricing.'
 
     if Strike <= 1e-12 * Fwd:
@@ -74,21 +82,41 @@ def BSOptFwd( IsCall, Fwd, Strike, Vol, Texp ):
             return Fwd
         else:
             return 0.
-
+    df = exp(-Rd * Texp)
     if IsCall:
-        return Fwd  * cnorm( fd1( Fwd, Strike, Vol, Texp ) ) \
-             - Strike * cnorm( fd2( Fwd, Strike, Vol, Texp ) )
+        return df * (Fwd  * cnorm( fd1( Fwd, Strike, Vol, Texp ) ) \
+             - Strike * cnorm( fd2( Fwd, Strike, Vol, Texp ) ))
     else:
-        return Strike * cnorm( -fd2( Fwd, Strike, Vol, Texp ) ) \
-             - Fwd * cnorm( -fd1( Fwd, Strike, Vol, Texp ) )
+        return df * (Strike * cnorm( -fd2( Fwd, Strike, Vol, Texp ) ) \
+             - Fwd * cnorm( -fd1( Fwd, Strike, Vol, Texp ) ))
 
-def BSOptFwdNormal( IsCall, Fwd, Strike, Vol, Texp ):
+def BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd ):
     'Standard Bachelier European vanilla pricing.'
     d = (Fwd-Strike)/Vol/sqrt(Texp)
     p = (Fwd-Strike)  * cnorm( d ) + Vol * sqrt(Texp) * pnorm(d)
     if not IsCall:
         p = Fwd - Strike - p
-    return p
+    return p * exp(-Texp*Rd)
+    
+def BSDelta( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
+    'Standard Black-Scholes Delta calculation. Over-currency spot delta.'
+
+    if IsCall:
+        return exp( -Rf * Texp ) * cnorm( d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
+    else:
+        return -exp( -Rf * Texp ) * cnorm( -d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
+
+def BSVega( Spot, Strike, Vol, Texp, Rd, Rf ):
+    'Standard Black-Scholes Vega calculation.'
+
+    d = d1( Spot, Strike, Vol, Texp, Rd, Rf )
+    return Spot * exp( -Rf * Texp ) * sqrt( Texp / 2. / pi ) * exp( -d * d / 2. )
+    
+def BSFwdNormalDelta( IsCall, Fwd, Strike, Vol, Texp, Rd = 0 ):
+    return BSDelta( IsCall, Fwd, Strike, Vol, Texp, Rd, Rd )
+
+def BSFwdNormalVega( IsCall, Fwd, Strike, Vol, Texp, Rd = 0 ):
+    return BSVega( Fwd, Strike, Vol, Texp, Rd, Rd )
 
 def BSBin( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
     'Standard Black-Scholes European binary call/put pricing.'
@@ -98,20 +126,6 @@ def BSBin( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
         Bin = 1 - Bin
     Bin = Bin * exp( -Rd * Texp )
     return Bin
-
-def BSDelta( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
-    'Standard Black-Scholes Delta calculation. Over-currency spot delta.'
-
-    if IsCall:
-        return exp( -Rf * Texp ) * cnorma( d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
-    else:
-        return -exp( -Rf * Texp ) * cnorma( -d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
-
-def BSVega( Spot, Strike, Vol, Texp, Rd, Rf ):
-    'Standard Black-Scholes Vega calculation.'
-
-    d = d1( Spot, Strike, Vol, Texp, Rd, Rf )
-    return Spot * exp( -Rf * Texp ) * sqrt( Texp / 2. / pi ) * exp( -d * d / 2. )
 
 def BSImpVol( IsCall, Spot, Strike, Texp, Rd, Rf, Price ):
     '''Calculates Black-Scholes implied volatility from a European price.
@@ -166,7 +180,7 @@ def BSImpVolNormal( IsCall, Fwd, Strike, Texp, Rd, Price ):
     '''Calculates the normal-model implied vol to match the option price.'''
 
     def ArgFunc( Vol ):
-        PriceCalc = BSOptNormal( IsCall, Fwd, Strike, Vol, Texp, Rd )
+        PriceCalc = BSOptFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd )
         return PriceCalc - Price
 
     Vol = brenth( ArgFunc, 0.0000001, Fwd )
@@ -205,10 +219,10 @@ def OneTouch( IsHigh, IsDelayed, Spot, Strike, Vol, Texp, Rd, Rf ):
     if IsDelayed:
         if IsHigh:
             Price = exp( -Rd * Texp ) * ( cnorm( ( -Alpha + Mu * Texp ) / Vol / sqrt( Texp ) ) \
-                  + exp( 2 * Mu * Alpha / Vol / Vol ) * cnorma( ( -Alpha - Mu * Texp ) / Vol / sqrt( Texp ) ) )
+                  + exp( 2 * Mu * Alpha / Vol / Vol ) * cnorm( ( -Alpha - Mu * Texp ) / Vol / sqrt( Texp ) ) )
         else:
             Price = exp( -Rd * Texp ) * ( cnorm( (  Alpha - Mu * Texp ) / Vol / sqrt( Texp ) ) \
-                  + exp( 2 * Mu * Alpha / Vol / Vol ) * cnorma( (  Alpha + Mu * Texp ) / Vol / sqrt( Texp ) ) )
+                  + exp( 2 * Mu * Alpha / Vol / Vol ) * cnorm( (  Alpha + Mu * Texp ) / Vol / sqrt( Texp ) ) )
     else:
         MuHat = sqrt( Mu * Mu + 2 * Rd * Vol * Vol )
         if IsHigh:
@@ -240,8 +254,8 @@ def BSKnockout( IsCall, Spot, Strike, KO, IsUp, Vol, Texp, Rd, Rf ):
     y1 = log( KO * KO / Spot / Strike ) / Vol / SqrtT + ( 1 + m ) * Vol * SqrtT
     y2 = log( KO / Spot ) / Vol / SqrtT + ( 1 + m ) * Vol * SqrtT
 
-    A = Phi * Spot * exp( -Rf * Texp ) * cnorm( Phi * x1 ) - Phi * Strike * exp( -Rd * Texp ) * cnorma( Phi * x1 - Phi * Vol * SqrtT )
-    B = Phi * Spot * exp( -Rf * Texp ) * cnorm( Phi * x2 ) - Phi * Strike * exp( -Rd * Texp ) * cnorma( Phi * x2 - Phi * Vol * SqrtT )
+    A = Phi * Spot * exp( -Rf * Texp ) * cnorm( Phi * x1 ) - Phi * Strike * exp( -Rd * Texp ) * cnorm( Phi * x1 - Phi * Vol * SqrtT )
+    B = Phi * Spot * exp( -Rf * Texp ) * cnorm( Phi * x2 ) - Phi * Strike * exp( -Rd * Texp ) * cnorm( Phi * x2 - Phi * Vol * SqrtT )
     C = Phi * Spot * exp( -Rf * Texp ) * ( KO / Spot ) ** ( 2 * ( m + 1 ) ) * cnorm( Eta * y1 ) - Phi * Strike * exp( -Rd * Texp ) * ( KO / Spot ) ** ( 2 * m ) * cnorm( Eta * y1 - Eta * Vol * SqrtT )
     D = Phi * Spot * exp( -Rf * Texp ) * ( KO / Spot ) ** ( 2 * ( m + 1 ) ) * cnorm( Eta * y2 ) - Phi * Strike * exp( -Rd * Texp ) * ( KO / Spot ) ** ( 2 * m ) * cnorm( Eta * y2 - Eta * Vol * SqrtT )
 
@@ -382,12 +396,6 @@ def WhaleyDelta( IsCall, Spot, Fwd, Strike, Vol, Texp, Df, Tr, D,\
             else:
                 fD = - fD * Fwd / Strike + PriceMid / Strike
         return fD
-
-def fd1(Fwd,K,Vol,T):
-    return log(Fwd/K)/Vol/sqrt(T) + Vol*sqrt(T)/2.
-
-def fd2(Fwd,K,Vol,T):
-    return log(Fwd/K)/Vol/sqrt(T) - Vol*sqrt(T)/2.
 
 def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
     '''
