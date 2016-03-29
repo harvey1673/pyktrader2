@@ -88,7 +88,7 @@ class OptAgentMixin(object):
                 expiry = inst.expiry
                 prod = inst.product
                 if expiry in self.volgrids[prod].volnode:
-                    inst.set_pricer(self.volgrids[prod], self.irate)
+                    inst.set_pricer(self.volgrids[prod], self.irate[inst.ccy])
                     inst.update_greeks()
                 else:
                     print "missing %s volgrid for %s" % (prod, expiry)
@@ -175,4 +175,4 @@ class OptionAgent(Agent, OptAgentMixin):
     def restart(self):
         for prod in self.volgrids:
             self.reval_volgrids(prod, True)
-        Agent.restart()
+        Agent.restart(self)

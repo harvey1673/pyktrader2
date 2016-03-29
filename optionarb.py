@@ -19,9 +19,11 @@ def get_option_map(underliers, cont_mths, strikes):
     
 class OptionArbStrat(Strategy):
     common_params =  dict({'future_conts': [], 'strikes': [], 'cont_mths': [], 'exit_ratio': 0.1, 'profit_ratio': 0.01}, **Strategy.common_params)
-    asset_params = dict({'bid_prices': 0, 'ask_prices': 0, 'channels': 20, 'min_rng': 0.003, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'bid_prices': 0, 'ask_prices': 0, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
-        Strategy.__init__(self, config, agent)
+        self.future_conts = config['future_conts']
+        self.cont_mths = config['cont_mths']
+        self.strikes = config['strikes']
         self.option_map = get_option_map(self.future_conts, self.cont_mths, self.strikes)
         underliers = []
         volumes = []
@@ -69,6 +71,11 @@ class OptionArbStrat(Strategy):
                         v_range = {'lower':0, 'upper': None, 'scaler': 100.0}
                         self.value_range.append(v_range)
                         idx += 1
+        config['assets'] = []
+        for under, v, tunit in zip(underliers, volumes, trade_units):
+            data = {'underliers': under, 'volumes': v, 'trade_unit': tunit}
+            config['assets'].append(data)
+        Strategy.__init__(self, config, agent)
         self.order_type = OPT_LIMIT_ORDER
         self.is_initialized = False
         self.trade_margin = [[0.0, 0.0]] * len(underliers)

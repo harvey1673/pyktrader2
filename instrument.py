@@ -156,7 +156,7 @@ class Future(Instrument):
 class OptionInst(Instrument):
     def __init__(self,name):
         self.strike = 0.0 # only used by option
-        self.otype = ''   # only used by option
+        self.otype = 'C'   # only used by option
         self.underlying = ''   # only used by option
         Instrument.__init__(self, name)
         self.pricer = None
@@ -255,17 +255,18 @@ class FutOptionInst(OptionInst):
     def initialize(self):
         self.ptype = ProductType.Option
         self.product = inst2product(self.name)
+        sep_name = self.name.split('-')
         if self.product == 'IO_Opt':
-            self.underlying = self.name[:6].replace('IO','IF')
-            self.strike = float(self.name[-4:])
-            self.otype = self.name[7]
+            self.underlying = sep_name[0].replace('IO','IF')
+            self.strike = float(sep_name[2])
+            self.otype = str(sep_name[1])
             self.cont_mth = int(self.underlying[-4:]) + 200000 
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
             self.product = 'IO'
         elif '_Opt' in self.product:
-            self.underlying = self.name[:5]
-            self.strike = float(self.name[-4:])
-            self.otype = self.name[7]
+            self.underlying = sep_name[0]
+            self.strike = float(sep_name[2])
+            self.otype = str(sep_name[1])
             self.cont_mth = int(self.underlying[-4:]) + 200000 
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
             self.product = self.product[:-4]

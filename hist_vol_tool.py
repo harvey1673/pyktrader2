@@ -10,24 +10,22 @@ YEARLY_DAYS = 365.0
 # bussinessDays is number of business days from the startD to expiryT
 
 def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
-    startD = Dates[0]
-    endD = Dates[-1]
-    lastPrice = ts[startD]
-    lastTau = (expiryT - startD).days/YEARLY_DAYS
-
-    date =tenor.RDateAdd(rehedge_period,startD, exceptionDateList)
     CF = 0.0
-    while date < endD:
-        if date in ts.Dates():
-            CF = CF + bsopt.BSDelta(IsCall, lastPrice, strike, vol, lastTau, rd, rf) * (ts[date] - lastPrice)
-            lastPrice = ts[date]
-            lastTau = (expiryT - date).days/YEARLY_DAYS
-
-        date = tenor.RDateAdd(rehedge_period,date, exceptionDateList)
-
-    cashflow = cashflow + bsopt.BSDelta(IsCall, lastPrice, strike, vol, lastTau, rd, rf) * (ts[endD] - lastPrice)
+    strike = option_input['strike']
+    otype = option_input.get('otype', 1)
+    expiry = option_input['expiry']
+    rd = option_input['rd']
+    rf = option_input.get('rf', rd)
+    dfunc_name = option_input.get('delta_func', 'bsopt.BSDelta')
+    delta_func = eval(dfunc_name)
+    nlen = len(df.index)
+    for pidx in range(int(nlen/rehedge_period)):
+        idx = pidx * rehedge_period
+        nxt_idx = min((pidx + 1) * rehedge_period, nlen)
+        tau = (expiry - df.index[idx])/YEARLY_DAYS
+        opt_delta = delta_func(otype, df[column][idx], strike, vol, tau, rd, rf)
+        CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
     return CF
-
 
 def BSrealizedVol(IsCall, ts, strike, expiryT, rd =0.0, rf = 0.0, optPayoff=0.0, rehedge_period = "1d", refVol = 0.5):
     startD = ts.Dates()[0]
