@@ -4,7 +4,7 @@ import copy
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
 ITERATION_STEP = 0.001
-YEARLY_DAYS = 365.0
+YEARLY_DAYS = 365.25
 # Cash flow calculation for delta hedging.
 # Inside the period, Vol is constant and hedging frequency is once per ndays
 # bussinessDays is number of business days from the startD to expiryT
@@ -27,25 +27,29 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
     return CF
 
-def BSrealizedVol(IsCall, ts, strike, expiryT, rd =0.0, rf = 0.0, optPayoff=0.0, rehedge_period = "1d", refVol = 0.5):
-    startD = ts.Dates()[0]
-    endD = ts.Dates()[-1]
-
-    if tenor.RDateAdd(rehedge_period, startD, exceptionDateList) > endD :
-        raise ValueError, 'the difference between the start and the end is smaller than the hedging step'
-
-    if expiryT < endD :
-        raise ValueError, 'Expiry time must be later than the end of the time series'
-
-    F0 = ts.Values()[0]
-
+def realized_vol(df, option_input, calib_input, rehedge_period = 1, column = 'close'):
+    strike = option_input['strike']
+    otype = option_input.get('otype', 1)
+    expiry = option_input['expiry']
+    rd = option_input['rd']
+    rf = option_input.get('rf', rd)
+    ref_vol = calib_input.get('ref_vol', 0.5)
+    opt_payoff = calib_input.get('opt_payoff', 0.0)
+    fwd = df['column'][0]
+    is_dtime = calib_input.get('is_dtime', False)
+    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
+    if expiry < df.index[-1]:
+        raise ValueError, 'Expiry time must be no earlier than the end of the time series'
     numTries = 0
     diff = 1000.0
-    tau = (expiryT - startD).days/YEARLY_DAYS
-    vol = refVol
-
+    startD = df.index[0]
+    if is_dtime:
+        startD = startD.date()
+    tau = (expiry - startD).days/YEARLY_DAYS
+    vol = ref_vol
     def func(x):
-        return bsopt.BSOpt(IsCall, F0, strike, x, tau, rd, rf) + delta_cashflow(IsCall, ts, strike, x, expiryT, rd, rf, rehedge_period, exceptionDateList) - optPayoff
+        opt_input = 
+        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, x, expiryT, rd, rf, rehedge_period, column) - opt_payoff
 
     while diff >= SOLVER_ERROR_EPSILON and numTries <= ITERATION_NUM:
         current = func(vol)
@@ -67,8 +71,8 @@ def BSrealizedVol(IsCall, ts, strike, expiryT, rd =0.0, rf = 0.0, optPayoff=0.0,
     else :
         return vol
 
-def BS_ATMVol_TermStr(IsCall, tsFwd, expiryT, rd = 0.0, rf = 0.0, endVol = 0.0, termTenor="1m", rehedge_period ="1d", exceptionDateList=[]):
-
+def realized_atm_termstruct(IsCall, tsFwd, expiryT, rd = 0.0, rf = 0.0, endVol = 0.0, termTenor="1m", rehedge_period ="1d", exceptionDateList=[]):
+    term_tenor = 
     ts = curve.Curve()
     for d in tsFwd.Dates():
         if d not in exceptionDateList and d <= expiryT:
