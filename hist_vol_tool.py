@@ -1,6 +1,6 @@
 import bsopt
 import copy
-
+import dateutil
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
 ITERATION_STEP = 0.001
@@ -27,17 +27,20 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
     return CF
 
-def realized_vol(df, option_input, calib_input, rehedge_period = 1, column = 'close'):
+def realized_vol(df, option_input, calib_input, column = 'close'):
     strike = option_input['strike']
     otype = option_input.get('otype', 1)
     expiry = option_input['expiry']
     rd = option_input['rd']
     rf = option_input.get('rf', rd)
+    
     ref_vol = calib_input.get('ref_vol', 0.5)
     opt_payoff = calib_input.get('opt_payoff', 0.0)
+    rehedge_period = calib_input.get('rehedge_period', 1)
     fwd = df['column'][0]
     is_dtime = calib_input.get('is_dtime', False)
     pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
+
     if expiry < df.index[-1]:
         raise ValueError, 'Expiry time must be no earlier than the end of the time series'
     numTries = 0
@@ -48,8 +51,7 @@ def realized_vol(df, option_input, calib_input, rehedge_period = 1, column = 'cl
     tau = (expiry - startD).days/YEARLY_DAYS
     vol = ref_vol
     def func(x):
-        opt_input = 
-        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, x, expiryT, rd, rf, rehedge_period, column) - opt_payoff
+        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, x, rehedge_period, column) - opt_payoff
 
     while diff >= SOLVER_ERROR_EPSILON and numTries <= ITERATION_NUM:
         current = func(vol)
@@ -71,41 +73,49 @@ def realized_vol(df, option_input, calib_input, rehedge_period = 1, column = 'cl
     else :
         return vol
 
-def realized_atm_termstruct(IsCall, tsFwd, expiryT, rd = 0.0, rf = 0.0, endVol = 0.0, termTenor="1m", rehedge_period ="1d", exceptionDateList=[]):
-    term_tenor = 
-    ts = curve.Curve()
-    for d in tsFwd.Dates():
-        if d not in exceptionDateList and d <= expiryT:
-            ts[d] = tsFwd[d]
-
-    rptTenor = '-' + termTenor
-    DateList = [x for x in ts.Dates() if x not in exceptionDateList]
-    TSstart = DateList[0]
-    TSend = DateList[-1]
-
-    date = copy.copy(TSend)
-    endDate = tenor.RDateAdd('1d', date)
-    startDate = tenor.RDateAdd(rptTenor, date, exceptionDateList)
-    finalValue = 0.0
-
-    volTS = curve.Curve()
-    while startDate >= TSstart:
-        subTS = ts.Slice(startDate, endDate)
-
-        if len(subTS) < 2:
-            print 'No data in time series further than ', startDate
+def relative_date( ref_date, tenor):
+    nlen = len(tenor)
+    num = int(tenor[:-1])
+    
+    if tenor[-1] == 'm':
+        key = 'months'
+    elif tenor[-1] == 'y':
+        key = 'years'
+    elif tenor[-1] == 'w':
+        key = 'weeks'
+    elif tenor[-1] == 'd':
+        key = 'days'
+    input = { key: num }
+    return ref_date + dateutil.relativedelta.relativedelta(**input)
+            
+def realized_termstruct(df, option_input, calib_input, endVol = 0.0):
+    is_dtime = calib_input.get('is_dtime', False)
+    expiry = option_input['expiry']
+    term_tenor = calib_input.get('term_tenor', '1m')
+    otype = option_input.get('otype', 1)
+    expiry = option_input['expiry']
+    rd = option_input['rd']
+    rf = option_input.get('rf', rd)    
+    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
+    if is_dtime:
+        datelist = df['date']
+        dexp = expiry.date()
+    else:
+        datelist = df.index
+        dexp = expiry
+    xdf = df[datelist <= dexp]
+    datelist = datelist[datelist <= dexp]
+    
+    end_d   = datelist[-1]
+    start_d = relative_date(end_d, term_tenor)
+    final_value = 0.0
+    while start_d > datelist[0]:
+        sub_df = df[(datelist <= end_d) & (datelist > start_d)]
+        if len(sub_df) < 2:
             break
-
-        if 0.0 in subTS.Values():
-            print 'Price is zero at some date from ', startDate, ' to ', endDate
-            break
-
-        # for the moment, consider ATM vol
-        strike = subTS.Values()[0]
-
         if endVol > 0:
-            tau = (expiryT - subTS.Dates()[-1]).days/YEARLY_DAYS
-            finalValue = bsopt.BSOpt(IsCall, subTS.Values()[-1], strike, endVol, tau, rd, rf)
+            tau = (expiry - datelist[-1]).days/YEARLY_DAYS
+            finalValue = pricer_func(IsCall, subTS.Values()[-1], strike, endVol, tau, rd, rf)
             refVol = endVol
         elif endVol == 0:
             if IsCall:
