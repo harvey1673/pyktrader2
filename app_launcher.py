@@ -23,8 +23,8 @@ def get_option_map(underliers, expiries, strikes):
                 opt_map[key] = instID
     return opt_map
 
-def save_ctp(name, config_file, tday, filter):
-    base.config_logging(name + "_agent.log", level=logging.DEBUG,
+def save(name, config_file, tday, filter):
+    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
                    console_level = logging.INFO)
@@ -44,7 +44,7 @@ def save_ctp(name, config_file, tday, filter):
         save_agent.exit()
 
 def run(name, config_file, tday, agent_class = 'agent.Agent'):
-    base.config_logging("ctp_" + name + ".log", level=logging.DEBUG,
+    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
                    console_level = logging.INFO)
