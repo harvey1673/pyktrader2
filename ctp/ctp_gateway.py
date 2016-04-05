@@ -84,7 +84,9 @@ class CtpGateway(Gateway):
         self.qry_trigger = 2         # 查询触发点
         self.qry_commands = []
         self.qry_instruments = {}
+        self.system_orders = []
         self.md_data_buffer = 0
+        self.td_conn_mode = TERT_QUICK
         
     #----------------------------------------------------------------------
     def connect(self):
@@ -1431,7 +1433,10 @@ class CtpTdApi(TdApi):
             if not os.path.exists(path):
                 os.makedirs(path)
             self.createFtdcTraderApi(str(path))
-            
+
+            # THOST_TERT_RESTART = 0, THOST_TERT_RESUME = 1, THOST_TERT_QUICK = 2
+            self.subscribePublicTopic(self.gateway.td_conn_mode)
+            self.subscribePrivateTopic(self.gateway.td_conn_mode)
             # 注册服务器地址
             self.registerFront(self.address)
             
@@ -1498,17 +1503,14 @@ class CtpTdApi(TdApi):
         self.reqID += 1
         self.orderRef = max(self.orderRef, iorder.local_id)
         req = {}
-        req['InstrumentID'] = iorder.instrument.name
+        req['InstrumentID'] = str(iorder.instrument.name)
         req['LimitPrice'] = iorder.limit_price
         req['VolumeTotalOriginal'] = iorder.volume
         
         # 下面如果由于传入的类型本接口不支持，则会返回空字符串
-        try:
-            req['OrderPriceType'] = iorder.price_type
-            req['Direction'] = iorder.direction
-            req['CombOffsetFlag'] = iorder.action_type
-        except KeyError:
-            return ''
+        req['OrderPriceType'] = iorder.price_type
+        req['Direction'] = iorder.direction
+        req['CombOffsetFlag'] = iorder.action_type
             
         req['OrderRef'] = str(iorder.local_id)
         req['InvestorID'] = self.userID
@@ -1520,8 +1522,7 @@ class CtpTdApi(TdApi):
         req['IsAutoSuspend'] = 0                                             # 非自动挂起
         req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
         req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
-        req['MinVolume'] = 1                                                 # 最小成交量为1       
-
+        req['MinVolume'] = 1                                                 # 最小成交量为1
         self.reqOrderInsert(req, self.reqID)
     
     #----------------------------------------------------------------------
@@ -1530,7 +1531,7 @@ class CtpTdApi(TdApi):
         inst = iorder.instrument
         self.reqID += 1
         req = {}
-        req['InstrumentID'] = iorder.instID
+        req['InstrumentID'] = iorder.instrument.name
         req['ExchangeID'] = inst.exchange
         req['ActionFlag'] = defineDict['THOST_FTDC_AF_Delete']
         req['BrokerID'] = self.brokerID

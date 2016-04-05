@@ -92,7 +92,7 @@ class MktDataMixin(object):
             return False
         if (self.cur_day[inst]['open'] == 0.0):
             self.cur_day[inst]['open'] = tick.price
-            self.logger.debug('open data is received for inst=%s, price = %s, tick_id = %s' % (inst, tick.price, tick.tick_id))
+            #self.logger.debug('open data is received for inst=%s, price = %s, tick_id = %s' % (inst, tick.price, tick.tick_id))
         self.cur_day[inst]['close'] = tick.price
         self.cur_day[inst]['high']  = tick.high
         self.cur_day[inst]['low']   = tick.low
@@ -602,6 +602,12 @@ class Agent(MktDataMixin):
     def update_instrument(self, tick):      
         inst = tick.instID    
         curr_tick = tick.tick_id
+        if (self.instruments[inst].exchange == 'CZCE') and (self.instruments[inst].last_update == tick.tick_id) and \
+                ((self.instruments[inst].volume < tick.volume) or (self.instruments[inst].ask_vol1 != tick.askVol1) or \
+                    (self.instruments[inst].bid_vol1 != tick.bidVol1)):
+                if tick.tick_id % 10 < 5:
+                    tick.tick_id += 5
+                    tick.timestamp = tick.timestamp + datetime.timedelta(milliseconds=500)
         self.tick_id = max(curr_tick, self.tick_id)
         self.instruments[inst].up_limit   = tick.upLimit
         self.instruments[inst].down_limit = tick.downLimit        
@@ -783,7 +789,6 @@ class Agent(MktDataMixin):
                             self.ref2order[iorder.order_ref] = iorder
                             if iorder.status == order.OrderStatus.Ready:
                                 pending_orders.append(iorder.order_ref)
-        #print pending_orders
         if (len(pending_orders) > 0):
             for order_ref in pending_orders:
                 self.send_order(self.ref2order[order_ref])
