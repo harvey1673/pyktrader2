@@ -37,7 +37,7 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
     ref_vol = calib_input.get('ref_vol', 0.5)
     opt_payoff = calib_input.get('opt_payoff', 0.0)
     rehedge_period = calib_input.get('rehedge_period', 1)
-    fwd = df['column'][0]
+    fwd = df[column][0]
     is_dtime = calib_input.get('is_dtime', False)
     pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
 
@@ -45,10 +45,10 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
         raise ValueError, 'Expiry time must be no earlier than the end of the time series'
     numTries = 0
     diff = 1000.0
-    startD = df.index[0]
+    start_d = df.index[0]
     if is_dtime:
-        startD = startD.date()
-    tau = (expiry - startD).days/YEARLY_DAYS
+        start_d = startD.date()
+    tau = (expiry - start_d).days/YEARLY_DAYS
     vol = ref_vol
     def func(x):
         return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, x, rehedge_period, column) - opt_payoff
@@ -88,12 +88,16 @@ def relative_date( ref_date, tenor):
     input = { key: num }
     return ref_date + dateutil.relativedelta.relativedelta(**input)
             
-def realized_termstruct(df, option_input, calib_input, endVol = 0.0):
-    is_dtime = calib_input.get('is_dtime', False)
+def realized_termstruct(option_input, data):
+    is_dtime = data.get('is_dtime', False)
+    column = data.get('data_column', 'close')
+    term_tenor = data.get('term_tenor', '1m')
+    df = data['dataframe']
+    calib_input = {'rehedge_period', data.get('rehedge_period', 1), }
+                    
     expiry = option_input['expiry']
-    term_tenor = calib_input.get('term_tenor', '1m')
     otype = option_input.get('otype', 1)
-    expiry = option_input['expiry']
+    strike = option_input['strike']
     rd = option_input['rd']
     rf = option_input.get('rf', rd)    
     pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
@@ -104,37 +108,34 @@ def realized_termstruct(df, option_input, calib_input, endVol = 0.0):
         datelist = df.index
         dexp = expiry
     xdf = df[datelist <= dexp]
-    datelist = datelist[datelist <= dexp]
-    
-    end_d   = datelist[-1]
-    start_d = relative_date(end_d, term_tenor)
+    datelist = datelist[datelist <= dexp]    
+    end_d  = datelist[-1]
     final_value = 0.0
-    while start_d > datelist[0]:
-        sub_df = df[(datelist <= end_d) & (datelist > start_d)]
+    vol_ts = pd.Series()
+    while end_d > datelist[0]:
+        start_d = relative_date(end_d, term_tenor)
+        sub_df = xdf[(datelist <= end_d) & (datelist > start_d)]
         if len(sub_df) < 2:
             break
-        if endVol > 0:
+        if end_vol > 0:
             tau = (expiry - datelist[-1]).days/YEARLY_DAYS
-            finalValue = pricer_func(IsCall, subTS.Values()[-1], strike, endVol, tau, rd, rf)
-            refVol = endVol
-        elif endVol == 0:
-            if IsCall:
-                finalValue = max((subTS.Values()[-1] - strike), 0)
+            final_value = pricer_func(otype, sub_df[column][-1], strike, end_vol, tau, rd, rf)
+            ref_vol = end_vol
+        elif end_vol == 0:
+            if otype:
+                final_value = max((sub_df[column][-1] - strike), 0)
             else:
-                finalValue = max((strike - subTS.Values()[-1]), 0)
-            refVol = 0.5
-        elif endVol == None:
+                final_value = max((strike - sub_df[column][-1]), 0)
+            ref_vol = 0.5
+        elif end_vol == None:
             raise ValueError, 'no vol is found to match PnL'
-
-        vol = BSrealizedVol(IsCall, subTS, strike, expiryT, rd, rf, finalValue, rehedge_period, exceptionDateList, refVol = refVol)
-        volTS[startDate] = vol
-        endVol =vol
-
-        date = startDate
-        endDate = tenor.RDateAdd('1d', date)
-        startDate = tenor.RDateAdd(rptTenor, date, exceptionDateList)
-
-    return volTS
+        calib_input['ref_vol'] = ref_vol
+        calib_input['opt_payoff'] = final_value
+        vol = realized_vol(sub_df, option_input, calib_input, column)
+        vol_ts[sub_df.index[0]] = vol
+        end_vol = vol
+        end_d = start_d
+    return vol_ts
 
 def BS_VolSurf_TermStr(tsFwd, moneyness, expiryT, rd = 0.0, rf = 0.0, endVol = 0.0, termTenor="1m", rehedge_period ="1d", exceptionDateList=[]):
     ts =curve.Curve()
