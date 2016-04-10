@@ -267,7 +267,10 @@ class FutOptionInst(OptionInst):
             self.underlying = sep_name[0]
             self.strike = float(sep_name[2])
             self.otype = str(sep_name[1])
-            self.cont_mth = int(self.underlying[-4:]) + 200000 
+            if inst2exch(self.underlying) == 'CZCE':
+                self.cont_mth = int(self.underlying[-3:]) + 201000
+            else:
+                self.cont_mth = int(self.underlying[-4:]) + 200000
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
             self.product = self.product[:-4]
         prod_info = mysqlaccess.load_product_info(self.product)

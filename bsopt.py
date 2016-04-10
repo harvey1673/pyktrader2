@@ -15,7 +15,7 @@ def pnorm(x):
     scipy.stats.norm.pdf(x)
 
 def d1(Spot, Strike, Vol, Texp, Rd, Rf ):
-    retrun (log(Spot/Strike) + (Rf - Rd + 0.5* Vol**2) * Texp)/(Vol*sqrt(Texp))
+    return (log(Spot/Strike) + (Rf - Rd + 0.5* Vol**2) * Texp)/(Vol*sqrt(Texp))
 
 def d2(Spot, Strike, Vol, Texp, Rd, Rf ):
     return d1(Spot, Strike, Vol, Texp, Rd, Rf ) - Vol*sqrt(Texp)
@@ -33,9 +33,9 @@ def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rf, Rd):
     res = {}
 
     if IsCall:
-        res['Price'] = S * exp(-rd*Texp)* x1 - K * exp(-rf*Texp) * x2
+        res['Price'] = S * exp(-Rd*Texp)* x1 - K * exp(-Rf*Texp) * x2
         res['Delta'] = x1 * exp(-Rd*Texp)
-    elif CallPut == 'P':
+    else:
         res['Price'] = K * exp(-Rf*Texp) * (1 - x2) - S * exp(-Rd*Texp) * (1 - x1)
         res['Delta'] = (x1  - 1) * exp(-Rd*Texp)
     res['Vega'] = S * sqrt(Texp) * y * exp(-Rd*Texp)
@@ -46,20 +46,19 @@ def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
     FA = F1/(F2+K)
     Sigma = sqrt(Sigma1**2 + (Sigma2*F2/(F2+K))**2 - \
                        2*Corr*Sigma1*Sigma2*F2/(F2+K))
-    d1 = (numpy.log(FA) + 0.5* Sigma**2 * T)/(Sigma*sqrt(Texp))
+    d1 = (numpy.log(FA) + 0.5* Sigma**2 * Texp)/(Sigma*sqrt(Texp))
     d2 = d1 - Sigma*sqrt(Texp)
     x1 = scipy.stats.norm.cdf(d1)
     x2 = scipy.stats.norm.cdf(d2)
+    res = {}
     if IsCall:
         res['Price'] = (F2+K)*(FA * x1 - x2) * exp(-r*Texp)
     else:
         res['Price'] = (F2+K)*((1 - x2) - FA*(1 - x1)) * exp(-r*Texp)
-
     return res
 
 def BSOpt( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
     'Standard Black-Scholes European vanilla pricing.'
-
     if Strike <= 1e-12 * Spot:
         if IsCall:
             return Spot * exp( -Rf * Texp )
@@ -180,7 +179,7 @@ def BSImpVolNormal( IsCall, Fwd, Strike, Texp, Rd, Price ):
     '''Calculates the normal-model implied vol to match the option price.'''
 
     def ArgFunc( Vol ):
-        PriceCalc = BSOptFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd )
+        PriceCalc = BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd )
         return PriceCalc - Price
 
     Vol = brenth( ArgFunc, 0.0000001, Fwd )
@@ -306,13 +305,13 @@ def WhaleyPremium( IsCall, Fwd, Strike, Vol, Texp, Df, Tr ):
         if Phi == 1:
             q2=(1.+sqrt(1.+4.*k))/2.
             def EarlyExerBdry( eeb ):
-                x = D*BSOptFwd(True,eeb,K,Vol,T) + (1.-D*cnorm(fd1(eeb,K,Vol,T)))*eeb/q2 - eeb + K
+                x = D*BSFwd(True,eeb,K,Vol,T) + (1.-D*cnorm(fd1(eeb,K,Vol,T)))*eeb/q2 - eeb + K
                 return x
 
-            eeBdry = D*BSOptFwd(True,Fwd,K,Vol,T) + (1.-D*cnorm(fd1(Fwd,K,Vol,T)))*Fwd/q2 + K
+            eeBdry = D*BSFwd(True,Fwd,K,Vol,T) + (1.-D*cnorm(fd1(Fwd,K,Vol,T)))*Fwd/q2 + K
             eeBdry = newton(EarlyExerBdry,eeBdry)
             if Fwd >= eeBdry:
-                eePrem = -D*BSOptFwd(True,Fwd,K,Vol,T) + Fwd - K
+                eePrem = -D*BSFwd(True,Fwd,K,Vol,T) + Fwd - K
                 earlyExercise = True
             else:
                 A2=(eeBdry/q2)*(1.-D*cnorm(fd1(eeBdry,K,Vol,T)))
@@ -321,13 +320,13 @@ def WhaleyPremium( IsCall, Fwd, Strike, Vol, Texp, Df, Tr ):
         elif Phi == -1:
             q1=(1.-sqrt(1.+4.*k))/2.
             def EarlyExerBdry( eeb ):
-                x = D*BSOptFwd(False,eeb,K,Vol,T) - (1.-D*cnorm(-fd1(eeb,K,Vol,T)))*eeb/q1 + eeb - K
+                x = D*BSFwd(False,eeb,K,Vol,T) - (1.-D*cnorm(-fd1(eeb,K,Vol,T)))*eeb/q1 + eeb - K
                 return x
 
-            eeBdry = -D*BSOptFwd(False,Fwd,K,Vol,T) + (1.-D*cnorm(-fd1(Fwd,K,Vol,T)))*Fwd/q1 + K
+            eeBdry = -D*BSFwd(False,Fwd,K,Vol,T) + (1.-D*cnorm(-fd1(Fwd,K,Vol,T)))*Fwd/q1 + K
             eeBdry = newton(EarlyExerBdry,eeBdry)
             if Fwd <= eeBdry:
-                eePrem = -D*BSOptFwd(False,Fwd,K,Vol,T) + K - Fwd
+                eePrem = -D*BSFwd(False,Fwd,K,Vol,T) + K - Fwd
                 earlyExercise = True
             else:
                 A1=-(eeBdry/q1)*(1.-D*cnorm(-fd1(eeBdry,K,Vol,T)))
@@ -351,9 +350,9 @@ def WhaleyDelta( IsCall, Spot, Fwd, Strike, Vol, Texp, Df, Tr, D,\
     Blip = .0001*Fwd
 
     def ECall(Fwd, Strike, Vol, Texp, Df):
-        return Df * BSOptFwd(True, Fwd, Strike, Vol, Texp)
+        return Df * BSFwd(True, Fwd, Strike, Vol, Texp)
     def EPut(Fwd, Strike, Vol, Texp, Df):
-        return Df * BSOptFwd(False, Fwd, Strike, Vol, Texp)
+        return Df * BSFwd(False, Fwd, Strike, Vol, Texp)
 
     def ACall(Fwd, Strike, Vol, Texp, Df, Tr, D):
         return ECall(Fwd, Strike, Vol, Texp, Df)+WhaleyPremium(True, Fwd, Strike, Vol, Texp, D, Texp)[1] * Df/D
@@ -420,26 +419,26 @@ def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
     if Phi == 1:
         q2=(-(beta-1.)+sqrt((beta-1.)**2+4.*k))/2.
         def EarlyExerBdry( eeb ):
-            x = D*BSOptFwd(True,eeb,K,Vol,T) + (1.-Dq*cnorm(fd1(eeb,K,Vol,T)))*eeb/q2 - eeb + K
+            x = D*BSFwd(True,eeb,K,Vol,T) + (1.-Dq*cnorm(fd1(eeb,K,Vol,T)))*eeb/q2 - eeb + K
             return x
 
-        eeBdry = D*BSOptFwd(True,Fwd,K,Vol,T) + (1.-Dq*cnorm(fd1(Fwd,K,Vol,T)))* Fwd/q2 + K
+        eeBdry = D*BSFwd(True,Fwd,K,Vol,T) + (1.-Dq*cnorm(fd1(Fwd,K,Vol,T)))* Fwd/q2 + K
         eeBdry = newton(EarlyExerBdry,eeBdry)
         if Fwd >= eeBdry:
-            eePrem = -D*BSOptFwd(True,Fwd,K,Vol,T) + Fwd - K
+            eePrem = -D*BSFwd(True,Fwd,K,Vol,T) + Fwd - K
         else:
             A2=(eeBdry/q2)*(1.-Dq*cnorm(fd1(eeBdry,K,Vol,T)))
             eePrem = A2 * pow(Fwd/eeBdry,q2)
     elif Phi == -1:
         q1=(-(beta-1.)-sqrt((beta-1.)**2+4.*k))/2.
         def EarlyExerBdry( eeb ):
-            x = D*BSOptFwd(False,eeb,K,Vol,T) - (1.-Dq*cnorm(-fd1(eeb,K,Vol,T)))*eeb/q1 + eeb - K
+            x = D*BSFwd(False,eeb,K,Vol,T) - (1.-Dq*cnorm(-fd1(eeb,K,Vol,T)))*eeb/q1 + eeb - K
             return x
 
-        eeBdry = -D*BSOptFwd(False,Fwd,K,Vol,T) + (1.-Dq*cnorm(-fd1(Fwd,K,Vol,T)))*Fwd/q1 + K
+        eeBdry = -D*BSFwd(False,Fwd,K,Vol,T) + (1.-Dq*cnorm(-fd1(Fwd,K,Vol,T)))*Fwd/q1 + K
         eeBdry = brentq(EarlyExerBdry,1e-12, K)
         if Fwd <= eeBdry:
-            eePrem = -D*BSOptFwd(False,Fwd,K,Vol,T) + K - Fwd
+            eePrem = -D*BSFwd(False,Fwd,K,Vol,T) + K - Fwd
         else:
             A1=-(eeBdry/q1)*(1.-Dq*cnorm(-fd1(eeBdry,K,Vol,T)))
             eePrem = A1 * pow(Fwd/eeBdry,q1)
@@ -451,7 +450,7 @@ def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
 def BAWAmOptPricer( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
     prem = BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd )
     D    = exp( -rf * Texp)
-    Euro = D * BSOptFwd(IsCall, Fwd, Strike, Vol, Texp)
+    Euro = D * BSFwd(IsCall, Fwd, Strike, Vol, Texp)
     return Euro + prem
 
 def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rf, rd):
@@ -463,7 +462,7 @@ def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rf, rd):
         raise ValueError, 'maturity must be > 0'
 
     def f( vol ):
-        return Price - Df * BSOptFwd(IsCall, Fwd, Strike, vol, Texp) - BAWPremium(IsCall, Fwd, Strike, vol, Texp, rf, rd)
+        return Price - Df * BSFwd(IsCall, Fwd, Strike, vol, Texp) - BAWPremium(IsCall, Fwd, Strike, vol, Texp, rf, rd)
 
     Vol = brentq(f,0.001, 10.0)
 

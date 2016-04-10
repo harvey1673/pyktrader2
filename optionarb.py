@@ -3,7 +3,7 @@ import instrument
 from misc import *
 from strategy import *
 
-def get_option_map(underliers, cont_mths, strikes):
+def get_option_map(underliers, cont_mths, strikes, exch = ''):
     opt_map = {}
     for under, cmth, ks in zip(underliers, cont_mths, strikes):
         for otype in ['C', 'P']:
@@ -13,7 +13,10 @@ def get_option_map(underliers, cont_mths, strikes):
                 instID = under
                 if instID[:2] == "IF":
                     instID = instID.replace('IF', 'IO')
-                instID = instID + '-' + otype + '-' + str(strike)
+                if exch == 'CZCE':
+                    instID = instID + otype + str(strike)
+                else:
+                    instID = instID + '-' + otype + '-' + str(strike)
                 opt_map[key] = instID
     return opt_map
     

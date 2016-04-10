@@ -1,6 +1,12 @@
 import bsopt
 import copy
 import dateutil
+import pandas as pd
+import math
+import mysqlaccess
+from scipy.stats import norm
+from misc import *
+
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
 ITERATION_STEP = 0.001
@@ -22,7 +28,9 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
     for pidx in range(int(nlen/rehedge_period)):
         idx = pidx * rehedge_period
         nxt_idx = min((pidx + 1) * rehedge_period, nlen)
-        tau = (expiry - df.index[idx])/YEARLY_DAYS
+        if nxt_idx >= nlen -1:
+            break
+        tau = (expiry - df.index[idx]).days/YEARLY_DAYS
         opt_delta = delta_func(otype, df[column][idx], strike, vol, tau, rd, rf)
         CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
     return CF
@@ -39,7 +47,7 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
     rehedge_period = calib_input.get('rehedge_period', 1)
     fwd = df[column][0]
     is_dtime = calib_input.get('is_dtime', False)
-    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
+    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSOpt'))
 
     if expiry < df.index[-1]:
         raise ValueError, 'Expiry time must be no earlier than the end of the time series'
@@ -47,11 +55,11 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
     diff = 1000.0
     start_d = df.index[0]
     if is_dtime:
-        start_d = startD.date()
+        start_d = start_d.date()
     tau = (expiry - start_d).days/YEARLY_DAYS
     vol = ref_vol
     def func(x):
-        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, x, rehedge_period, column) - opt_payoff
+        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, rehedge_period, column) - opt_payoff
 
     while diff >= SOLVER_ERROR_EPSILON and numTries <= ITERATION_NUM:
         current = func(vol)
@@ -73,34 +81,28 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
     else :
         return vol
 
-def relative_date( ref_date, tenor):
-    nlen = len(tenor)
-    num = int(tenor[:-1])
-    
-    if tenor[-1] == 'm':
-        key = 'months'
-    elif tenor[-1] == 'y':
-        key = 'years'
-    elif tenor[-1] == 'w':
-        key = 'weeks'
-    elif tenor[-1] == 'd':
-        key = 'days'
-    input = { key: num }
-    return ref_date + dateutil.relativedelta.relativedelta(**input)
-            
+def bs_delta_to_ratio(delta, vol, texp):
+    ys = norm.ppf(delta)
+    return math.exp((ys - 0.5 * vol * math.sqrt(texp)) * vol * math.sqrt(texp))
+
 def realized_termstruct(option_input, data):
     is_dtime = data.get('is_dtime', False)
     column = data.get('data_column', 'close')
-    term_tenor = data.get('term_tenor', '1m')
+    xs = data.get('xs', [0.5])
+    xs_cols = data.get('xs_names', ['atm'])
+    xs_func = data.get('xs_func', 'bs_delta_to_ratio')
+    xs_func = eval(xs_func)
+    term_tenor = data.get('term_tenor', '-1m')
     df = data['dataframe']
-    calib_input = {'rehedge_period', data.get('rehedge_period', 1), }
-                    
+    calib_input = {}
+    calib_input['rehedge_period'] = data.get('rehedge_period', 1)
     expiry = option_input['expiry']
     otype = option_input.get('otype', 1)
-    strike = option_input['strike']
+    ref_vol = option_input.get('ref_vol', 0.5)
     rd = option_input['rd']
-    rf = option_input.get('rf', rd)    
-    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
+    rf = option_input.get('rf', rd)
+    end_vol = option_input.get('end_vol', 0.0)
+    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSOpt'))
     if is_dtime:
         datelist = df['date']
         dexp = expiry.date()
@@ -111,139 +113,68 @@ def realized_termstruct(option_input, data):
     datelist = datelist[datelist <= dexp]    
     end_d  = datelist[-1]
     final_value = 0.0
-    vol_ts = pd.Series()
+    vol_ts = pd.DataFrame(columns = xs )
+    roll_idx = 0
     while end_d > datelist[0]:
-        start_d = relative_date(end_d, term_tenor)
+        roll_idx += 1
+        start_d = day_shift(end_d, term_tenor)
         sub_df = xdf[(datelist <= end_d) & (datelist > start_d)]
         if len(sub_df) < 2:
             break
-        if end_vol > 0:
-            tau = (expiry - datelist[-1]).days/YEARLY_DAYS
-            final_value = pricer_func(otype, sub_df[column][-1], strike, end_vol, tau, rd, rf)
-            ref_vol = end_vol
-        elif end_vol == 0:
-            if otype:
-                final_value = max((sub_df[column][-1] - strike), 0)
-            else:
-                final_value = max((strike - sub_df[column][-1]), 0)
-            ref_vol = 0.5
-        elif end_vol == None:
-            raise ValueError, 'no vol is found to match PnL'
-        calib_input['ref_vol'] = ref_vol
-        calib_input['opt_payoff'] = final_value
-        vol = realized_vol(sub_df, option_input, calib_input, column)
-        vol_ts[sub_df.index[0]] = vol
-        end_vol = vol
-        end_d = start_d
+        vols = []
+        for idx, x in enumerate(xs):
+            strike = sub_df[column][0]
+            texp = (expiry - start_d).days/YEARLY_DAYS
+            if idx > 0:
+                strike *= xs_func(xs[idx], vols[0], texp)
+            option_input['strike'] = strike
+            if end_vol > 0:
+                tau = (expiry - end_d).days/YEARLY_DAYS
+                final_value = pricer_func(otype, sub_df[column][-1], strike, end_vol, tau, rd, rf)
+                ref_vol = end_vol
+            elif end_vol == 0:
+                if otype:
+                    final_value = max((sub_df[column][-1] - strike), 0)
+                else:
+                    final_value = max((strike - sub_df[column][-1]), 0)
+            elif end_vol == None:
+                raise ValueError, 'no vol is found to match PnL'
+            calib_input['ref_vol'] = ref_vol
+            calib_input['opt_payoff'] = final_value
+            vol = realized_vol(sub_df, option_input, calib_input, column)
+            vols.append(vol)
+            end_vol = vol
+            end_d = start_d
+        tenor_str = str(roll_idx * int(term_tenor[-2])) + term_tenor[-1]
+        vol_ts[tenor_str] = vols
     return vol_ts
 
-def BS_VolSurf_TermStr(tsFwd, moneyness, expiryT, rd = 0.0, rf = 0.0, endVol = 0.0, termTenor="1m", rehedge_period ="1d", exceptionDateList=[]):
-    ts =curve.Curve()
-    rptTenor = '-' + termTenor
+def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
+    cont_mth, exch = mysqlaccess.prod_main_cont_exch(prodcode)
+    contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
+    exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
+    data = {'is_dtime': False,
+            'data_column': 'close',
+            'xs': [0.5],
+            'xs_names': ['atm'],
+            'xs_func': 'bs_delta_to_ratio',
+            'rehedge_period': 1,
+            'term_tenor': '-1m',
+            }
+    option_input = {'otype': 1,
+                    'rd': 0.0,
+                    'rf': 0.0,
+                    'end_vol': 0.0,
+                    'ref_vol': 0.3,
+                    'pricer_func': 'bsopt.BSOpt',
+                    'delta_func': 'bsopt.BSDelta',
+                    }
+    for cont, expiry in zip(contlist, exp_dates):
+        p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
+        d_start = day_shift(expiry, p_str)
+        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry, database = 'hist_data')
+        option_input['expiry'] = expiry
+        data['dataframe'] = df
+        vol_df = realized_termstruct(option_input, data)
+        print vol_df
 
-
-def BS_ConstDelta_VolSurf(tsFwd, moneynessList, expiryT, rd = 0.0, rf = 0.0, exceptionDateList=[]):
-    ts = curve.Curve()
-    rptTenor = '-1m'
-    rehedge_period = '1d'
-    IsCall = 1
-
-    for d in tsFwd.Dates():
-        if d not in exceptionDateList:
-            ts[d] = tsFwd[d]
-
-    DateList = [x for x in ts.Dates() if x not in exceptionDateList]
-    TSstart = DateList[0]
-    TSend = DateList[-1]
-
-    date = copy.copy(TSend)
-    endDate = tenor.RDateAdd('1d', date)
-    startDate = tenor.RDateAdd(rptTenor, date, exceptionDateList)
-
-    volTS = curve.GRCurve()
-    while startDate >= TSstart:
-        subTS = ts.Slice(startDate, endDate)
-        vol = []
-        if len(subTS) < 2:
-            print 'No data in time series further than ', startDate
-            break
-
-        if 0.0 in subTS.Values():
-            print 'Price is zero at some date from ', startDate, ' to ', endDate
-            break
-
-        # for the moment, consider ATM vol
-        for m in moneynessList:
-            strike = subTS.Values()[0] * m
-            if IsCall:
-                finalValue = max((subTS.Values()[-1] - strike), 0)
-            else:
-                finalValue = max((strike - subTS.Values()[-1]), 0)
-
-        vol += [BSrealizedVol(IsCall, subTS, strike, expiryT, rd, rf, finalValue, rehedge_period, exceptionDateList)]
-        if None in vol:
-            print 'no vol is found to match PnL- strike:'+ str(m) + ' expiry:' + expiryT
-
-        volTS[startDate] = vol
-        startDate = tenor.RDateAdd(rptTenor, startDate, exceptionDateList)
-
-    return volTS
-
-def Spread_ATMVolCorr_TermStr(ts1, ts2, op, expiryT, r1 = 0, r2 = 0, termTenor="1m", exceptionDateList=[]):
-    if op != '*' and op!= '/':
-        raise ValueError, 'Operator has to be either * or / for Spread_ATMVolCorr_TermStr'
-
-    dates = [ d for d in ts1.Dates() if d in ts2.Dates() and d <= expiryT]
-    F1 = curve.Curve()
-    F2 = curve.Curve()
-    HR = curve.Curve()
-    for d in dates:
-        if ts1[d] > 0 and ts2[d]>0 :
-            F1[d] = ts1[d]
-            F2[d] = ts2[d]
-            if op == '/':
-                HR[d] = F1[d]/F2[d]
-                r = r1 - r2
-            else:
-                HR[d] = F1[d] * F2[d]
-                r = r1 + r2
-
-    IsCall = 1
-    HRVol= BS_ATMVol_TermStr(IsCall, HR, expiryT, rd = r, rf = 0.0, endVol = 0.0, termTenor=termTenor, rehedge_period ="1d", exceptionDateList=exceptionDateList)
-    VolF1= BS_ATMVol_TermStr(IsCall, F1, expiryT, rd = r1, rf = 0.0, endVol = 0.0, termTenor=termTenor, rehedge_period ="1d", exceptionDateList=exceptionDateList)
-    VolF2= BS_ATMVol_TermStr(IsCall, F2, expiryT, rd = r2, rf = 0.0, endVol = 0.0, termTenor=termTenor, rehedge_period ="1d", exceptionDateList=exceptionDateList)
-
-    corr = curve.Curve()
-    for d in HRVol.Dates():
-        if op == '/':
-            corr[d] = (VolF1[d]**2 + VolF2[d]**2 -HRVol[d]**2)/(2* VolF1[d] * VolF2[d])
-        else:
-            corr[d] = (HRVol[d]**2 - VolF1[d]**2 - VolF2[d]**2)/(2* VolF1[d] * VolF2[d])
-
-    return HRVol, corr, VolF1, VolF2
-
-def Crack_ATMVol_TermStr(tsList, weights, expiryT, termTenor="1m", exceptionDateList=[]):
-
-    dates = []
-    if len(tsList) != len(weights):
-        raise ValueError, 'The number of elements of weights and time series should be equal'
-
-    for ts in tsList:
-        if dates == []:
-            dates = ts.Dates()
-        else:
-            dates = [ d for d in ts.Dates() if d in dates]
-
-    Crk = curve.Curve()
-    undFwd = curve.Curve()
-
-    for d in dates:
-        Fwd = [ts[d] for ts in tsList]
-        Crk[d] = sum([f*w for (f,w) in zip(Fwd, weights)])
-        undFwd[d] = tsList[0][d]
-
-    IsCall = 1
-    CrkVol = BS_ATMVol_TermStr(IsCall, Crk, expiryT, rd = 0, rf = 0.0, endVol = 0.0, termTenor=termTenor, rehedge_period ="1d", exceptionDateList=exceptionDateList)
-    undVol = BS_ATMVol_TermStr(IsCall, undFwd, expiryT, rd = 0, rf = 0.0, endVol = 0.0, termTenor=termTenor, rehedge_period ="1d", exceptionDateList=exceptionDateList)
-
-    return CrkVol, undVol
