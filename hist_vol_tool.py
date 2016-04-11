@@ -113,7 +113,7 @@ def realized_termstruct(option_input, data):
     datelist = datelist[datelist <= dexp]    
     end_d  = datelist[-1]
     final_value = 0.0
-    vol_ts = pd.DataFrame(columns = xs )
+    vol_ts = pd.DataFrame(columns = xs_cols )
     roll_idx = 0
     while end_d > datelist[0]:
         roll_idx += 1
@@ -146,35 +146,38 @@ def realized_termstruct(option_input, data):
             end_vol = vol
             end_d = start_d
         tenor_str = str(roll_idx * int(term_tenor[-2])) + term_tenor[-1]
-        vol_ts[tenor_str] = vols
+        vol_ts.ix[tenor_str, :] = vols
     return vol_ts
 
 def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
     cont_mth, exch = mysqlaccess.prod_main_cont_exch(prodcode)
     contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
+    print contlist
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
     data = {'is_dtime': False,
             'data_column': 'close',
-            'xs': [0.5],
-            'xs_names': ['atm'],
+            'xs': [0.5, 0.25, 0.75],
+            'xs_names': ['atm', 'd25', 'd75'],
             'xs_func': 'bs_delta_to_ratio',
             'rehedge_period': 1,
-            'term_tenor': '-1m',
+            'term_tenor': tenor,
             }
     option_input = {'otype': 1,
                     'rd': 0.0,
                     'rf': 0.0,
                     'end_vol': 0.0,
-                    'ref_vol': 0.3,
+                    'ref_vol': 0.2,
                     'pricer_func': 'bsopt.BSOpt',
                     'delta_func': 'bsopt.BSDelta',
                     }
     for cont, expiry in zip(contlist, exp_dates):
+        if expiry > end_d:
+            break
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
         d_start = day_shift(expiry, p_str)
         df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry, database = 'hist_data')
         option_input['expiry'] = expiry
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
-        print vol_df
+        print cont, expiry, vol_df
 
