@@ -181,3 +181,18 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry, vol_df
 
+def variance_ratio(ts, freqs):
+    data = ts.values
+    nlen = len(data)
+    res = {'n': [], 'ln':[]}
+    var1 = np.var(data[1:] - data[:-1])
+    lnvar1 = np.var(np.log(data[1:]/data[:-1]))
+    for freq in freqs:
+        nrow = nlen/freq
+        nsize = freq * nrow
+        shaped_arr = np.reshape(data[:nsize], (nrow, freq))
+        diff = shaped_arr[1:,freq-1] - shaped_arr[:-1,freq-1]
+        res['n'].append(np.var(diff)/freq/var1)
+        ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
+        res['ln'].append(np.var(ln_diff)/freq/lnvar1)
+    return res
