@@ -441,6 +441,7 @@ class Agent(MktDataMixin):
             daily_end = self.scur_day
             self.day_data[inst] = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end)
             df = self.day_data[inst]
+            print inst
             if len(df) > 0:
                 self.instruments[inst].price = df['close'][-1]
                 self.instruments[inst].last_update = 0

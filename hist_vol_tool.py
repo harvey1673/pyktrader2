@@ -5,6 +5,7 @@ import pandas as pd
 import math
 import mysqlaccess
 from scipy.stats import norm
+import numpy as np
 from misc import *
 
 SOLVER_ERROR_EPSILON = 1e-5
