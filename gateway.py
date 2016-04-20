@@ -1,5 +1,5 @@
 # encoding: UTF-8
-
+import pandas as pd
 import time
 import os
 import instrument
@@ -28,6 +28,7 @@ class Gateway(object):
         self.positions = {}
         self.instruments = []      # 已订阅合约代码
         self.eod_flag = False
+        self.eod_report = True
         self.account_info = {'available': 0,
                             'locked_margin': 0,
                             'used_margin': 0,
@@ -36,7 +37,8 @@ class Gateway(object):
                             'pnl_total': 0,
                             'yday_pnl': 0,
                             'tday_pnl': 0,
-                            }							
+                            }
+        self.pl_by_product = {}
         self.order_stats = {'total_submit': 0, 'total_failure': 0, 'total_cancel':0 }
         self.order_constraints = {	'total_submit': 2000, 'total_cancel': 2000, 'total_failure':500, \
                                     'submit_limit': 200,  'cancel_limit': 200,  'failure_limit': 200 }
@@ -44,8 +46,22 @@ class Gateway(object):
     def initialize(self):
         pass
 
+    def process_eod_report(self, tday):
+        df = pd.DataFrame.from_dict( self.pl_by_product, orient='index' )
+        cols = ['yday_mark', 'tday_mark', 'yday_pos', 'yday_pnl', 'new_long', 'new_long_avg', 'new_short', 'new_short_avg', 'tday_pnl', 'used_margin', 'locked_margin']
+        df = df[cols]
+        file_prefix = self.file_prefix
+        logfile = file_prefix + 'PNL_attribution_' + tday.strftime('%y%m%d')+'.csv'
+        if os.path.isfile(logfile):
+            return False
+        else:
+            df.to_csv(logfile, sep=',')
+            return True
+            
     def day_finalize(self, tday):
         self.save_local_positions(tday)
+        if self.eod_report:
+            self.process_eod_report()
         eod_pos = {}
         for inst in self.positions:
             pos = self.positions[inst]
@@ -224,16 +240,24 @@ class Gateway(object):
             under_price = 0.0
             if (inst.ptype == instrument.ProductType.Option):
                 under_price = self.agent.instruments[inst.underlying].price
-            locked_margin += pos.locked_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
-            locked_margin += pos.locked_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price) 
-            used_margin += pos.curr_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
-            used_margin += pos.curr_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price)
-            yday_pnl += (pos.pos_yday.long - pos.pos_yday.short) * (inst.price - inst.prev_close) * inst.multiple
-            tday_pnl += pos.tday_pos.long * (inst.price-pos.tday_avp.long) * inst.multiple
-            tday_pnl -= pos.tday_pos.short * (inst.price-pos.tday_avp.short) * inst.multiple            
-        self.account_info['locked_margin'] = locked_margin
-        self.account_info['used_margin'] = used_margin
-        self.account_info['pnl_total'] = yday_pnl + tday_pnl
+            self.pl_by_product[instID] = {}
+            self.pl_by_product[instID]['yday_mark'] = inst.prev_close
+            self.pl_by_product[instID]['tday_mark'] = inst.price
+            self.pl_by_product[instID]['new_long']  = pos.tday_pos.long
+            self.pl_by_product[instID]['new_short'] = pos.tday_pos.short
+            self.pl_by_product[instID]['new_long_avg'] = pos.tday_avp.long
+            self.pl_by_product[instID]['new_short_avg'] = pos.tday_avp.short
+            self.pl_by_product[instID]['locked_margin'] =  pos.locked_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
+            self.pl_by_product[instID]['locked_margin'] += pos.locked_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price) 
+            self.pl_by_product[instID]['used_margin'] =  pos.curr_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
+            self.pl_by_product[instID]['used_margin'] += pos.curr_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price)
+            self.pl_by_product[instID]['yday_pos'] = pos.pos_yday.long - pos.pos_yday.short
+            self.pl_by_product[instID]['yday_pnl'] = (pos.pos_yday.long - pos.pos_yday.short) * (inst.price - inst.prev_close) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] =  pos.tday_pos.long * (inst.price-pos.tday_avp.long) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] -= pos.tday_pos.short * (inst.price-pos.tday_avp.short) * inst.multiple            
+        for key in ['locked_margin', 'used_margin', 'yday_pnl', 'tday_pnl']:
+            self.account_info[key] = sum([self.pl_by_product[instID][key] for instID in self.positions])
+        self.account_info['pnl_total'] = self.account_info['yday_pnl'] + self.account_info['tday_pnl']
         self.account_info['curr_capital'] = self.account_info['prev_capital'] + self.account_info['pnl_total']
         self.account_info['available'] = self.account_info['curr_capital'] - self.account_info['locked_margin']
 
