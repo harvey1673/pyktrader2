@@ -196,3 +196,23 @@ def variance_ratio(ts, freqs):
         ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
         res['ln'].append(np.var(ln_diff)/freq/lnvar1)
     return res
+
+def price_stats(df):
+    stats  = {}
+    stats['20H'] = max(df['high'][-20:])
+    stats['20H'] = min(df['low'][-20:])
+    
+
+def validate_db_data(tday, filter = False):
+    all_insts = filter_main_cont(tday, filter)
+    data_count = {}
+    inst_list = {'min': [], 'daily': [] }
+    for instID in all_insts:
+        df = mysqlaccess.load_daily_data_to_df('fut_daily', instID, tday, tday)
+        if len(df) <= 0:
+            inst_list['daily'].append(instID)
+        df = mysqlaccess.load_min_data_to_df('fut_min', instID, tday, tday, minid_start=300, minid_end=2115, database='blueshale')
+        if len(df) < 100:
+            output = instID + ':' + str(len(df))
+            inst_list['min'].append(output)
+    print inst_list
