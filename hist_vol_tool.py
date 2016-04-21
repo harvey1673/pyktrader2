@@ -2,6 +2,7 @@ import bsopt
 import copy
 import dateutil
 import pandas as pd
+import numpy as np
 import math
 import mysqlaccess
 from scipy.stats import norm

@@ -15,7 +15,6 @@ class DTTrader(Strategy):
         self.last_min_id = [0] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
-        self.update_trade_unit()
 
     def initialize(self):
         self.load_state()
@@ -92,7 +91,7 @@ class DTTrader(Strategy):
             buy_trig  += self.factors[idx] * c_rng
         elif self.cur_ma[idx] < t_open:
             sell_trig -= self.factors[idx] * c_rng
-        buy_trig = min( self.agent.instruments[inst].up_limit - self.tick_base[idx] * self.price_limit_buffer, bug_trig )
+        buy_trig = min( self.agent.instruments[inst].up_limit - self.tick_base[idx] * self.price_limit_buffer, buy_trig )
         sell_trig = max( self.agent.instruments[inst].down_limit + self.tick_base[idx] * self.price_limit_buffer, sell_trig )
 
         if (min_id >= self.last_min_id[idx]):
@@ -122,6 +121,4 @@ class DTTrader(Strategy):
             self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
             self.status_notifier(msg)
             self.save_state()
-        
-    def update_trade_unit(self):
-        self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
+

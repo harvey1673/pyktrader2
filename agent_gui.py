@@ -116,7 +116,6 @@ class StratGui(object):
                         ent.insert(0, value)
                     elif field in self.status_fields:
                         self.stringvars[under_key][field].set(keepdigit(value, 4))
-        return
         
     def set_params(self):
         params = {}
@@ -137,12 +136,10 @@ class StratGui(object):
                     value = str2type(value, vtype)
                     params[field].append(value)
         self.app.set_strat_params(self.name, params)
-        return
 
     def OnFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))        
-        pass
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
             
     def set_frame(self, root):
         self.canvas = tk.Canvas(root)
@@ -166,6 +163,8 @@ class StratGui(object):
         refresh_btn.grid(row=row_id, column=4, sticky="ew")
         recalc_btn = ttk.Button(self.lblframe, text='Recalc', command=self.recalc)
         recalc_btn.grid(row=row_id, column=5, sticky="ew")
+        save_btn = ttk.Button(self.lblframe, text='SaveConfig', command=self.save_config)
+        save_btn.grid(row=row_id, column=6, sticky="ew")
         row_id += 1
         for idx, field in enumerate(self.shared_fields):
             lbl = ttk.Label(self.lblframe, text = field, anchor='w', width = 8)
@@ -213,21 +212,24 @@ class StratGui(object):
         self.stringvars = stringvars        
         #self.lblframe.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         self.get_params()
-        return
     
     def recalc(self):
         self.app.run_strat_func(self.name, 'initialize')
 
+    def save_config(self):
+        self.app.run_strat_func(self.name, 'save_config')
+
 class DTStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['RunFlag', 'NumTick', 'OrderType', 'MinRng', 'MaWin', 'TradeUnit', 'Lookbacks', 'Ratios', 'CloseTday']
-        self.status_fields = ['TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
-        self.shared_fields = ['NumTick', 'OrderType', 'MaWin']
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday']
+        self.status_fields = ['TradeUnit', 'TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int', 
-                            'Ratios': 'floatlist',
+                            'Ratios': 'float',
+                            'Factors': 'float',
                             'CloseTday': 'bool',
                             'TdayOpen': 'float',
                             'CurrPrices': 'float',
@@ -236,14 +238,17 @@ class DTStratGui(StratGui):
                             'NumTick': 'int', 
                             'MaWin': 'int',
                             'OrderType': 'str',
-                            'MinRng': 'float'}
+                            'MinRng': 'float',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int'}
 
 class DTSplitDChanStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['RunFlag', 'NumTick', 'OrderType', 'MinRng', 'Channels', 'TradeUnit', 'Lookbacks', 'Ratios', 'CloseTday']
-        self.status_fields = ['TdayOpen', 'OpenIdx', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['NumTick', 'OrderType']
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday']
+        self.status_fields = ['TdayOpen', 'OpenIdx', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int',
@@ -258,7 +263,11 @@ class DTSplitDChanStratGui(StratGui):
                             'NumTick': 'int',
                             'Channels': 'int',
                             'OrderType': 'str',
-                            'MinRng': 'float'}
+                            'MinRng': 'float',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
 
 class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
@@ -430,7 +439,6 @@ class OptVolgridGui(object):
             self.curr_insts[inst]['BidIV'] = bvol
             self.root.stringvars[inst]['AskIV'].set(keepdigit(avol,4))
             self.curr_insts[inst]['AskIV'] = avol
-        return
     
     def calib_volgrids(self):
         pass
@@ -476,13 +484,10 @@ class OptVolgridGui(object):
                                     factor = 100
                                 txt = self.curr_insts[inst][field]*factor
                             tk.Label(self.pos_frame, text = keepdigit(txt,3)).grid(row=idy, column=idx)
-        #pos_win.pack()
-        return
         
     def OnPosFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
-        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))        
-        pass
+        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
     
     def set_frame(self, root):
         self.canvas = tk.Canvas(root)
@@ -541,12 +546,10 @@ class OptVolgridGui(object):
                             tk.Label(self.frame, textvariable = self.root.stringvars[inst2][instlbl], padx=10).grid(row=row_id+1+idy, column=col_id+2*len(inst_labels)-idx)
             row_id = row_id + len(strikes) + 2
         self.get_T_table()
-        return
 
     def OnFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))        
-        pass
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
     
 class Gui(tk.Tk):
     def __init__(self, app = None):
@@ -594,8 +597,7 @@ class Gui(tk.Tk):
     
         for strat_name in self.app.agent.strategies:
             strat = self.app.agent.strategies[strat_name]
-            if strat.__class__.__name__ in ['DTTrader', 'DTSplitTrader', \
-                                            'DTBarTrader']:
+            if strat.__class__.__name__ in ['DTTrader']:
                 self.strat_gui[strat_name] = DTStratGui(strat, app, self)
             if strat.__class__.__name__ in ['DTSplitDChanFilter']:
                 self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
@@ -671,8 +673,7 @@ class Gui(tk.Tk):
 
     def OnPosFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
-        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))        
-        pass
+        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
     
     def qry_agent_inst(self):
         instfield = 'QryInst'
@@ -784,7 +785,6 @@ class Gui(tk.Tk):
             vtype = self.field_types[field]
             params[field] = str2type(value, vtype)
         self.app.set_agent_params(params)
-        pass
     
     def get_agent_params(self, fields):
         params = self.app.get_agent_params(fields)
@@ -798,7 +798,6 @@ class Gui(tk.Tk):
             elif field in self.stringvars:
                 var = self.stringvars[field]
                 var.set(keepdigit(value,4))
-        return
         
     def refresh_agent_status(self):
         pass
@@ -816,8 +815,6 @@ class Gui(tk.Tk):
     def onExit(self):
         self.app.exit_agent()
         self.destroy()
-        #self.quit()
-        return
         
 class MainApp(object):
     def __init__(self, name, tday, config_file, agent_class = 'agent.Agent', master = None):
@@ -935,7 +932,6 @@ class MainApp(object):
             var = field2variable(field)
             value = params[field]
             setattr(self.agent, var, value)
-        return
 
     def set_gateway_params(self, gway, params):
         gateway = self.agent.gateways[gway]
@@ -943,7 +939,6 @@ class MainApp(object):
             var = field2variable(field)
             value = params[field]
             setattr(gateway, var, value)
-        return
 
     def get_strat_params(self, strat_name, fields):
         params = {}
@@ -966,12 +961,10 @@ class MainApp(object):
 
     def run_agent_func(self, func_name, params):
         getattr(self.agent, func_name)(*params)
-        return 
 
     def run_gateway_func(self, gway, func_name, params):
         gateway = self.agent.gateways[gway]
         getattr(gateway, func_name)(*params)
-        return
 
     def exit_agent(self):
         if self.agent != None:

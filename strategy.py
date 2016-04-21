@@ -4,10 +4,9 @@ from base import *
 from misc import *
 import data_handler
 import order as order
-import math
-import logging
 import datetime
 import csv
+import json
 import os
 
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
@@ -155,6 +154,7 @@ class Strategy(object):
         self.num_exits   = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
         self.run_flag = [1] * num_assets
+        self.update_trade_unit()
 
     def save_config(self):
         config = {}
@@ -167,7 +167,7 @@ class Strategy(object):
             for key in self.asset_params:
                 asset[key] = d[key][idx]
             config['assets'].append(asset)
-        fname = self.folder + '_config.json'
+        fname = self.folder + 'config.json'
         with open(fname, 'w') as ofile:
             json.dump(config, ofile)        
     
@@ -207,7 +207,7 @@ class Strategy(object):
 
     def initialize(self):
         self.load_state()
-        return
+        self.update_trade_unit()
 
     def on_trade(self, etrade):
         save_status = False
@@ -389,7 +389,7 @@ class Strategy(object):
         return
 
     def update_trade_unit(self):
-        pass
+        self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
 
     def status_notifier(self, msg):
         self.logger.info(msg)
