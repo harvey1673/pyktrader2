@@ -1,11 +1,10 @@
 #-*- coding:utf-8 -*-
-#from base import *
 from misc import *
 from strategy import *
  
 class DTTrader(Strategy):
-    common_params =  dict({'price_limit_buffer': 5}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, 'daily_close': False, 'factors': 0.0 }, **Strategy.asset_params)
+    common_params =  dict({'price_limit_buffer': 5, 'pos_scaler': 100.0}, **Strategy.common_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, 'daily_close': False, 'factors': 0.0, 'alloc_w': 0.01}, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -16,6 +15,7 @@ class DTTrader(Strategy):
         self.last_min_id = [0] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
+        self.update_trade_unit()
 
     def initialize(self):
         self.load_state()
@@ -35,15 +35,20 @@ class DTTrader(Strategy):
             min_id = self.agent.instruments[inst].last_tick_id/1000
             min_id = int(min_id/100)*60 + min_id % 100 - self.daily_close_buffer
             self.last_min_id[idx] = int(min_id/60)*100 + min_id % 60
+        self.update_trade_unit()
         self.save_state()
-        return
 
+    def register_bar_freq(self):
+        for idx, underlier in enumerate(self.underliers):
+            if self.freq[idx] > 0:
+                instID = self.underliers[idx][0]
+                self.agent.inst2strat[instID][self.name].append(self.freq[idx])
+            
     def save_local_variables(self, file_writer):
         for idx, underlier in enumerate(self.underliers):
             inst = underlier[0]
             row = ['CurrRange', str(inst), self.cur_rng[idx]]
             file_writer.writerow(row)
-        return
     
     def load_local_variables(self, row):
         if row[0] == 'CurrRange':
@@ -51,9 +56,18 @@ class DTTrader(Strategy):
             idx = self.under2idx[inst]
             if idx >= 0:
                 self.cur_rng[idx] = float(row[2])
-        return
-        
+
+    def on_bar(self, idx, freq):
+        if (self.freq[idx]>0) and (freq == self.freq[idx]):
+            inst = self.underliers[idx][0]
+            mslice = self.agent.min_data[inst][freq].iloc[-1]
+            self.check_trigger(idx, mslice.high, mslice.low)
+            
     def on_tick(self, idx, ctick):
+        if self.freq[idx] == 0:
+            self.check_trigger(idx, self.curr_prices[idx], self.curr_prices[idx])
+    
+    def check_trigger(self, idx, buy_price, sell_price): 
         if len(self.submitted_trades[idx]) > 0:
             return
         inst = self.underliers[idx][0]
@@ -78,6 +92,8 @@ class DTTrader(Strategy):
             buy_trig  += self.factors[idx] * c_rng
         elif self.cur_ma[idx] < t_open:
             sell_trig -= self.factors[idx] * c_rng
+        buy_trig = min( self.agent.instruments[inst].up_limit - self.tick_base[idx] * self.price_limit_buffer, bug_trig )
+        sell_trig = max( self.agent.instruments[inst].down_limit + self.tick_base[idx] * self.price_limit_buffer, sell_trig )
 
         if (min_id >= self.last_min_id[idx]):
             if (buysell!=0) and (self.close_tday[idx]):
@@ -88,7 +104,7 @@ class DTTrader(Strategy):
                 self.save_state()
             return
 
-        if ((self.curr_prices[idx] >= buy_trig) and (buysell <=0)) or ((self.curr_prices[idx] <= sell_trig) and (buysell >=0)):
+        if ((buy_price >= buy_trig) and (buysell <=0)) or ((sell_price <= sell_trig) and (buysell >=0)):
             if buysell!=0:
                 msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, curr_price= %s, direction=%s, volume=%s' \
                                     % (inst, self.tday_open[idx], buy_trig, sell_trig, self.curr_prices[idx], buysell, self.trade_unit[idx])
@@ -97,7 +113,7 @@ class DTTrader(Strategy):
                 self.save_state()
             if self.trade_unit[idx] <= 0:
                 return
-            if  (self.curr_prices[idx] >= buy_trig):
+            if  (buy_price >= buy_trig):
                 buysell = 1
             else:
                 buysell = -1
@@ -106,7 +122,6 @@ class DTTrader(Strategy):
             self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
             self.status_notifier(msg)
             self.save_state()
-        return 
         
     def update_trade_unit(self):
-        pass
+        self.trade_unit = [ self.pos_scaler * self.alloc_w[idx] for idx in range(len(self.underliers))]
