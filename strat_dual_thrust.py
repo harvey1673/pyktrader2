@@ -3,8 +3,8 @@ from misc import *
 from strategy import *
  
 class DTTrader(Strategy):
-    common_params =  dict({'price_limit_buffer': 5, 'pos_scaler': 100.0}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, 'daily_close': False, 'factors': 0.0, 'alloc_w': 0.01}, **Strategy.asset_params)
+    common_params =  dict({'price_limit_buffer': 5,}, **Strategy.common_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, 'daily_close': False, 'factors': 0.0, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -124,4 +124,4 @@ class DTTrader(Strategy):
             self.save_state()
         
     def update_trade_unit(self):
-        self.trade_unit = [ self.pos_scaler * self.alloc_w[idx] for idx in range(len(self.underliers))]
+        self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
