@@ -5,7 +5,6 @@ import pandas as pd
 import math
 import mysqlaccess
 from scipy.stats import norm
-import numpy as np
 from misc import *
 
 SOLVER_ERROR_EPSILON = 1e-5
@@ -202,7 +201,6 @@ def price_stats(df):
     stats  = {}
     stats['20H'] = max(df['high'][-20:])
     stats['20H'] = min(df['low'][-20:])
-    
 
 def validate_db_data(tday, filter = False):
     all_insts = filter_main_cont(tday, filter)
@@ -212,8 +210,13 @@ def validate_db_data(tday, filter = False):
         df = mysqlaccess.load_daily_data_to_df('fut_daily', instID, tday, tday)
         if len(df) <= 0:
             inst_list['daily'].append(instID)
+        elif (df.close[-1] == 0) or (df.high[-1] == 0) or (df.low[-1] == 0) or df.open[-1] == 0:
+            inst_list['daily'].append(instID)
         df = mysqlaccess.load_min_data_to_df('fut_min', instID, tday, tday, minid_start=300, minid_end=2115, database='blueshale')
-        if len(df) < 100:
+        if len(df) <= 100:
             output = instID + ':' + str(len(df))
             inst_list['min'].append(output)
+        elif df.min_id < 2055:
+            output = instID + ': end earlier'
+            inst_list['min'].append(output)        
     print inst_list
