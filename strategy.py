@@ -135,23 +135,14 @@ def tradepos2dict(tradepos):
     return trade
 
 class Strategy(object):
-    common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], \
+    common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 100.0, \
                      'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
-                     'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {} }
-    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  \
+                     'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
+    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, \
                     'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0}
     def __init__(self, config, agent = None):
-        d = self.__dict__
-        for key in self.common_params:
-            d[key] = config.get(key, self.common_params[key])
-        all_params = self.asset_params
-        for key in self.asset_params:
-            d[key] = []
-        assets = config['assets']
-        for asset in assets:
-            for key in self.asset_params:
-                d[key].append(asset.get(key, self.asset_params[key]))
-        num_assets = len(assets)
+        self.load_config(config)
+        num_assets = len(self.underliers)
         self.instIDs = self.dep_instIDs()
         self.positions  = [[] for _ in self.underliers]
         self.submitted_trades = [[] for _ in self.underliers]
@@ -165,6 +156,31 @@ class Strategy(object):
         self.curr_prices = [0.0] * num_assets
         self.run_flag = [1] * num_assets
 
+    def save_config(self):
+        config = {}
+        d = self.__dict__
+        for key in self.common_params:
+            config[key] = d[key]
+        config['assets'] = []
+        for idx, under in enumerate(self.underliers):
+            asset = {}
+            for key in self.asset_params:
+                asset[key] = d[key][idx]
+            config['assets'].append(asset)
+        fname = self.folder + '_config.json'
+        with open(fname, 'w') as ofile:
+            json.dump(config, ofile)        
+    
+    def load_config(self, config):
+        d = self.__dict__
+        for key in self.common_params:
+            d[key] = config.get(key, self.common_params[key])
+        for key in self.asset_params:
+            d[key] = []
+        for asset in config['assets']:
+            for key in self.asset_params:
+                d[key].append(asset.get(key, self.asset_params[key]))
+        
     def dep_instIDs(self):
         return list(set().union(*self.underliers))
 
