@@ -50,8 +50,7 @@ class Gateway(object):
         df = pd.DataFrame.from_dict( self.pl_by_product, orient='index' )
         cols = ['yday_mark', 'tday_mark', 'yday_pos', 'yday_pnl', 'new_long', 'new_long_avg', 'new_short', 'new_short_avg', 'tday_pnl', 'used_margin', 'locked_margin']
         df = df[cols]
-        file_prefix = self.file_prefix
-        logfile = file_prefix + 'PNL_attribution_' + tday.strftime('%y%m%d')+'.csv'
+        logfile = self.file_prefix + 'PNL_attribution_' + tday.strftime('%y%m%d')+'.csv'
         if os.path.isfile(logfile):
             return False
         else:
@@ -61,7 +60,7 @@ class Gateway(object):
     def day_finalize(self, tday):
         self.save_local_positions(tday)
         if self.eod_report:
-            self.process_eod_report()
+            self.process_eod_report(tday)
         eod_pos = {}
         for inst in self.positions:
             pos = self.positions[inst]
