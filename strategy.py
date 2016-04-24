@@ -134,7 +134,7 @@ def tradepos2dict(tradepos):
     return trade
 
 class Strategy(object):
-    common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 100.0, \
+    common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
                      'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
                      'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, \

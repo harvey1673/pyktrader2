@@ -298,9 +298,9 @@ class TLStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['RunFlag', 'NumTick', 'OrderType', 'TradeUnit', 'Channels', 'MaxPos', 'TrailLoss']
-        self.status_fields = ['TradingFreq', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow'] 
-        self.shared_fields = ['NumTick', 'OrderType']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'NumTick', 'OrderType', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss']
+        self.status_fields = ['TradingFreq', 'TradeUnit', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'TradingFreq': 'str',
@@ -314,7 +314,9 @@ class TLStratGui(StratGui):
                             'ExitHigh': 'float',
                             'ExitLow':  'float',
                             'NumTick': 'int',
-                            'OrderType': 'str' } 
+                            'OrderType': 'str',
+                            'AllocW': 'float',
+                            'PosScaler': 'float'}
 
 class OptionArbStratGui(StratGui):
     def __init__(self, strat, app, master):
