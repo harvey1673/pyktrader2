@@ -1,24 +1,26 @@
+# encoding: UTF-8
 import os
-import ctp.futures as pyctp
+import pyctp.futures as py_ctp
 from base import *
 from misc import *
 from gateway import *
+from ctp_gateway import *
 import logging
 import datetime
 
 class PyctpGateway(CtpGateway):
     def __init__(self, agent, gatewayName='CTP'):
-        super(PyctpGateway, self).__init__(agent, gatewayName, md_api = 'pyctp_gateway.PyctpMdApi', td_api = 'pyctp_gateway.PyctpTdApi')        
+        super(PyctpGateway, self).__init__(agent, gatewayName, md_api = 'ctp.pyctp_gateway.PyctpMdApi', td_api = 'ctp.pyctp_gateway.PyctpTdApi')
     
 ########################################################################
-class PyctpMdApi(pyctp.MdApi):
+class PyctpMdApi(py_ctp.MdApi):
     """CTP行情API实现"""
 
     #----------------------------------------------------------------------
-    ApiStruct = pyctp.ApiStruct
+    ApiStruct = py_ctp.ApiStruct
     def __init__(self, gateway):
         """Constructor"""
-        super(CtpMdApi, self).__init__()
+        super(PyctpMdApi, self).__init__()
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
@@ -67,7 +69,7 @@ class PyctpMdApi(pyctp.MdApi):
     def OnRspUserLogin(self, userlogin, info, rid, is_last):
         """登陆回报"""
         # 如果登录成功，推送日志信息
-        if (info.ErrorID == 0 and is_last:
+        if (info.ErrorID == 0) and is_last:
             self.loginStatus = True
             self.gateway.mdConnected = True
             logContent = u'行情服务器登录完成'
@@ -75,7 +77,7 @@ class PyctpMdApi(pyctp.MdApi):
             # 重新订阅之前订阅的合约
             for instID in self.gateway.instruments:
                 self.subscribe(instID)
-            trade_day_str = self.getTradingDay()
+            trade_day_str = self.GetTradingDay()
             if len(trade_day_str) > 0:
                 try:
                     self.trading_day = int(trade_day_str)
@@ -209,18 +211,18 @@ class PyctpMdApi(pyctp.MdApi):
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
-        self.exit()
+        pass
 
 
 ########################################################################
-class PyctpTdApi(TdApi):
+class PyctpTdApi(py_ctp.TraderApi):
     """CTP交易API实现"""
     
     #----------------------------------------------------------------------
-    ApiStruct = pyctp.ApiStruct
+    ApiStruct = py_ctp.ApiStruct
     def __init__(self, gateway):
         """API对象的初始化函数"""
-        super(CtpTdApi, self).__init__()
+        super(PyctpTdApi, self).__init__()
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
@@ -240,6 +242,9 @@ class PyctpTdApi(TdApi):
         self.sessionID = EMPTY_INT          # 会话编号
         
     #----------------------------------------------------------------------
+    def isRspSuccess(self, error):
+        return error == None or error.ErrorID == 0
+
     def OnFrontConnected(self):
         """服务器连接"""
         self.connectionStatus = True
@@ -293,8 +298,8 @@ class PyctpTdApi(TdApi):
             self.gateway.tdConnected = False
             err = VtErrorData()
             err.gatewayName = self.gateway
-            err.errorID = error.ErrorID
-            err.errorMsg = error.ErrorMsg.decode('gbk')
+            err.errorID = info.ErrorID
+            err.errorMsg = info.ErrorMsg.decode('gbk')
             self.gateway.onError(err)			
             time.sleep(30)
             self.login()
@@ -336,35 +341,39 @@ class PyctpTdApi(TdApi):
         err.errorMsg = error.ErrorMsg.decode('gbk')
         self.gateway.onError(err)
 
-        event2 = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
-        event2.dict['data'] = data.__dict__
-        event2.dict['error'] = error.__dict__
-        event2.dict['gateway'] = self.gatewayName
-        self.gateway.eventEngine.put(event2)
+        if data != None:
+            event2 = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
+            event2.dict['data'] = data.__dict__
+            event2.dict['error'] = error.__dict__
+            event2.dict['gateway'] = self.gatewayName
+            self.gateway.eventEngine.put(event2)
     
     #----------------------------------------------------------------------
     def OnRtnOrder(self, data):
         """报单回报"""
         # 更新最大报单编号
-        event = Event(type=EVENT_RTNORDER + self.gatewayName)
-        event.dict['data'] = data.__dict__
-        self.gateway.eventEngine.put(event)
+        if data != None:
+            event = Event(type=EVENT_RTNORDER + self.gatewayName)
+            event.dict['data'] = data.__dict__
+            self.gateway.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def OnRtnTrade(self, data):
         """成交回报"""
         # 创建报单数据对象
-        event = Event(type=EVENT_RTNTRADE+self.gatewayName)
-        event.dict['data'] = data.__dict__
-        self.gateway.eventEngine.put(event)
+        if data != None:
+            event = Event(type=EVENT_RTNTRADE+self.gatewayName)
+            event.dict['data'] = data.__dict__
+            self.gateway.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def OnErrRtnOrderInsert(self, data, error):
         """发单错误回报（交易所）"""
-        event = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
-        event.dict['data'] = data.__dict__
-        event.dict['error'] = error.__dict__
-        self.gateway.eventEngine.put(event)
+        if data != None:
+            event = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
+            event.dict['data'] = data.__dict__
+            event.dict['error'] = error.__dict__
+            self.gateway.eventEngine.put(event)
 
         err = VtErrorData()
         err.gatewayName = self.gatewayName
@@ -375,11 +384,12 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnErrRtnOrderAction(self, data, error):
         """撤单错误回报（交易所）"""
-        event = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
-        event.dict['data'] = data.__dict__
-        event.dict['error'] = error.__dict__
-        event.dict['gateway'] = self.gatewayName
-        self.gateway.eventEngine.put(event)
+        if data != None:
+            event = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
+            event.dict['data'] = data.__dict__
+            event.dict['error'] = error.__dict__
+            event.dict['gateway'] = self.gatewayName
+            self.gateway.eventEngine.put(event)
 
         err = VtErrorData()
         err.gatewayName = self.gatewayName
@@ -395,12 +405,12 @@ class PyctpTdApi(TdApi):
         err.errorID = error.ErrorID
         err.errorMsg = error.ErrorMsg.decode('gbk')
         self.gateway.onError(err)
-
-        event2 = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
-        event2.dict['data'] = data.__dict__
-        event2.dict['error'] = error.__dict__
-        event2.dict['gateway'] = self.gatewayName
-        self.gateway.eventEngine.put(event2)
+        if data != None:
+            event2 = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
+            event2.dict['data'] = data.__dict__
+            event2.dict['error'] = error.__dict__
+            event2.dict['gateway'] = self.gatewayName
+            self.gateway.eventEngine.put(event2)
 
     #----------------------------------------------------------------------
     def OnRspQueryMaxOrderVolume(self, data, error, n, last):
@@ -423,11 +433,13 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnRspQryTradingAccount(self, data, error, n, last):
         """资金账户查询回报"""
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYACCOUNT + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            items = data.__dict__
+            if len(items) > 0:
+                event = Event(type=EVENT_QRYACCOUNT + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             logContent = u'资金账户查询回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
             self.gateway.onLog(logContent, level = logging.DEBUG)
@@ -481,11 +493,12 @@ class PyctpTdApi(TdApi):
     def OnRspQryOrder(self, data, error, n, last):
         """"""
         '''请求查询报单响应'''
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYORDER + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            if data != None:
+                event = Event(type=EVENT_QRYORDER + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             logContent = u'交易错误回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
             self.gateway.onLog(logContent, level = logging.DEBUG)
@@ -493,11 +506,12 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnRspQryTrade(self, data, error, n, last):
         """"""
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYTRADE + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            if data != None:
+                event = Event(type=EVENT_QRYTRADE + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             event = Event(type=EVENT_LOG)
             logContent = u'交易错误回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
@@ -506,11 +520,12 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnRspQryInvestorPosition(self, data, error, n, last):
         """持仓查询回报"""
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYPOSITION + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            if data != None:
+                event = Event(type=EVENT_QRYPOSITION + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             logContent = u'持仓查询回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
             self.gateway.onLog(logContent, level = logging.DEBUG)
@@ -518,11 +533,12 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnRspQryInvestor(self, data, error, n, last):
         """投资者查询回报"""
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYINVESTOR + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            if data != None:
+                event = Event(type=EVENT_QRYINVESTOR + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             logContent = u'合约投资者回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
             self.gateway.onLog(logContent, level = logging.DEBUG)
@@ -555,11 +571,12 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def OnRspQryInstrument(self, data, error, n, last):
         """合约查询回报"""
-        if error.ErrorID == 0:
-            event = Event(type=EVENT_QRYINSTRUMENT + self.gatewayName )
-            event.dict['data'] = data.__dict__
-            event.dict['last'] = last
-            self.gateway.eventEngine.put(event)
+        if self.isRspSuccess(error):
+            if data != None:
+                event = Event(type=EVENT_QRYINSTRUMENT + self.gatewayName )
+                event.dict['data'] = data.__dict__
+                event.dict['last'] = last
+                self.gateway.eventEngine.put(event)
         else:
             logContent = u'交易错误回报，错误代码：' + unicode(error.ErrorID) + u',' + u'错误信息：' + error.ErrorMsg.decode('gbk')
             self.gateway.onLog(logContent, level = logging.DEBUG)
@@ -937,6 +954,7 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def qryAccount(self):
         """查询账户"""
+        req = {}
         self.reqID += 1
         req['BrokerID'] = self.brokerID
         req['InvestorID'] = self.userID
@@ -1013,7 +1031,7 @@ class PyctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
-        self.exit()
+        pass
         
 if __name__ == '__main__':
     pass

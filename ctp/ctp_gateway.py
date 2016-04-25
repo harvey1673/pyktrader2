@@ -10,9 +10,51 @@ import json
 from base import *
 from misc import *
 from gateway import *
+from ctpDataType import *
 import logging
 import datetime
 import order
+
+# 以下为一些VT类型和CTP类型的映射字典
+# 价格类型映射
+priceTypeMap = {}
+priceTypeMap[PRICETYPE_LIMITPRICE] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+priceTypeMap[PRICETYPE_MARKETPRICE] = defineDict["THOST_FTDC_OPT_AnyPrice"]
+priceTypeMapReverse = {v: k for k, v in priceTypeMap.items()}
+
+# 方向类型映射
+directionMap = {}
+directionMap[DIRECTION_LONG] = defineDict['THOST_FTDC_D_Buy']
+directionMap[DIRECTION_SHORT] = defineDict['THOST_FTDC_D_Sell']
+directionMapReverse = {v: k for k, v in directionMap.items()}
+
+# 开平类型映射
+offsetMap = {}
+offsetMap[OFFSET_OPEN] = defineDict['THOST_FTDC_OF_Open']
+offsetMap[OFFSET_CLOSE] = defineDict['THOST_FTDC_OF_Close']
+offsetMap[OFFSET_CLOSETODAY] = defineDict['THOST_FTDC_OF_CloseToday']
+offsetMap[OFFSET_CLOSEYESTERDAY] = defineDict['THOST_FTDC_OF_CloseYesterday']
+offsetMapReverse = {v:k for k,v in offsetMap.items()}
+
+# 交易所类型映射
+exchangeMap = {}
+#exchangeMap[EXCHANGE_CFFEX] = defineDict['THOST_FTDC_EIDT_CFFEX']
+#exchangeMap[EXCHANGE_SHFE] = defineDict['THOST_FTDC_EIDT_SHFE']
+#exchangeMap[EXCHANGE_CZCE] = defineDict['THOST_FTDC_EIDT_CZCE']
+#exchangeMap[EXCHANGE_DCE] = defineDict['THOST_FTDC_EIDT_DCE']
+exchangeMap[EXCHANGE_CFFEX] = 'CFFEX'
+exchangeMap[EXCHANGE_SHFE] = 'SHFE'
+exchangeMap[EXCHANGE_CZCE] = 'CZCE'
+exchangeMap[EXCHANGE_DCE] = 'DCE'
+exchangeMap[EXCHANGE_UNKNOWN] = ''
+exchangeMapReverse = {v:k for k,v in exchangeMap.items()}
+
+# 持仓类型映射
+posiDirectionMap = {}
+posiDirectionMap[DIRECTION_NET] = defineDict["THOST_FTDC_PD_Net"]
+posiDirectionMap[DIRECTION_LONG] = defineDict["THOST_FTDC_PD_Long"]
+posiDirectionMap[DIRECTION_SHORT] = defineDict["THOST_FTDC_PD_Short"]
+posiDirectionMapReverse = {v:k for k,v in posiDirectionMap.items()}
 
 TERT_RESTART = 0 #从本交易日开始重传
 TERT_RESUME = 1 #从上次收到的续传
@@ -22,24 +64,26 @@ class CtpGateway(Gateway):
     """CTP接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, agent, gatewayName='CTP', md_api = 'vnctp_gateway.VnctpMdApi', td_api = 'vnctp_gateway.VnctpTdApi'):
+    def __init__(self, agent, gatewayName='CTP', md_api = 'ctp.vnctp_gateway.VnctpMdApi', td_api = 'ctp.vnctp_gateway.VnctpTdApi'):
         """Constructor"""
         super(CtpGateway, self).__init__(agent, gatewayName)
 
         md_str_split = md_api.split('.')
         if len(md_str_split) > 1:
-            md_module = __import__(md_str_split[0])
-            mdApi_cls = getattr(md_module, md_str_split[1])            
+            mod_str = '.'.join(md_str_split[:-1])
+            md_module = __import__(mod_str, fromlist = [md_str_split[-1]])
+            mdApi_cls = getattr(md_module, md_str_split[-1])
         else:
             mdApi_cls = getattr(md_str_split[0])
-        self.mdApi = self.mdApi = mdApi_cls()
+        self.mdApi = mdApi_cls(self)
         td_str_split = td_api.split('.')
         if len(td_str_split) > 1:
-            td_module = __import__(td_str_split[0])
-            tdApi_cls = getattr(td_module, td_str_split[1])
+            mod_str = '.'.join(td_str_split[:-1])
+            td_module = __import__(mod_str, fromlist = [td_str_split[-1]])
+            tdApi_cls = getattr(td_module, td_str_split[-1])
         else:
             tdApi_cls = getattr(td_str_split[0])        
-        self.tdApi = tdApi_cls()
+        self.tdApi = tdApi_cls(self)
         self.mdConnected = False        # 行情API连接状态，登录完成后为True
         self.tdConnected = False        # 交易API连接状态
         self.auto_db_update = False

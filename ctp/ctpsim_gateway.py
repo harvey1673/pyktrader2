@@ -4,7 +4,7 @@ from ctp_gateway import *
 class CtpSimGateway(CtpGateway):
     def __init__(self, agent, gatewayName='CTP'):
         """Constructor"""
-        super(CtpSimGateway, self).__init__(agent, gatewayName, md_api = "vnctp_gateway.VnctpMdApi", tdApi = "ctpsim_gateway.SimctpTdApi")
+        super(CtpSimGateway, self).__init__(agent, gatewayName, md_api = "ctp.vnctp_gateway.VnctpMdApi", td_api = "ctp.ctpsim_gateway.SimctpTdApi")
         self.qryEnabled = False         # 是否要启动循环查询
         self.md_data_buffer = 0
 

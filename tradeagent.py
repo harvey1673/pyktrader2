@@ -319,7 +319,7 @@ class Agent(MktDataMixin):
             for key in self.gateways:
                 gateway = self.gateways[key]
                 gway_class = type(gateway).__name__
-                if 'Ctp' in gway_class:
+                if ('ctp' in gway_class) or ('Ctp' in gway_class):
                     return gateway
         return None
 

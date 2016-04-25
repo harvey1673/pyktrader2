@@ -1,3 +1,4 @@
+# encoding: UTF-8
 import os
 from base import *
 from misc import *
@@ -5,12 +6,13 @@ from vnctpmd import MdApi
 from vnctptd import TdApi
 from ctpDataType import *
 from gateway import *
+from ctp_gateway import *
 import logging
 import datetime
 
 class VnctpGateway(CtpGateway):
     def __init__(self, agent, gatewayName='CTP'):
-        super(VnctpGateway, self).__init__(agent, gatewayName, md_api = 'vnctp_gateway.VnctpMdApi', td_api = 'vnctp_gateway.VnctpTdApi')
+        super(VnctpGateway, self).__init__(agent, gatewayName, md_api = 'ctp.vnctp_gateway.VnctpMdApi', td_api = 'ctp.vnctp_gateway.VnctpTdApi')
     
 ########################################################################
 class VnctpMdApi(MdApi):
@@ -19,7 +21,7 @@ class VnctpMdApi(MdApi):
     #----------------------------------------------------------------------
     def __init__(self, gateway):
         """Constructor"""
-        super(CtpMdApi, self).__init__()
+        super(VnctpMdApi, self).__init__()
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
@@ -218,7 +220,7 @@ class VnctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def __init__(self, gateway):
         """API对象的初始化函数"""
-        super(CtpTdApi, self).__init__()
+        super(VnctpTdApi, self).__init__()
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
