@@ -1,7 +1,51 @@
 # encoding: UTF-8
 from ctp_gateway import *
 
-class SimCtpTdApi(object):
+class CtpSimGateway(CtpGateway):
+    def __init__(self, agent, gatewayName='CTP'):
+        """Constructor"""
+        super(CtpSimGateway, self).__init__(agent, gatewayName, md_api = "vnctp_gateway.VnctpMdApi", tdApi = "ctpsim_gateway.SimctpTdApi")
+        self.qryEnabled = False         # 是否要启动循环查询
+        self.md_data_buffer = 0
+
+    def connect(self):
+        fileName = self.file_prefix + 'connect.json'
+        try:
+            f = file(fileName)
+        except IOError:
+            logContent = u'读取连接配置出错，请检查'
+            self.onLog(logContent, level = logging.WARNING)
+            return
+        # 解析json文件
+        setting = json.load(f)
+        try:
+            userID = str(setting['userID'])
+            password = str(setting['password'])
+            brokerID = str(setting['brokerID'])
+            mdAddress = str(setting['mdAddress'])
+        except KeyError:
+            logContent = u'连接配置缺少字段，请检查'
+            self.onLog(logContent, level = logging.WARNING)
+            return
+
+        # 创建行情和交易接口对象
+        self.mdApi.connect(userID, password, brokerID, mdAddress)
+        self.mdConnected = False
+        self.tdApi.connect(userID, password, brokerID, mdAddress)
+        self.tdConnected = True
+
+    def register_event_handler(self):
+        self.eventEngine.register(EVENT_MARKETDATA+self.gatewayName, self.rsp_market_data)
+        self.eventEngine.register(EVENT_ERRORDERCANCEL+self.gatewayName, self.err_order_insert)
+        self.eventEngine.register(EVENT_ERRORDERINSERT+self.gatewayName, self.err_order_action)
+        self.eventEngine.register(EVENT_RTNTRADE+self.gatewayName, self.rtn_trade)
+        #self.eventEngine.register(EVENT_RTNORDER+self.gatewayName, self.rtn_order)
+
+    def rsp_td_login(self, event):
+        pass
+
+        
+class SimctpTdApi(object):
     def __init__(self, gateway):
         """API对象的初始化函数"""
         self.gateway = gateway                  # gateway对象
@@ -120,48 +164,3 @@ class SimCtpTdApi(object):
         self.password = password            # 密码
         self.brokerID = brokerID            # 经纪商代码
         self.address = address              # 服务器地址
-
-class CtpSimGateway(CtpGateway):
-    def __init__(self, agent, gatewayName='CTP'):
-        """Constructor"""
-        super(CtpSimGateway, self).__init__(agent, gatewayName)
-        self.tdApi = SimCtpTdApi(self)     # 交易API
-        self.qryEnabled = False         # 是否要启动循环查询
-        self.md_data_buffer = 0
-
-    def connect(self):
-        fileName = self.file_prefix + 'connect.json'
-        try:
-            f = file(fileName)
-        except IOError:
-            logContent = u'读取连接配置出错，请检查'
-            self.onLog(logContent, level = logging.WARNING)
-            return
-        # 解析json文件
-        setting = json.load(f)
-        try:
-            userID = str(setting['userID'])
-            password = str(setting['password'])
-            brokerID = str(setting['brokerID'])
-            mdAddress = str(setting['mdAddress'])
-        except KeyError:
-            logContent = u'连接配置缺少字段，请检查'
-            self.onLog(logContent, level = logging.WARNING)
-            return
-
-        # 创建行情和交易接口对象
-        self.mdApi.connect(userID, password, brokerID, mdAddress)
-        self.mdConnected = False
-        self.tdApi.connect(userID, password, brokerID, mdAddress)
-        self.tdConnected = True
-
-    def register_event_handler(self):
-        self.eventEngine.register(EVENT_MARKETDATA+self.gatewayName, self.rsp_market_data)
-        self.eventEngine.register(EVENT_ERRORDERCANCEL+self.gatewayName, self.err_order_insert)
-        self.eventEngine.register(EVENT_ERRORDERINSERT+self.gatewayName, self.err_order_action)
-        self.eventEngine.register(EVENT_RTNTRADE+self.gatewayName, self.rtn_trade)
-        #self.eventEngine.register(EVENT_RTNORDER+self.gatewayName, self.rtn_order)
-
-    def rsp_td_login(self, event):
-        pass
-
