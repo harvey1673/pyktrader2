@@ -273,10 +273,12 @@ class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['RunFlag','NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer', 'TradeUnit', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId']
-        self.status_fields = ['CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
-        self.shared_fields = ['NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer']
+        self.entry_fields = ['PosScaler', 'RunFlag','NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId']
+        self.status_fields = ['TradeUnit', 'CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
+        self.shared_fields = ['PosScaler','NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer']
         self.field_types = {'RunFlag':'int',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
                             'TradeUnit':'int',
                             'MinRng':'float', 
                             'Ratios': 'floatlist', 
@@ -333,9 +335,9 @@ class OptionArbStratGui(StratGui):
                             'TradeMargin':'floatlist',
                             'NumTick': 'int',
                             'OrderType': 'str',
-                            'ProfitRatio': 'float', 
-                            'ExitRatio': 'float'} 
-                   
+                            'ProfitRatio': 'float',
+                            'ExitRatio': 'float'}
+
 class OptVolgridGui(object):
     def __init__(self, vg, app, master):
         all_insts = app.agent.instruments
@@ -344,7 +346,7 @@ class OptVolgridGui(object):
         self.app = app
         self.expiries = vg.underlier.keys()
         self.expiries.sort()
-        self.underliers = [vg.underlier[expiry] for expiry in self.expiries] 
+        self.underliers = [vg.underlier[expiry] for expiry in self.expiries]
         self.option_insts = list(set().union(*vg.option_insts.values()))
         self.spot_model = vg.spot_model
         self.cont_mth = list(set([ all_insts[inst].cont_mth for inst in self.option_insts]))
@@ -363,8 +365,8 @@ class OptVolgridGui(object):
 
         #vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10', 'Updated']
         self.volgrid = instrument.copy_volgrid(vg)
-        self.curr_insts = {} 
-        self.rf = app.agent.irate
+        self.curr_insts = {}
+        self.rf = app.agent.irate['CNY']
         self.entries = {}
         self.option_map = {}
         self.group_risk = {}
@@ -603,7 +605,7 @@ class Gui(tk.Tk):
                 self.strat_gui[strat_name] = DTStratGui(strat, app, self)
             if strat.__class__.__name__ in ['DTSplitDChanFilter']:
                 self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
-            elif strat.__class__.__name__ == 'RBreakerTrader':
+            elif strat.__class__.__name__ == 'RBreaker':
                 self.strat_gui[strat_name] = RBStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'TurtleTrader':
                 self.strat_gui[strat_name] = TLStratGui(strat, app, self)
@@ -729,7 +731,7 @@ class Gui(tk.Tk):
         row_idx += 1
         #account_fields = ['CurrCapital', 'PrevCapital', 'PnlTotal', 'LockedMargin', 'UsedMargin', 'Available']
         for col_idx, field in enumerate(['gateway'] + self.account_fields):
-            lab = ttk.Label(lbl_frame, text=field, anchor='w')
+            lab = ttk.Label(lbl_frame, text=field, anchor='w', width = 9)
             lab.grid(column=col_idx, row=row_idx, sticky="ew")
         col_idx = 0
         row_idx += 1
@@ -741,7 +743,7 @@ class Gui(tk.Tk):
                 v = tk.DoubleVar()
                 key = str(gway) + '.'+ field
                 self.stringvars['Account'][key] = v
-                lab = ttk.Label(lbl_frame, textvariable = v, anchor='w')
+                lab = ttk.Label(lbl_frame, textvariable = v, anchor='w', width = 7)
                 lab.grid(column=col_idx, row=row_idx, sticky="ew")
             row_idx += 1
         agent_fields = entry_fields + label_fields
