@@ -21,12 +21,15 @@ def get_option_map(underliers, cont_mths, strikes, exch = ''):
     return opt_map
     
 class OptionArbStrat(Strategy):
-    common_params =  dict({'future_conts': [], 'strikes': [], 'cont_mths': [], 'exit_ratio': 0.1, 'profit_ratio': 0.01}, **Strategy.common_params)
+    common_params =  dict({'future_conts': [], 'strikes': [], 'cont_mths': [], 'exit_ratio': 0.1, 'profit_ratio': 0.01, 'fut_unit':1, 'opt_unit': 1, 'scaler':10}, **Strategy.common_params)
     asset_params = dict({'bid_prices': 0, 'ask_prices': 0, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         self.future_conts = config['future_conts']
         self.cont_mths = config['cont_mths']
         self.strikes = config['strikes']
+        self.fut_unit = config.get('fut_unit', 1)
+        self.opt_unit = config.get('opt_unit', 1)
+        self.scaler = config.get('scaler',10)
         self.option_map = get_option_map(self.future_conts, self.cont_mths, self.strikes)
         underliers = []
         volumes = []
@@ -39,9 +42,9 @@ class OptionArbStrat(Strategy):
                 call_key = (fut, 'C', strike)
                 put_key  = (fut, 'P', strike)
                 underliers.append([self.option_map[call_key], self.option_map[put_key], fut])
-                volumes.append([3, -3, -1])
+                volumes.append([-self.opt_unit, self.opt_unit, self.fut_unit])
                 trade_units.append(1)
-                v_range = {'lower': -strike, 'upper':-strike, 'scaler': 300.0 }
+                v_range = {'lower': -strike, 'upper':-strike, 'scaler': self.scaler }
                 self.value_range.append(v_range)
                 idx += 1
                 if (i < slen - 1):
@@ -49,14 +52,14 @@ class OptionArbStrat(Strategy):
                     underliers.append([self.option_map[call_key], self.option_map[next_call]])
                     volumes.append([1, -1])
                     trade_units.append(1)
-                    v_range = {'lower':0, 'upper': strike_list[i+1] - strike, 'scaler': 100.0 }
+                    v_range = {'lower':0, 'upper': strike_list[i+1] - strike, 'scaler': self.scaler }
                     self.value_range.append(v_range)
                     idx += 1
                     next_put = (fut, 'P', strike_list[i+1])
                     underliers.append([self.option_map[next_put], self.option_map[put_key]])
                     volumes.append([1, -1])
                     trade_units.append(1)
-                    v_range = {'lower':0, 'upper': strike_list[i+1] - strike, 'scaler': 100.0  }
+                    v_range = {'lower':0, 'upper': strike_list[i+1] - strike, 'scaler': self.scaler  }
                     self.value_range.append(v_range)
                     idx += 1
                     if i > 0:
@@ -64,14 +67,14 @@ class OptionArbStrat(Strategy):
                         underliers.append([self.option_map[prev_call], self.option_map[call_key], self.option_map[next_call]])
                         volumes.append([1, -2, 1])
                         trade_units.append(1)
-                        v_range = {'lower':0, 'upper': None, 'scaler': 100.0}
+                        v_range = {'lower':0, 'upper': None, 'scaler': self.scaler}
                         self.value_range.append(v_range)
                         idx += 1
                         prev_put = (fut, 'P', strike_list[i-1])
                         underliers.append([self.option_map[prev_put], self.option_map[put_key], self.option_map[next_put]])
                         volumes.append([1, -2, 1])
                         trade_units.append(1)
-                        v_range = {'lower':0, 'upper': None, 'scaler': 100.0}
+                        v_range = {'lower':0, 'upper': None, 'scaler': self.scaler}
                         self.value_range.append(v_range)
                         idx += 1
         config['assets'] = []
@@ -161,3 +164,6 @@ class OptionArbStrat(Strategy):
         if need_save:
             self.save_state()
         return
+
+    def update_trade_unit(self):
+        pass

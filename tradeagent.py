@@ -59,7 +59,7 @@ class MktDataMixin(object):
         if inst not in self.day_data_func:
             self.day_data_func[inst] = []
             self.min_data_func[inst] = {}
-        if fobj.name not in self.calc_func_dict:
+        if (fobj != None) and (fobj.name not in self.calc_func_dict):
             self.calc_func_dict[fobj.name] = fobj
         if 'd' in freq:
             for func in self.day_data_func[inst]:
@@ -75,7 +75,6 @@ class MktDataMixin(object):
                     return False            
             if fobj != None:
                 self.min_data_func[inst][mins].append(self.calc_func_dict[fobj.name])
-        return self.calc_func_dict[fobj.name]
 
     def get_min_id(self, tick_id):
         return int(tick_id/1000)

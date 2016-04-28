@@ -1,12 +1,12 @@
 import sys
 import misc
-import agent
 import data_handler as dh
 import pandas as pd
 import numpy as np
-import strategy as strat
 import datetime
 import backtest
+import strategy as strat
+import json
 
 def rbreaker_sim( mdf, config):
     if 'ddf' in config:
@@ -14,17 +14,19 @@ def rbreaker_sim( mdf, config):
     else:
         freq = config['freq']
         ddf = dh.conv_ohlc_freq(mdf, freq)
+    start_equity = config['capital']
+    tcost = config['trans_cost']
+    unit = config['unit']
+    pos_class = config['pos_class']
+    pos_args  = config['pos_args']
     close_daily = config['close_daily']
     marginrate = config['marginrate']
     offset = config['offset']
+    min_rng = config['min_rng']
     k = config['params']
     a = k[0]
     b = k[1]
     c = k[2]
-    start_equity = config['capital']
-    tcost = config['trans_cost']
-    unit = config['unit']
-    close_daily = config['close_daily']
     ddf['range'] = ddf.high - ddf.low
     ddf['ssetup'] = ddf.high + a*(ddf.close - ddf.low)
     ddf['bsetup'] = ddf.low  - a*(ddf.high - ddf.close)
@@ -47,8 +49,10 @@ def rbreaker_sim( mdf, config):
     rev_flag = True
     for dd in mdf.index:
         mslice = mdf.ix[dd]
-        min_id = agent.get_min_id(dd)
-        d = dd.date()
+        min_id = mslice.min_id
+        d = mslice.date
+        if d not in ddf.index:
+            continue
         dslice = ddf.ix[d]
         if np.isnan(dslice.bbreak):
             continue
@@ -83,8 +87,8 @@ def rbreaker_sim( mdf, config):
         else:
             if num_trades >=2:
                 continue
-            if rev_flag and (((cur_high < dslice.bbreak) and (cur_high >= dslice.ssetup) and (mslice.close < dslice.senter) and (pos >=0)) \ 
-                         or ((cur_low > dslice.sbreak)  and (cur_low  <= dslice.bsetup) and (mslice.close > dslice.benter) and (pos <=0))):
+            if rev_flag and (((cur_high < dslice.bbreak) and (cur_high >= dslice.ssetup) and (mslice.close < dslice.senter) and (pos >=0)) or \
+                            ((cur_low > dslice.sbreak)  and (cur_low  <= dslice.bsetup) and (mslice.close > dslice.benter) and (pos <=0))):
                 if len(curr_pos) > 0:
                     curr_pos[0].close(mslice.close-misc.sign(pos)*offset, dd)
                     tradeid += 1
@@ -92,7 +96,7 @@ def rbreaker_sim( mdf, config):
                     closed_trades.append(curr_pos[0])
                     curr_pos = []
                     mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
-                new_pos = strat.TradePos([mslice.contract], [1], -unit*misc.sign(pos), mslice.close, 0)
+                new_pos = pos_class([mslice.contract], [1], -unit*misc.sign(pos), mslice.close, 0, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
                 new_pos.open(mslice.close + offset*misc.sign(pos), dd)
@@ -105,7 +109,7 @@ def rbreaker_sim( mdf, config):
                     direction = 1
                 else:
                     direction = -1
-                new_pos = strat.TradePos([mslice.contract], [1], unit*direction, mslice.close, 0)
+                new_pos = pos_class([mslice.contract], [1], unit*direction, mslice.close, 0, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
                 new_pos.open(mslice.close + offset*misc.sign(direction), dd)
@@ -114,7 +118,6 @@ def rbreaker_sim( mdf, config):
                 mdf.ix[dd, 'cost'] -=  abs(direction) * (offset + mslice.close*tcost)
                 num_trades += 1                
         mdf.ix[dd, 'pos'] = pos
-            
     (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
     res = dict( res_pnl.items() + res_trade.items())
@@ -129,7 +132,7 @@ def gen_config_file(filename):
     sim_config['start_date'] = '20141101'
     sim_config['end_date']   = '20160219'
     sim_config['need_daily'] = True
-    sim_config['min_rng']  =  [ 0.015, 0.02, 0.25 ]
+    sim_config['min_rng']  =  [ 0.015, 0.02, 0.025 ]
     sim_config['params'] = [(0.25, 0.05, 0.15), (0.30, 0.06, 0.20), (0.35, 0.08, 0.25), (0.4, 0.1, 0.3)]    
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
@@ -142,6 +145,8 @@ def gen_config_file(filename):
               'unit': 1,
               'stoploss': 0.0,
               'pos_args': {},
+              'pos_update': False,
+              'start_min': 303,
               #'chan_func': chan_func,
               }
     sim_config['config'] = config

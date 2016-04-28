@@ -48,7 +48,10 @@ class RBreaker(Strategy):
         return         
 
     def register_func_freq(self):
-        pass
+        for idx, under in enumerate(self.underliers):
+            inst = under[0]
+            freq = str(self.freq[idx]) + 'm'
+            self.agent.register_data_func(inst, freq, None)
 
     def register_bar_freq(self):
         for idx, under in enumerate(self.underliers):
