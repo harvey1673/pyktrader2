@@ -40,39 +40,44 @@ def rbreaker_sim( mdf, config):
     mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
     curr_pos = []
     closed_trades = []
-    start_d = ddf.index[0]
+    start_d = mdf.index[0].date()
     end_d = mdf.index[-1].date()
     prev_d = start_d - datetime.timedelta(days=1)
     tradeid = 0
     cur_high = 0
     cur_low = 0
     rev_flag = True
+    dslice = None
+    num_trades = 0
     for dd in mdf.index:
         mslice = mdf.ix[dd]
         min_id = mslice.min_id
         d = mslice.date
-        if d not in ddf.index:
-            continue
-        dslice = ddf.ix[d]
-        if np.isnan(dslice.bbreak):
-            continue
         if (prev_d < d):
             num_trades = 0
             cur_high = mslice.high
             cur_low = mslice.low
+            if d not in ddf.index:
+                continue
+            else:
+                dslice = ddf.ix[d]
+            if np.isnan(dslice.bbreak):
+                continue
             if dslice.range < min_rng * dslice.close:
                 rev_flag = False
             else:
                 rev_flag = True
+            prev_d = d
         else:
             cur_high = max([cur_high, mslice.high])
-            cur_low = min([cur_low, mslice.low])
-        prev_d = d
+            cur_low = min([cur_low, mslice.low])        
         if len(curr_pos) == 0:
             pos = 0
         else:
             pos = curr_pos[0].pos
-        mdf.ix[dd, 'pos'] = pos    
+        mdf.ix[dd, 'pos'] = pos
+        if (min_id <= config['start_min']):
+            continue
         if (min_id >= config['exit_min']):
             if (pos != 0) and (close_daily or (d == end_d)):
                 curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
@@ -82,10 +87,8 @@ def rbreaker_sim( mdf, config):
                 curr_pos = []
                 mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost) 
                 pos = 0
-        elif (min_id <= config['start_min']):
-            continue
         else:
-            if num_trades >=2:
+            if num_trades >=3:
                 continue
             if rev_flag and (((cur_high < dslice.bbreak) and (cur_high >= dslice.ssetup) and (mslice.close < dslice.senter) and (pos >=0)) or \
                             ((cur_low > dslice.sbreak)  and (cur_low  <= dslice.bsetup) and (mslice.close > dslice.benter) and (pos <=0))):
@@ -104,11 +107,19 @@ def rbreaker_sim( mdf, config):
                 pos = -unit*misc.sign(pos)
                 mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
                 num_trades += 1
-            elif ((mslice.high >= dslice.bbreak) or (mslice.low <= dslice.sbreak)) and (pos == 0):
+            elif ((mslice.high >= dslice.bbreak) and (pos <= 0)) or ((mslice.low <= dslice.sbreak) and (pos >= 0)):
                 if (mslice.close >= dslice.bbreak):
                     direction = 1
                 else:
                     direction = -1
+                if pos != 0:
+                    curr_pos[0].close(mslice.close-direction*offset, dd)
+                    tradeid += 1
+                    curr_pos[0].exit_tradeid = tradeid
+                    closed_trades.append(curr_pos[0])
+                    curr_pos = []
+                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost) 
+                    pos = 0
                 new_pos = pos_class([mslice.contract], [1], unit*direction, mslice.close, 0, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
