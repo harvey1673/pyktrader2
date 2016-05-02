@@ -58,7 +58,7 @@ def rbreaker_sim( mdf, config):
             cur_high = mslice.high
             cur_low = mslice.low
             if d not in ddf.index:
-                continue
+                print d, dd
             else:
                 dslice = ddf.ix[d]
             if np.isnan(dslice.bbreak):
@@ -69,8 +69,8 @@ def rbreaker_sim( mdf, config):
                 rev_flag = True
             prev_d = d
         else:
-            cur_high = max([cur_high, mslice.high])
-            cur_low = min([cur_low, mslice.low])        
+            cur_high = max(cur_high, mslice.high)
+            cur_low = min(cur_low, mslice.low)
         if len(curr_pos) == 0:
             pos = 0
         else:
@@ -90,8 +90,29 @@ def rbreaker_sim( mdf, config):
         else:
             if num_trades >=3:
                 continue
-            if rev_flag and (((cur_high < dslice.bbreak) and (cur_high >= dslice.ssetup) and (mslice.close < dslice.senter) and (pos >=0)) or \
-                            ((cur_low > dslice.sbreak)  and (cur_low  <= dslice.bsetup) and (mslice.close > dslice.benter) and (pos <=0))):
+            if ((mslice.high >= dslice.bbreak) and (pos <= 0)) or ((mslice.low <= dslice.sbreak) and (pos >= 0)):
+                rev_flag = False
+                if (mslice.close >= dslice.bbreak):
+                    direction = 1
+                else:
+                    direction = -1
+                if pos != 0:
+                    curr_pos[0].close(mslice.close + direction*offset, dd)
+                    tradeid += 1
+                    curr_pos[0].exit_tradeid = tradeid
+                    closed_trades.append(curr_pos[0])
+                    curr_pos = []
+                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
+                new_pos = pos_class([mslice.contract], [1], unit*direction, mslice.close, 0, **pos_args)
+                tradeid += 1
+                new_pos.entry_tradeid = tradeid
+                new_pos.open(mslice.close + offset*direction, dd)
+                curr_pos.append(new_pos)
+                pos = unit*direction
+                mdf.ix[dd, 'cost'] -=  abs(direction) * (offset + mslice.close*tcost)
+                num_trades += 1
+            elif rev_flag and (((cur_high < dslice.bbreak) and (cur_high >= dslice.ssetup) and (mslice.close <= dslice.senter) and (pos >=0)) or \
+                            ((cur_low > dslice.sbreak)  and (cur_low  <= dslice.bsetup) and (mslice.close >= dslice.benter) and (pos <=0))):
                 if len(curr_pos) > 0:
                     curr_pos[0].close(mslice.close-misc.sign(pos)*offset, dd)
                     tradeid += 1
@@ -107,27 +128,6 @@ def rbreaker_sim( mdf, config):
                 pos = -unit*misc.sign(pos)
                 mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
                 num_trades += 1
-            elif ((mslice.high >= dslice.bbreak) and (pos <= 0)) or ((mslice.low <= dslice.sbreak) and (pos >= 0)):
-                if (mslice.close >= dslice.bbreak):
-                    direction = 1
-                else:
-                    direction = -1
-                if pos != 0:
-                    curr_pos[0].close(mslice.close-direction*offset, dd)
-                    tradeid += 1
-                    curr_pos[0].exit_tradeid = tradeid
-                    closed_trades.append(curr_pos[0])
-                    curr_pos = []
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost) 
-                    pos = 0
-                new_pos = pos_class([mslice.contract], [1], unit*direction, mslice.close, 0, **pos_args)
-                tradeid += 1
-                new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.close + offset*misc.sign(direction), dd)
-                curr_pos.append(new_pos)
-                pos = unit*direction
-                mdf.ix[dd, 'cost'] -=  abs(direction) * (offset + mslice.close*tcost)
-                num_trades += 1                
         mdf.ix[dd, 'pos'] = pos
     (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
@@ -140,8 +140,8 @@ def gen_config_file(filename):
     sim_config['scen_keys'] = ['min_rng', 'params']
     sim_config['sim_name']   = 'RBreaker_'
     sim_config['products']   = ['y', 'p', 'l', 'pp', 'cs', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'j', 'jd', 'jm', 'ag', 'cu', 'm', 'RM', 'ru']
-    sim_config['start_date'] = '20141101'
-    sim_config['end_date']   = '20160219'
+    sim_config['start_date'] = '20150102'
+    sim_config['end_date']   = '20160331'
     sim_config['need_daily'] = True
     sim_config['min_rng']  =  [ 0.015, 0.02, 0.025 ]
     sim_config['params'] = [(0.25, 0.05, 0.15), (0.30, 0.06, 0.20), (0.35, 0.08, 0.25), (0.4, 0.1, 0.3)]    
@@ -158,6 +158,7 @@ def gen_config_file(filename):
               'pos_args': {},
               'pos_update': False,
               'start_min': 303,
+              'exit_min': 2055,
               #'chan_func': chan_func,
               }
     sim_config['config'] = config

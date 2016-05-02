@@ -41,9 +41,9 @@ trade_offset_dict = {
                 'm':  1,    'RM': 1,    'y' : 2,    'p': 2,
                 'c':  1,    'CF': 5,    'i' : 0.5,  'j': 0.5,
                 'jm': 0.5,  'pp': 1,    'l' : 5,    'SR': 1,
-                'TA': 2,    'TC': 0.2,  'ME': 1,    'IF': 0.4,
-                'jd': 1,    'ni': 10,   'IC': 1.0,
-                'IH': 0.4,  'FG': 1,    'TF':0.005, 'OI': 2,
+                'TA': 2,    'TC': 0.2,  'ME': 1,    'IF': 0.2,
+                'jd': 1,    'ni': 10,   'IC': 0.2,
+                'IH': 0.2,  'FG': 1,    'TF':0.005, 'OI': 2,
                 'T': 0.005, 'MA': 1,    'cs': 1,    'bu': 1,
                 'sn': 10,   'v':  5,    'ZC': 0.2,
                 }
@@ -66,7 +66,7 @@ def get_asset_tradehrs(asset):
     hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
     if exch in ['SSE', 'SZE']:
         hrs = [(1530, 1730), (1900, 2100)]
-    elif exch == 'CFFEX':
+    elif asset in ['TF', 'IF']:
         hrs = [(1515, 1730), (1900, 2115)]
     else:
         if asset in misc.night_session_markets:
@@ -82,8 +82,13 @@ def cleanup_mindata(df, asset):
             cond = (df.min_id>= tradehrs[idx][0]) & (df.min_id < tradehrs[idx][1])
         else:
             cond = cond | (df.min_id>= tradehrs[idx][0]) & (df.min_id < tradehrs[idx][1])
-    if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'm']:
+    if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'jm']:
         cond = cond | ((df.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (df.min_id>=300) & (df.min_id<830))
+    if asset in ['rb', 'hc', 'bu']:
+        cond = cond | ((df.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (df.min_id>=300) & (df.min_id < 700))
+    if asset in ['IF', 'IH', 'IC']:
+        cond = cond | ((df.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (df.min_id>=1515) & (df.min_id < 1530))
+        cond = cond | ((df.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (df.min_id>=2100) & (df.min_id < 2115))
     df = df.ix[cond]
     df = df[(df.close > 0) & (df.high > 0) & (df.open > 0) & (df.low > 0)]
     return df
@@ -257,15 +262,16 @@ def simlauncher_min(config_file):
                 start_date =  max(sim_start_dict[asset], config['start_date'])
             else:
                 start_date = config['start_date']
+            config['tick_base'] = trade_offset_dict[asset]
             if 'offset' in sim_config:
                 config['offset'] = sim_config['offset'] * trade_offset_dict[asset]
             else:
                 config['offset'] = trade_offset_dict[asset]
             config['marginrate'] = ( sim_margin_dict[asset], sim_margin_dict[asset])
             config['nearby'] = 1
-            config['rollrule'] = '-50b'
-            config['exit_min'] = 2112
-            config['no_trade_set'] = range(300, 301) + range(1500, 1501) + range(2059, 2100)
+            config['rollrule'] = config.get('rollrule', '-50b')
+            config['exit_min'] = config.get('exit_min', 2057)
+            config['no_trade_set'] = config.get('no_trade_set', range(300, 301) + range(1500, 1501) + range(2059, 2100))
             if asset in ['cu', 'al', 'zn']:
                 config['nearby'] = 3
                 config['rollrule'] = '-1b'
