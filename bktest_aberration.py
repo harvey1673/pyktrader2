@@ -115,7 +115,7 @@ def gen_config_file(filename):
     sim_config['end_date']   = '20160429'
     sim_config['need_daily'] = True
     sim_config['freq']  =  [ '15min', '30min', '60min']
-    sim_config['bbands'] = [(20, 1), (40, 1)]
+    sim_config['bbands'] = [(40, 1)]
     sim_config['chan'] = [10, 20]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
