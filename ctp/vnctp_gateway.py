@@ -207,6 +207,14 @@ class VnctpMdApi(MdApi):
             self.reqID += 1
             self.reqUserLogin(req, self.reqID)    
 
+    def logout(self):
+        if self.userID and self.brokerID:
+            req = {}
+            req['UserID'] = self.userID
+            req['BrokerID'] = self.brokerID
+            self.reqID += 1
+            self.reqUserLogout(req, self.reqID)
+
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
@@ -912,16 +920,8 @@ class VnctpTdApi(TdApi):
             req['Password'] = self.password
             req['BrokerID'] = self.brokerID
             self.reqID += 1
-            self.reqUserLogin(req, self.reqID)
-
-    def logout(self):
-        if self.userID and self.brokerID:
-            req = {}
-            req['UserID'] = self.userID
-            req['BrokerID'] = self.brokerID
-            self.reqID += 1
-            self.reqUserLogout(req, self.reqID)
-
+            self.reqUserLogin(req, self.reqID)   
+        
     #----------------------------------------------------------------------
     def qryOrder(self):
         self.reqID += 1
@@ -970,10 +970,20 @@ class VnctpTdApi(TdApi):
         req['VolumeTotalOriginal'] = iorder.volume
         
         # 下面如果由于传入的类型本接口不支持，则会返回空字符串
-        req['OrderPriceType'] = iorder.price_type
         req['Direction'] = iorder.direction
         req['CombOffsetFlag'] = iorder.action_type
-            
+        if iorder.price_type == OPT_FAK_ORDER:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']
+        elif iorder.price_type == OPT_FOK_ORDER:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_CV']
+        else:
+            req['OrderPriceType'] = iorder.price_type
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         req['OrderRef'] = str(iorder.local_id)
         req['InvestorID'] = self.userID
         req['UserID'] = self.userID
@@ -982,8 +992,6 @@ class VnctpTdApi(TdApi):
         req['ContingentCondition'] = defineDict['THOST_FTDC_CC_Immediately'] # 立即发单
         req['ForceCloseReason'] = defineDict['THOST_FTDC_FCC_NotForceClose'] # 非强平
         req['IsAutoSuspend'] = 0                                             # 非自动挂起
-        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
-        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         req['MinVolume'] = 1                                                 # 最小成交量为1
         self.reqOrderInsert(req, self.reqID)
     
