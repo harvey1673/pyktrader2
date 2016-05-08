@@ -59,6 +59,7 @@ def rbreaker_sim( mdf, config):
             cur_low = mslice.low
             if d not in ddf.index:
                 print d, dd
+                continue
             else:
                 dslice = ddf.ix[d]
             if np.isnan(dslice.bbreak):
@@ -139,12 +140,12 @@ def gen_config_file(filename):
     sim_config['sim_func']  = 'bktest_rbreaker.rbreaker_sim'
     sim_config['scen_keys'] = ['min_rng', 'params']
     sim_config['sim_name']   = 'RBreaker_'
-    sim_config['products']   = ['y', 'p', 'l', 'pp', 'cs', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'j', 'jd', 'jm', 'ag', 'cu', 'm', 'RM', 'ru']
+    sim_config['products']   = ['y', 'p', 'l', 'pp', 'rb', 'SR', 'TA', 'MA', 'i', 'j', 'ru']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160331'
+    sim_config['end_date']   = '20160429'
     sim_config['need_daily'] = True
-    sim_config['min_rng']  =  [ 0.015, 0.02, 0.025 ]
-    sim_config['params'] = [(0.25, 0.05, 0.15), (0.30, 0.06, 0.20), (0.35, 0.08, 0.25), (0.4, 0.1, 0.3)]    
+    sim_config['min_rng']  =  [ 0.02, 0.025, 0.03 ]
+    sim_config['params'] = [(0.25, 0.05, 0.15), (0.30, 0.06, 0.20), (0.35, 0.07, 0.25), (0.4, 0.1, 0.3)]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
     #chan_func = { 'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},

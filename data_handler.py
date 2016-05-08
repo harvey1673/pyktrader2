@@ -302,13 +302,13 @@ def ULTOSC(df):
     return UltO
 
 #Donchian Channel
-def DONCH_H(df, n):
-    DC_H = pd.rolling_max(df['high'],n)
-    return pd.Series(DC_H, name = 'DONCH_H'+ str(n))
+def DONCH_H(df, n, field = 'high'):
+    DC_H = pd.rolling_max(df[field],n)
+    return pd.Series(DC_H, name = 'DONCH_' + field[0].upper() + str(n))
 
-def DONCH_L(df, n):    
-    DC_L = pd.rolling_min(df['low'], n)
-    return pd.Series(DC_L, name = 'DONCH_L'+ str(n))
+def DONCH_L(df, n, field = 'low'):
+    DC_L = pd.rolling_min(df[field], n)
+    return pd.Series(DC_L, name = 'DONCH_'+ field[0].upper() + str(n))
 
 def DONCH_IDX(df, n):
     high = pd.Series(pd.rolling_max(df['high'], n), name = 'DONCH_H'+ str(n))
@@ -329,11 +329,11 @@ def CHENOW_PLUNGER(df, n, atr_n = 40):
     low  = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/atr, name = 'CPLUNGER_L'+ str(n))
     return pd.concat([high,low], join='outer', axis=1)
 
-def donch_h(df, n):
-    df.ix[-1,'DONCH_H'+str(n)] = max(df.ix[-n:,'high'])
+def donch_h(df, n, field = 'high'):
+    df.ix[-1,'DONCH_'+ field[0].upper() + str(n)] = max(df.ix[-n:,field])
  
-def donch_l(df, n):
-    df.ix[-1,'DONCH_L'+str(n)] = min(df.ix[-n:,'low'])
+def donch_l(df, n, field = 'low'):
+    df.ix[-1,'DONCH_'+ field[0].upper() + str(n)] = min(df.ix[-n:,field])
 
 def DONCH_C(df, n):
     DC_H = pd.rolling_max(df['close'],n)

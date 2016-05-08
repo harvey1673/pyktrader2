@@ -94,18 +94,21 @@ def cleanup_mindata(df, asset):
     return df
 
 def stat_min2daily(df):
-    return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
+    return pd.Series([df['net_pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['net_pnl','cost','margin'])
 
 def get_pnl_stats(df, start_capital, marginrate, freq):
     df['pnl'] = df['pos'].shift(1)*(df['close'] - df['close'].shift(1)).fillna(0.0)
+    if 'traded_price' in df.columns:
+        df['pnl'] = df['pnl'] + (df['pos'] - df['pos'].shift(1).fillna(0.0))*(df['close'] - df['traded_price'])
     df['margin'] = pd.concat([df.pos*marginrate[0]*df.close, -df.pos*marginrate[1]*df.close], join='outer', axis=1).max(1)
+    df['net_pnl'] = df['pnl'] - df['cost']
     if freq == 'm':
         res = df.groupby([df['date']]).apply(stat_min2daily).reset_index().set_index(['date'])
-        daily_pnl = pd.Series(res['pnl'])
+        daily_pnl = pd.Series(res['net_pnl'])
         daily_margin = pd.Series(res['margin'])
         daily_cost = pd.Series(res['cost'])
     else:
-        daily_pnl = pd.Series(df['pnl'])
+        daily_pnl = pd.Series(df['net_pnl'])
         daily_margin = pd.Series(df['margin'])
         daily_cost = pd.Series(df['cost'])
     daily_pnl.name = 'daily_pnl'

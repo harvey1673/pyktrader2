@@ -14,17 +14,18 @@ def aberration_sim( mdf, config):
     offset = config['offset']
     pos_class = config['pos_class']
     pos_args  = config['pos_args']
-    bbands = config['bbands']
+    param = config['param']
     tick_base = config['tick_base']
     close_daily = config['close_daily']
-    win = bbands[0]
-    k = bbands[1]
-    chan = config.get('chan', 0)
+    win = param[0]
+    k = param[1]
+    chan = param[2]
     if chan > 0:
         chan_func = config['chan_func']
     tcost = config['trans_cost']
     unit = config['unit']
     freq = config['freq']
+    #freq_min = int(freq[:-3])
     mode = config.get('mode', 'close')
     xdf = dh.conv_ohlc_freq(mdf, freq)
     boll_ma = dh.MA(xdf, win).shift(1)
@@ -32,8 +33,8 @@ def aberration_sim( mdf, config):
     upbnd = np.ceil((boll_ma + boll_std * k)/tick_base) * tick_base
     lowbnd = np.floor((boll_ma - boll_std * k)/tick_base) * tick_base
     boll_ma = np.floor(boll_ma/tick_base + 0.5) * tick_base
-    xdata = [boll_ma, boll_std, upbnd, lowbnd]
-    xkeys = ['ma', 'stdev', 'upbnd', 'lowbnd']
+    xdata = [boll_ma, boll_std, upbnd, lowbnd, xdf['min_id']]
+    xkeys = ['ma', 'stdev', 'upbnd', 'lowbnd', 'xmin_id']
     if chan > 0:
         chan_h = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args'])
         chan_l = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args'])
@@ -41,7 +42,7 @@ def aberration_sim( mdf, config):
         xkeys = xkeys + ['chan_h', 'chan_l']
     xdf = pd.concat( xdata, axis=1, keys=xkeys).fillna(0)
     mdf = mdf.join(xdf, how = 'left').fillna(method='ffill')
-    # mdf['next_open'] = mdf['open'].shift(-1)
+    mdf['is_new'] = (mdf['xmin_id'].shift(1) != mdf['xmin_id'])
     ll = mdf.shape[0]
     mdf['pos'] = pd.Series([0]*ll, index = mdf.index)
     mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
@@ -63,8 +64,14 @@ def aberration_sim( mdf, config):
         mdf.ix[dd, 'pos'] = pos
         if mslice.ma == 0:
             continue
-        if chan > 0 and mslice.chan_h == 0:
-            continue
+        upbnd = mslice.upbnd
+        lowbnd = mslice.lowbnd
+        if chan > 0:
+            if mslice.chan_h == 0:
+                continue
+            else:
+                upbnd  = max(mslice.chan_h, upbnd)
+                lowbnd = min(mslice.chan_l, lowbnd)
         if min_id >=config['exit_min']:
             if (pos!=0) and ((d == end_d) or close_daily):
                 curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
@@ -95,18 +102,18 @@ def aberration_sim( mdf, config):
                 curr_pos = []
                 mdf.ix[dd, 'cost'] -= abs(pos) * (offset + exec_price*tcost)
                 pos = 0
-            if ((high_trig > mslice.upbnd) and (pos<=0)) or ((low_trig < mslice.lowbnd) and (pos>=0)):
-                target_pos = ( high_trig > mslice.upbnd) * unit - (low_trig < mslice.lowbnd) * unit
+            if ((high_trig > upbnd) and (pos<=0)) or ((low_trig < lowbnd) and (pos>=0)):
+                target_pos = ( high_trig > upbnd) * unit - (low_trig < lowbnd) * unit
                 if target_pos == 0:
                     print "the min bar hit both up and low bounds, need to think about how to handle it", start_pos, mslice
                     if mslice.close > mslice.ma:
-                        target_pos = (high_trig > mslice.upbnd) * unit
-                        target = max(trade_price, mslice.upbnd)
+                        target_pos = (high_trig > upbnd) * unit
+                        target = max(trade_price, upbnd)
                     else:
-                        trade_pos = - (low_trig < mslice.lowbnd) * unit
-                        target =  min(trade_price, mslice.lowbnd)
+                        trade_pos = - (low_trig < lowbnd) * unit
+                        target =  min(trade_price, lowbnd)
                 else:
-                    target = (high_trig > mslice.upbnd) * max(trade_price, mslice.upbnd) + ( low_trig < mslice.lowbnd ) * min(trade_price, mslice.lowbnd)
+                    target = (high_trig > upbnd) * max(trade_price, upbnd) + (low_trig < lowbnd) * min(trade_price, lowbnd)
                 new_pos = pos_class([mslice.contract], [1], target_pos, target, target, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
@@ -123,15 +130,15 @@ def aberration_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_aberration.aberration_sim'
-    sim_config['scen_keys'] = ['freq', 'bbands']
+    sim_config['scen_keys'] = ['freq', 'param']
     sim_config['sim_name']   = 'Abberation_'
     sim_config['products']   = ['y', 'p', 'l', 'pp', 'cs', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'j', 'jd', 'jm', 'ag', 'cu', 'm', 'RM', 'ru']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160429'
     sim_config['need_daily'] = True
     sim_config['freq']  =  [ '15min', '30min', '60min']
-    sim_config['bbands'] = [(40, 1)]
-    sim_config['chan'] = [10, 20]
+    sim_config['param'] = [(20, 1, 0), (20, 1, 5), (20, 1, 10), (30, 1, 0), (30, 1, 5), (30, 1, 10), (30, 1, 15), (40, 1, 0), (40, 1, 10), (40, 1, 20), \
+                           (20, 1.5, 0), (20, 1.5, 5), (20, 1.5, 10), (30, 1.5, 0), (30, 1.5, 5), (30, 1.5, 10), (30, 1.5, 15), (40, 1.5, 0), (40, 1.5, 10), (40, 1.5, 20)]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
