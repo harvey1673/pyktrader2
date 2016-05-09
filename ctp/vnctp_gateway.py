@@ -972,6 +972,9 @@ class VnctpTdApi(TdApi):
         # 下面如果由于传入的类型本接口不支持，则会返回空字符串
         req['Direction'] = iorder.direction
         req['CombOffsetFlag'] = iorder.action_type
+        req['OrderPriceType'] = iorder.price_type
+        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
+        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         if iorder.price_type == OPT_FAK_ORDER:
             req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
             req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
@@ -980,10 +983,6 @@ class VnctpTdApi(TdApi):
             req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
             req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
             req['VolumeCondition'] = defineDict['THOST_FTDC_VC_CV']
-        else:
-            req['OrderPriceType'] = iorder.price_type
-            req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
-            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         req['OrderRef'] = str(iorder.local_id)
         req['InvestorID'] = self.userID
         req['UserID'] = self.userID
