@@ -141,8 +141,8 @@ def gen_config_file(filename):
                            (20, 1.5, 0), (20, 1.5, 5), (20, 1.5, 10), (30, 1.5, 0), (30, 1.5, 5), (30, 1.5, 10), (30, 1.5, 15), (40, 1.5, 0), (40, 1.5, 10), (40, 1.5, 20)]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
-    chan_func = { 'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
-                  'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}}}
+    chan_func = { 'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'close'}},
+                  'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'close'}}}
     config = {'capital': 10000,
               'chan': 0,
               'trans_cost': 0.0,

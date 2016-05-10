@@ -445,8 +445,8 @@ class CtpGateway(Gateway):
             print "update contract table, new inst # = %s" % len(self.qry_instruments)
             for instID in self.qry_instruments:
                 mysqlaccess.insert_cont_data(self.qry_instruments[instID])
-            print "logout TD"
-            self.tdApi.logout()
+            #print "logout TD"
+            #self.tdApi.logout()
 
     def rsp_qry_investor(self, event):
         pass

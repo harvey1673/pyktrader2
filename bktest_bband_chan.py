@@ -105,7 +105,7 @@ def gen_config_file(filename):
     sim_config['products']   = ['rb', 'ru', 'TA', 'MA', 'i', 'j']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160429'
-    sim_config['need_daily'] = True
+    sim_config['need_daily'] = False
     sim_config['freq']  =  [ '15min']
     sim_config['param'] = [(20, 1, 0), (20, 1, 10), (20, 1, 20), (20, 1.5, 0), (20, 1, 5, 10), (20, 1.5, 20), (40, 1, 0), (40, 1, 20), (40, 1, 40), \
                            (40, 1.5, 0), (40, 1.5, 20), (40, 1.5, 40), (80, 1, 0), (80, 1, 40), (80, 1, 80), (80, 1.5, 0), (80, 1.5, 40), (80, 1.5, 80)]

@@ -101,7 +101,7 @@ def get_pnl_stats(df, start_capital, marginrate, freq):
     if 'traded_price' in df.columns:
         df['pnl'] = df['pnl'] + (df['pos'] - df['pos'].shift(1).fillna(0.0))*(df['close'] - df['traded_price'])
     df['margin'] = pd.concat([df.pos*marginrate[0]*df.close, -df.pos*marginrate[1]*df.close], join='outer', axis=1).max(1)
-    df['net_pnl'] = df['pnl'] - df['cost']
+    df['net_pnl'] = df['pnl'] + df['cost']
     if freq == 'm':
         res = df.groupby([df['date']]).apply(stat_min2daily).reset_index().set_index(['date'])
         daily_pnl = pd.Series(res['net_pnl'])
