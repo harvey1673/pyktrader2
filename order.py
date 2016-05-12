@@ -330,8 +330,8 @@ class Position(object):
         return '%s' % (self.instrument.name)
         
 class GrossPosition(Position):
-    def __init__(self, instrument, gateway = 'CTP'):
-        super(SHFEPosition, self).__init__(instrument, gateway)        
+    def __init__(self, instrument, gateway = 'CTP', intraday_close_ratio = 1):
+        super(GrossPosition, self).__init__(instrument, gateway)
         self.tday_pos = BaseObject(long=0, short=0) 
         self.tday_avp = BaseObject(long=0.0, short=0.0)        
         self.pos_tday = BaseObject(long=0, short=0)
@@ -341,21 +341,18 @@ class GrossPosition(Position):
         self.can_yclose = BaseObject(long=0, short=0)
         self.can_close  = BaseObject(long=0, short=0)
         self.can_open = BaseObject(long=0, short=0)
-        self.intraday_close_ratio = 1
+        self.intraday_close_ratio = intraday_close_ratio
     
     def set_intraday_close_ratio(self, ratio):
         self.intraday_close_ratio = ratio
     
-    def update_can_close(self):
+    def update_can_close(self, tday_opened, tday_c_locked, yday_c_locked):
         self.can_yclose.long  = 0
         self.can_yclose.short = 0
         self.can_close.long  = max(self.pos_yday.short + tday_opened.short * self.intraday_close_ratio - tday_c_locked.long, 0) 
         self.can_close.short = max(self.pos_yday.long  + tday_opened.long * self.intraday_close_ratio  - tday_c_locked.short,0) 
         
     def re_calc(self): #
-        #print self.orders
-        #self.orders = [order for order in self.orders if not order.is_closed()]
-        #print self.orders
         tday_opened = BaseObject(long=0, short=0)
         tday_o_locked = BaseObject(long=0, short=0)
         tday_closed = BaseObject(long=0,short=0)
@@ -387,7 +384,7 @@ class GrossPosition(Position):
                     yday_closed.short += mo.filled_volume
                     yday_c_locked.short += mo.volume    
         
-        self.update_can_close()            
+        self.update_can_close(tday_opened, tday_c_locked, yday_c_locked)
         self.tday_pos.long  = tday_opened.long + tday_closed.long + yday_closed.long
         self.tday_pos.short = tday_opened.short + tday_closed.short + yday_closed.short
         
@@ -421,10 +418,10 @@ class GrossPosition(Position):
 
 ####头寸
 class SHFEPosition(GrossPosition):
-    def __init__(self, instrument, gateway = 'CTP'):
-        super(SHFEPosition, self).__init__(instrument, gateway)
+    def __init__(self, instrument, gateway = 'CTP', intraday_close_ratio = 1):
+        super(SHFEPosition, self).__init__(instrument, gateway, intraday_close_ratio)
     
-    def update_can_close(self):
+    def update_can_close(self, tday_opened, tday_c_locked, yday_c_locked):
         self.can_yclose.long  = max(self.pos_yday.short - yday_c_locked.long, 0)
         self.can_yclose.short = max(self.pos_yday.long  - yday_c_locked.short,0)
         self.can_close.long  = max(tday_opened.short * self.intraday_close_ratio - tday_c_locked.long, 0) 

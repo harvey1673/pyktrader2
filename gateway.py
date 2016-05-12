@@ -70,16 +70,21 @@ class Gateway(object):
         self.order_stats = {'total_submit': 0, 'total_failure': 0, 'total_cancel':0 }
         for inst in self.instruments:
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
-            self.positions[inst] = order.Position(self.agent.instruments[inst], self)
+            (pos_cls, pos_args) = self.get_pos_class(self.agent.instruments[inst])
+            self.positions[inst] = pos_cls(self.agent.instruments[inst], self, **pos_args)
             self.positions[inst].pos_yday.long = eod_pos[inst][0]
             self.positions[inst].pos_yday.short = eod_pos[inst][1]
             self.positions[inst].re_calc()
         self.account_info['prev_capital'] = self.account_info['curr_capital']
 
+    def get_pos_class(self, inst):
+        return (order.GrossPosition, {})
+
     def add_instrument(self, instID):
         self.instruments.append(instID)
         if instID not in self.positions:
-            self.positions[instID] = order.Position(self.agent.instruments[instID], self)
+            (pos_cls, pos_args) = self.get_pos_class(self.agent.instruments[instID])
+            self.positions[instID] = pos_cls(self.agent.instruments[instID], self, **pos_args)
         if instID not in self.order_stats:
             self.order_stats[instID] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
         if instID not in self.qry_pos:
@@ -204,7 +209,8 @@ class Gateway(object):
                     inst = row[1]
                     if inst in self.instruments:
                         if inst not in self.positions:
-                            self.positions[inst] = order.Position(self.agent.instruments[inst], self)
+                            (pos_cls, pos_args) = self.get_pos_class(self.agent.instruments[inst])
+                            self.positions[inst] = pos_cls(self.agent.instruments[inst], self, **pos_args)
                         self.positions[inst].pos_yday.long = int(row[2])
                         self.positions[inst].pos_yday.short = int(row[3])
         return True
