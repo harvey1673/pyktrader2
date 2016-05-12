@@ -26,24 +26,23 @@ def bband_chan_sim( mdf, config):
     unit = config['unit']
     freq = config['freq']
     xdf = dh.conv_ohlc_freq(mdf, freq)
-    xdf['boll_ma'] = dh.MA(xdf, win)
-    boll_std = dh.STDDEV(xdf, win)
+    xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
+    boll_std = dh.STDDEV(xdf, win).shift(1)
     xdf['upbnd'] = np.ceil((xdf['boll_ma'] + boll_std * k)/tick_base) * tick_base
     xdf['lowbnd'] = np.floor((xdf['boll_ma'] - boll_std * k)/tick_base) * tick_base
     if chan > 0:
-        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args'])
-        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args'])
+        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
+        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
     else:
         xdf['chan_h'] = 0
         xdf['chan_l'] = 10000000
     xdf['high_band'] = xdf[['chan_h', 'upbnd']].max(axis=1)
     xdf['low_band'] = xdf[['chan_l', 'lowbnd']].min(axis=1)
-    xdf['next_open'] = xdf['open'].shift(-1)
-    xdf['next_time'] = xdf.index
-    xdf['next_time'] = xdf['next_time'].shift(-1)
-    xdf['close_ind'] = np.isnan(xdf['next_open'])
-    daily_end = (xdf['date']!=xdf['date'].shift(-1))
-    xdf['close_ind'] = xdf['close_ind'] & daily_end
+    xdf['prev_close'] = xdf['close'].shift(1)
+    xdf['close_ind'] = np.isnan(xdf['prev_close'])
+    if close_daily:
+        daily_end = (xdf['date']!=xdf['date'].shift(-1))
+        xdf['close_ind'] = xdf['close_ind'] | daily_end
     ll = xdf.shape[0]
     xdf['pos'] = pd.Series([0]*ll, index = xdf.index)
     xdf['cost'] = pd.Series([0]*ll, index = xdf.index)
@@ -53,7 +52,6 @@ def bband_chan_sim( mdf, config):
     tradeid = 0
     for idx, dd in enumerate(xdf.index):
         mslice = xdf.ix[dd]
-        min_id = mslice.min_id
         if len(curr_pos) == 0:
             pos = 0
         else:
