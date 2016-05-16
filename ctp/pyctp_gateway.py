@@ -138,8 +138,7 @@ class PyctpMdApi(py_ctp.MdApi):
             self.gateway.onLog(logContent, level = logging.DEBUG)
             return
         event = Event(type = EVENT_MARKETDATA + self.gatewayName)
-        data = dp.__dict__
-        event.dict['data'] = data
+        event.dict['data'] = dict((name, getattr(dp, name)) for name in dir(dp) if not name.startswith('_'))
         event.dict['gateway'] = self.gatewayName
         self.gateway.eventEngine.put(event)
         
@@ -191,7 +190,7 @@ class PyctpMdApi(py_ctp.MdApi):
         # 这里的设计是，如果尚未登录就调用了订阅方法
         # 则先保存订阅请求，登录完成后会自动订阅
         if self.loginStatus:
-            self.SubscribeMarketData(str(symbol))
+            self.SubscribeMarketData([str(symbol)])
         if symbol not in self.gateway.instruments:
             self.gateway.instruments.append(symbol)
         
@@ -207,16 +206,7 @@ class PyctpMdApi(py_ctp.MdApi):
             req_data = self.ApiStruct.ReqUserLogin(**req)
             self.reqID += 1
             self.ReqUserLogin(req_data, self.reqID)    
-
-    def logout(self):
-        if self.userID and self.brokerID:
-            req = {}
-            req['UserID'] = self.userID
-            req['BrokerID'] = self.brokerID
-            req_data = self.ApiStruct.ReqUserLogout(**req)
-            self.reqID += 1
-            self.ReqUserLogout(req_data, self.reqID)
-
+    
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
@@ -352,8 +342,8 @@ class PyctpTdApi(py_ctp.TraderApi):
 
         if data != None:
             event2 = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
-            event2.dict['data'] = data.__dict__
-            event2.dict['error'] = error.__dict__
+            event2.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+            event2.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
             event2.dict['gateway'] = self.gatewayName
             self.gateway.eventEngine.put(event2)
     
@@ -363,7 +353,7 @@ class PyctpTdApi(py_ctp.TraderApi):
         # 更新最大报单编号
         if data != None:
             event = Event(type=EVENT_RTNORDER + self.gatewayName)
-            event.dict['data'] = data.__dict__
+            event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
             self.gateway.eventEngine.put(event)
     
     #----------------------------------------------------------------------
@@ -372,7 +362,7 @@ class PyctpTdApi(py_ctp.TraderApi):
         # 创建报单数据对象
         if data != None:
             event = Event(type=EVENT_RTNTRADE+self.gatewayName)
-            event.dict['data'] = data.__dict__
+            event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
             self.gateway.eventEngine.put(event)
     
     #----------------------------------------------------------------------
@@ -380,8 +370,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         """发单错误回报（交易所）"""
         if data != None:
             event = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
-            event.dict['data'] = data.__dict__
-            event.dict['error'] = error.__dict__
+            event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+            event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
             self.gateway.eventEngine.put(event)
 
         err = VtErrorData()
@@ -395,8 +385,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         """撤单错误回报（交易所）"""
         if data != None:
             event = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
-            event.dict['data'] = data.__dict__
-            event.dict['error'] = error.__dict__
+            event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+            event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
             event.dict['gateway'] = self.gatewayName
             self.gateway.eventEngine.put(event)
 
@@ -416,8 +406,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         self.gateway.onError(err)
         if data != None:
             event2 = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
-            event2.dict['data'] = data.__dict__
-            event2.dict['error'] = error.__dict__
+            event2.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+            event2.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
             event2.dict['gateway'] = self.gatewayName
             self.gateway.eventEngine.put(event2)
 
@@ -443,10 +433,10 @@ class PyctpTdApi(py_ctp.TraderApi):
     def OnRspQryTradingAccount(self, data, error, n, last):
         """资金账户查询回报"""
         if self.isRspSuccess(error):
-            items = data.__dict__
+            items =  dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
             if len(items) > 0:
                 event = Event(type=EVENT_QRYACCOUNT + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = items
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -505,7 +495,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         if self.isRspSuccess(error):
             if data != None:
                 event = Event(type=EVENT_QRYORDER + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+                event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -518,7 +509,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         if self.isRspSuccess(error):
             if data != None:
                 event = Event(type=EVENT_QRYTRADE + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+                event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -532,7 +524,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         if self.isRspSuccess(error):
             if data != None:
                 event = Event(type=EVENT_QRYPOSITION + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+                event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -545,7 +538,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         if self.isRspSuccess(error):
             if data != None:
                 event = Event(type=EVENT_QRYINVESTOR + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+                event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -583,7 +577,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         if self.isRspSuccess(error):
             if data != None:
                 event = Event(type=EVENT_QRYINSTRUMENT + self.gatewayName )
-                event.dict['data'] = data.__dict__
+                event.dict['data'] = dict((name, getattr(data, name)) for name in dir(data) if not name.startswith('_'))
+                event.dict['error'] = dict((name, getattr(error, name)) for name in dir(error) if not name.startswith('_'))
                 event.dict['last'] = last
                 self.gateway.eventEngine.put(event)
         else:
@@ -998,19 +993,10 @@ class PyctpTdApi(py_ctp.TraderApi):
         req['VolumeTotalOriginal'] = iorder.volume
         
         # 下面如果由于传入的类型本接口不支持，则会返回空字符串
+        req['OrderPriceType'] = iorder.price_type
         req['Direction'] = iorder.direction
         req['CombOffsetFlag'] = iorder.action_type
-        req['OrderPriceType'] = iorder.price_type
-        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
-        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
-        if iorder.price_type == OPT_FAK_ORDER:
-            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
-            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
-            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']
-        elif iorder.price_type == OPT_FOK_ORDER:
-            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
-            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
-            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_CV']
+            
         req['OrderRef'] = str(iorder.local_id)
         req['InvestorID'] = self.userID
         req['UserID'] = self.userID
@@ -1019,6 +1005,8 @@ class PyctpTdApi(py_ctp.TraderApi):
         req['ContingentCondition'] = defineDict['THOST_FTDC_CC_Immediately'] # 立即发单
         req['ForceCloseReason'] = defineDict['THOST_FTDC_FCC_NotForceClose'] # 非强平
         req['IsAutoSuspend'] = 0                                             # 非自动挂起
+        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
+        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         req['MinVolume'] = 1                                                 # 最小成交量为1
         req_data = self.ApiStruct.InputOrder(**req)
         self.ReqOrderInsert(req_data, self.reqID)
