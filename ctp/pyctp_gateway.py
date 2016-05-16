@@ -206,7 +206,16 @@ class PyctpMdApi(py_ctp.MdApi):
             req_data = self.ApiStruct.ReqUserLogin(**req)
             self.reqID += 1
             self.ReqUserLogin(req_data, self.reqID)    
-    
+
+    def logout(self):
+        if self.userID and self.brokerID:
+            req = {}
+            req['UserID'] = self.userID
+            req['BrokerID'] = self.brokerID
+            req_data = self.ApiStruct.ReqUserLogout(**req)
+            self.reqID += 1
+            self.ReqUserLogout(req_data, self.reqID)
+
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
@@ -993,10 +1002,19 @@ class PyctpTdApi(py_ctp.TraderApi):
         req['VolumeTotalOriginal'] = iorder.volume
         
         # 下面如果由于传入的类型本接口不支持，则会返回空字符串
-        req['OrderPriceType'] = iorder.price_type
         req['Direction'] = iorder.direction
         req['CombOffsetFlag'] = iorder.action_type
-            
+        req['OrderPriceType'] = iorder.price_type
+        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
+        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
+        if iorder.price_type == OPT_FAK_ORDER:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']
+        elif iorder.price_type == OPT_FOK_ORDER:
+            req['OrderPriceType'] = defineDict["THOST_FTDC_OPT_LimitPrice"]
+            req['TimeCondition'] = defineDict['THOST_FTDC_TC_IOC']
+            req['VolumeCondition'] = defineDict['THOST_FTDC_VC_CV']
         req['OrderRef'] = str(iorder.local_id)
         req['InvestorID'] = self.userID
         req['UserID'] = self.userID
@@ -1005,8 +1023,6 @@ class PyctpTdApi(py_ctp.TraderApi):
         req['ContingentCondition'] = defineDict['THOST_FTDC_CC_Immediately'] # 立即发单
         req['ForceCloseReason'] = defineDict['THOST_FTDC_FCC_NotForceClose'] # 非强平
         req['IsAutoSuspend'] = 0                                             # 非自动挂起
-        req['TimeCondition'] = defineDict['THOST_FTDC_TC_GFD']               # 今日有效
-        req['VolumeCondition'] = defineDict['THOST_FTDC_VC_AV']              # 任意成交量
         req['MinVolume'] = 1                                                 # 最小成交量为1
         req_data = self.ApiStruct.InputOrder(**req)
         self.ReqOrderInsert(req_data, self.reqID)
