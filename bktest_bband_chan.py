@@ -15,7 +15,7 @@ def bband_chan_sim( mdf, config):
     pos_class = config['pos_class']
     pos_args  = config['pos_args']
     param = config['param']
-    tick_base = config['tick_base']
+    #tick_base = config['tick_base']
     close_daily = config['close_daily']
     win = param[0]
     k = param[1]
@@ -28,8 +28,8 @@ def bband_chan_sim( mdf, config):
     xdf = dh.conv_ohlc_freq(mdf, freq)
     xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
     boll_std = dh.STDDEV(xdf, win).shift(1)
-    xdf['upbnd'] = np.ceil((xdf['boll_ma'] + boll_std * k)/tick_base) * tick_base
-    xdf['lowbnd'] = np.floor((xdf['boll_ma'] - boll_std * k)/tick_base) * tick_base
+    xdf['upbnd'] = xdf['boll_ma'] + boll_std * k
+    xdf['lowbnd'] = xdf['boll_ma'] - boll_std * k
     if chan > 0:
         xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
         xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
@@ -39,14 +39,14 @@ def bband_chan_sim( mdf, config):
     xdf['high_band'] = xdf[['chan_h', 'upbnd']].max(axis=1)
     xdf['low_band'] = xdf[['chan_l', 'lowbnd']].min(axis=1)
     xdf['prev_close'] = xdf['close'].shift(1)
-    xdf['close_ind'] = np.isnan(xdf['prev_close'])
+    xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
     ll = xdf.shape[0]
     xdf['pos'] = pd.Series([0]*ll, index = xdf.index)
     xdf['cost'] = pd.Series([0]*ll, index = xdf.index)
-    xdf['traded_price'] = xdf.close
+    xdf['traded_price'] = xdf.open
     curr_pos = []
     closed_trades = []
     tradeid = 0
@@ -61,35 +61,35 @@ def bband_chan_sim( mdf, config):
             continue
         if mslice.close_ind:
             if pos!=0:
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                xdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.close - abs(pos) * (offset + mslice.close*tcost)
+                xdf.ix[dd, 'cost'] -=  abs(pos) * ( mslice.open * tcost)
+                xdf.ix[dd, 'traded_price'] = mslice.open - misc.sign(pos) * offset
                 pos = 0
         else:
-            if ((mslice.close > mslice.boll_ma) and (pos<0)) or ((mslice.close < mslice.boll_ma) and (pos>0)):
-                curr_pos[0].close(mslice.next_open - misc.sign(pos) * offset, mslice.next_time)
+            if ((mslice.open > mslice.boll_ma) and (pos<0)) or ((mslice.open < mslice.boll_ma) and (pos>0)):
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                xdf.ix[mslice.next_time, 'cost'] -= abs(pos) * (offset + mslice.next_open * tcost)
-                xdf.ix[mslice.next_time, 'traded_price'] = mslice.next_open - abs(pos) * (offset + mslice.next_open * tcost)
+                xdf.ix[dd, 'cost'] -= abs(pos) * (mslice.open * tcost)
+                xdf.ix[dd, 'traded_price'] = mslice.open - misc.sign(pos) * offset
                 pos = 0
-            if ((mslice.close > mslice.high_band) and (pos<=0)) or ((mslice.close < mslice.low_band) and (pos>=0)):
-                target_pos = ( mslice.close > mslice.high_band) * unit - (mslice.close < mslice.low_band) * unit
-                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.next_open, mslice.next_open, **pos_args)
+            if ((mslice.open >= mslice.high_band) or (mslice.open <= mslice.low_band)) and (pos==0):
+                target_pos = ( mslice.open >= mslice.high_band) * unit - (mslice.open <= mslice.low_band) * unit
+                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.next_open + misc.sign(target_pos)*offset, mslice.next_time)
+                new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
                 curr_pos.append(new_pos)
                 pos = target_pos
-                xdf.ix[mslice.next_time, 'cost'] -=  abs(target_pos) * (offset + mslice.next_open * tcost)
-                xdf.ix[mslice.next_time, 'traded_price'] = mslice.next_open - abs(pos) * (offset + mslice.next_open * tcost)
-        mdf.ix[dd, 'pos'] = pos
+                xdf.ix[dd, 'cost'] -=  abs(target_pos) * (mslice.open * tcost)
+                xdf.ix[dd, 'traded_price'] = mslice.open + misc.sign(target_pos)*offset
+        xdf.ix[dd, 'pos'] = pos
     (res_pnl, ts) = backtest.get_pnl_stats( xdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
     res = dict( res_pnl.items() + res_trade.items())
@@ -98,24 +98,24 @@ def bband_chan_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_bband_chan.bband_chan_sim'
-    sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'bbands_chan_'
-    sim_config['products']   = ['rb', 'ru', 'TA', 'MA', 'i', 'j']
+    sim_config['scen_keys'] = ['close_daily', 'param']
+    sim_config['sim_name']   = 'bbands_chan_30min_HL'
+    sim_config['products']   = ['rb', 'i', 'j', 'ZC', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160429'
+    sim_config['end_date']   = '20160513'
     sim_config['need_daily'] = False
-    sim_config['freq']  =  [ '15min']
-    sim_config['param'] = [(20, 1, 0), (20, 1, 10), (20, 1, 20), (20, 1.5, 0), (20, 1, 5, 10), (20, 1.5, 20), (40, 1, 0), (40, 1, 20), (40, 1, 40), \
-                           (40, 1.5, 0), (40, 1.5, 20), (40, 1.5, 40), (80, 1, 0), (80, 1, 40), (80, 1, 80), (80, 1.5, 0), (80, 1.5, 40), (80, 1.5, 80)]
+    sim_config['close_daily']  =  [ False, True]
+    sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), \
+                           (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), \
+                           (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80)]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
-    chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'close'}},
-                  'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'close'}}}
+    chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
+                  'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
     config = {'capital': 10000,
-              'chan': 0,
+              'freq': '30min',
               'trans_cost': 0.0,
               'close_daily': False,
-              'mode': 'close',
               'unit': 1,
               'stoploss': 0.0,
               'pos_args': {},
