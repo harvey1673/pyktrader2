@@ -91,7 +91,9 @@ def STDEV(df, n, field = 'close'):
     return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
 
 def stdev(df, n, field = 'close'):
-    return 
+    key = 'MA_' + field[0].upper() + str(n)
+    df.ix[-1, key] = np.std(df[field][-n:])
+
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
     return pd.Series(pd.ewma(df[field], span = n, min_periods = n - 1, adjust = False), name = 'EMA_' + field[0].upper() + str(n))
