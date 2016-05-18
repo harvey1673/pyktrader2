@@ -80,19 +80,25 @@ def atr(df, n = 20):
 def tsMA(ts, n):
     return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
     
-def MA(df, n):
-    return pd.Series(pd.rolling_mean(df['close'], n), name = 'MA' + str(n))
+def MA(df, n, field = 'close'):
+    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n))
 
-def ma(df, n):
-    df.ix[-1,'MA'+str(n)] = df.ix[-2,'MA'+str(n)] + ( df.ix[-1,'close'] - df.ix[-1-n,'close'])/float(n)
+def ma(df, n, field = 'close'):
+    key = 'MA_' + field[0].upper() + str(n)
+    df.ix[-1, key] = df.ix[-2, key] + ( df.ix[-1, field] - df.ix[-1-n, field])/float(n)
 
+def STDEV(df, n, field = 'close'):
+    return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
+
+def stdev(df, n, field = 'close'):
+    return 
 #Exponential Moving Average
-def EMA(df, n):
-    return pd.Series(pd.ewma(df['close'], span = n, min_periods = n - 1, adjust = False), name = 'EMA' + str(n))
+def EMA(df, n, field = 'close'):
+    return pd.Series(pd.ewma(df[field], span = n, min_periods = n - 1, adjust = False), name = 'EMA_' + field[0].upper() + str(n))
 
-def ema(df, n):
+def ema(df, n, field =  'close'):
     alpha = 2.0/(n+1)
-    df.ix[-1,'EMA'+str(n)] = df.ix[-2,'EMA'+str(n)]*(1-alpha) + df.ix[-1,'close']*alpha
+    df.ix[-1,'EMA_' + field[0].upper() + str(n)] = df.ix[-2, 'EMA_' + field[0].upper() + str(n)] * (1-alpha) + df.ix[-1, field] * alpha
     
 #Momentum
 def MOM(df, n):
@@ -103,13 +109,13 @@ def ROC(df, n):
     N = df['close'].shift(n - 1)
     return pd.Series(M / N, name = 'ROC' + str(n))
 
-#Bollinger Bandsy
-def BBANDS(df, n):
+#Bollinger Bands
+def BBANDS(df, n, k = 2):
     MA = pd.Series(pd.rolling_mean(df['close'], n))
     MSD = pd.Series(pd.rolling_std(df['close'], n))
-    b1 = 4 * MSD / MA
+    b1 = 2 * k * MSD / MA
     B1 = pd.Series(b1, name = 'BollingerB' + str(n))
-    b2 = (df['close'] - MA + 2 * MSD) / (4 * MSD)
+    b2 = (df['close'] - MA + k * MSD) / (2 * k * MSD)
     B2 = pd.Series(b2, name = 'Bollingerb' + str(n))
     return pd.concat([B1,B2], join='outer', axis=1)
 
@@ -568,3 +574,4 @@ def PSAR(df, iaf = 0.02, maxaf = 0.2, incr = 0):
         else:
             direction[idx] = -1
     return pd.concat([psar, direction], join='outer', axis=1)
+    
