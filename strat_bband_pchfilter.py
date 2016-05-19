@@ -19,13 +19,12 @@ class BbandPChanTrader(Strategy):
         self.chan_high = [0.0] * numAssets
         self.chan_low  = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
-        self.data_func = [()]
         self.daily_close_buffer = 3
         self.num_tick = 1
 
     def register_func_freq(self):
         for idx, under in enumerate(self.underliers):
-            for infunc in self.data_func:
+            for idy, infunc in enumerate(self.data_func):
                 name  = infunc[0]
                 sfunc = eval(infunc[1])
                 rfunc = eval(infunc[2])
@@ -34,7 +33,10 @@ class BbandPChanTrader(Strategy):
                 else:
                     fargs = {}
                 freq_str = str(self.freq[idx]) + 'm'
-                chan = self.channels[idx]
+                if idy < 2:
+                    chan = self.channels[idx]
+                else:
+                    chan = self.band_win[idx]
                 fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
                 self.agent.register_data_func(under[0], freq_str, fobj)
 

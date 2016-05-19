@@ -454,6 +454,32 @@ def rbreaker_strat():
               }
     create_strat_file(config, ins_setup)
 
+def bband_chan_strat():
+    ins_setup = {
+                'i1609':  (80, 1.0, 10, 60, 2.0, False),
+                'j1609':  (80, 1.0, 40, 60, 1.0, False),
+                'rb1610': (80, 1.5, 10, 60, 4.0, False),
+                'ZC609':  (80, 1.5, 40, 60, 2.0, False),
+                'p1609':  (40, 1.0, 40, 30, 1.0, False),
+                'ni1609': (20, 1.0,  5, 30, 1.0, False),
+                'cs1609': (80, 1.5, 20, 60, 5.0, False),
+                'pp1609': (80, 1.0, 40, 60, 2.0, False),
+                }
+    config = {'name': 'bbandpch1',
+              'trade_valid_time': 600,
+              'num_tick': 1,
+              'pos_scaler': 1.0,
+              'filename': 'Prod2_Bbandpch1.json',
+              'channel_keys': ['DONCH_H', 'DONCH_L'],
+              'band_keys': ['MA_C', 'STDEV_C'],
+              'input_keys': ['band_win', 'ratios', 'channels', 'freq', 'alloc_w', 'daily_close'],
+              "data_func": [["DONCH_H", "dh.DONCH_H", "dh.donch_h"], ["DONCH_L", "dh.DONCH_L", "dh.donch_l"], \
+                              ['MA_C', 'dh.MA', 'dh.ma'], ['STDEV_C', 'dh.STDEV', 'dh.stdev']],
+              'common_keys': ['name', 'trade_valid_time', 'num_tick', 'data_func', 'band_keys', 'channel_keys', 'pos_scaler'],
+              'class': "strat_bband_pchfilter.BbandPChanTrader",
+              }
+    create_strat_file(config, ins_setup)
+
 def option_test_strats():
     pass
 
