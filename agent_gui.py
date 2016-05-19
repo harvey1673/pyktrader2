@@ -269,6 +269,31 @@ class DTSplitDChanStratGui(StratGui):
                             'Freq': 'int',
                             }
 
+class BBandPChanStratGui(StratGui):   
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'BandWin', 'UpperBand', 'MidBand', 'LowerBand', 'Channels', 'ChanHigh', 'ChanLow']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'Ratios': 'float',
+                            'CloseTday': 'bool',
+                            'CurrPrices': 'float',
+                            'MidBand': 'float',
+                            'UpperBand': 'float',
+                            'LowerBand': 'float',
+                            'BandWin': 'int',
+                            'ChanHigh': 'float',
+                            'ChanLow': 'float',
+                            'NumTick': 'int',
+                            'Channels': 'int',
+                            'OrderType': 'str',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
+                            
 class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
@@ -603,8 +628,10 @@ class Gui(tk.Tk):
             strat = self.app.agent.strategies[strat_name]
             if strat.__class__.__name__ in ['DTTrader']:
                 self.strat_gui[strat_name] = DTStratGui(strat, app, self)
-            if strat.__class__.__name__ in ['DTSplitDChanFilter']:
+            elif strat.__class__.__name__ in ['DTSplitDChanFilter']:
                 self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
+            elif strat.__class__.__name__ in ['BbandPChanTrader']:
+                self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)            
             elif strat.__class__.__name__ == 'RBreaker':
                 self.strat_gui[strat_name] = RBStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'TurtleTrader':
