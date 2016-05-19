@@ -309,19 +309,6 @@ def ULTOSC(df):
     UltO = pd.Series((4 * pd.rolling_sum(BP_l, 7) / pd.rolling_sum(TR_l, 7)) + (2 * pd.rolling_sum(BP_l, 14) / pd.rolling_sum(TR_l, 14)) + (pd.rolling_sum(BP_l, 28) / pd.rolling_sum(TR_l, 28)), name = 'UltOsc')
     return UltO
 
-#Donchian Channel
-def DONCH(df, n, field = 'high'):
-    DC_H = pd.rolling_max(df[field],n)
-    return pd.Series(DC_H, name = 'DONCH_' + field[0].upper() + str(n))
-
-def DONCH_H(df, n):
-    DC_H = pd.rolling_max(df['high'],n)
-    return pd.Series(DC_H, name = 'DONCH_H' + str(n))
-
-def DONCH_L(df, n):
-    DC_L = pd.rolling_min(df['low'], n)
-    return pd.Series(DC_L, name = 'DONCH_L' + str(n))
-
 def DONCH_IDX(df, n):
     high = pd.Series(pd.rolling_max(df['high'], n), name = 'DONCH_H'+ str(n))
     low  = pd.Series(pd.rolling_min(df['low'], n), name = 'DONCH_L'+ str(n))
@@ -341,21 +328,20 @@ def CHENOW_PLUNGER(df, n, atr_n = 40):
     low  = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/atr, name = 'CPLUNGER_L'+ str(n))
     return pd.concat([high,low], join='outer', axis=1)
 
-def donch(df, n, field = 'high'):
-    df.ix[-1,'DONCH_'+ field[0].upper() + str(n)] = max(df.ix[-n:,field])
+#Donchian Channel
+def DONCH_H(df, n, field = 'high'):
+    DC_H = pd.rolling_max(df[field],n)
+    return pd.Series(DC_H, name = 'DONCH_H' + field[0].upper() + str(n))
 
-def donch_h(df, n):
-    df.ix[-1,'DONCH_H'+ str(n)] = max(df.ix[-n:,'high'])
+def DONCH_L(df, n, field = 'low'):
+    DC_L = pd.rolling_min(df[field], n)
+    return pd.Series(DC_L, name = 'DONCH_L'+ field[0].upper() + str(n))
+
+def donch_h(df, n, field = 'high'):
+    df.ix[-1,'DONCH_H'+ field[0].upper() + str(n)] = max(df.ix[-n:,field])
  
-def donch_l(df, n):
-    df.ix[-1,'DONCH_L'+ str(n)] = min(df.ix[-n:,'low'])
-
-def DONCH_C(df, n):
-    DC_H = pd.rolling_max(df['close'],n)
-    return pd.Series(DC_H, name = 'DONCH_C'+ str(n))
-
-def donch_c(df, n):
-    df.ix[-1,'DONCH_C'+str(n)] = max(df.ix[-n:,'close'])
+def donch_l(df, n, field = 'low'):
+    df.ix[-1,'DONCH_L'+ field[0].upper() + str(n)] = min(df.ix[-n:,field])
     
 #Standard Deviation
 def STDDEV(df, n):

@@ -6,8 +6,8 @@ import copy
 from strategy import *
  
 class BbandPChanTrader(Strategy):
-    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_H', 'DONCH_L'], 'band_keys': ['MA_C', 'STDEV_C'], 'price_limit_buffer': 5, \
-                                                      'data_func': [["DONCH_H", "dh.DONCH_H", "dh.donch_h"], ["DONCH_L", "dh.DONCH_L", "dh.donch_l"], \
+    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'band_keys': ['MA_C', 'STDEV_C'], 'price_limit_buffer': 5, \
+                                                      'data_func': [["DONCH_HC", "dh.DONCH_H", "dh.donch_h", {'field':'close'}], ["DONCH_LC", "dh.DONCH_L", "dh.donch_l", {'field':'close'}], \
                                                                       ['MA_C', 'dh.MA', 'dh.ma'], ['STDEV_C', 'dh.STDEV', 'dh.stdev']]})
     asset_params = dict({'band_win': 40, 'ratios': 1.0, 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
