@@ -85,13 +85,13 @@ def MA(df, n, field = 'close'):
 
 def ma(df, n, field = 'close'):
     key = 'MA_' + field[0].upper() + str(n)
-    df.ix[-1, key] = df.ix[-2, key] + ( df.ix[-1, field] - df.ix[-1-n, field])/float(n)
+    df.ix[-1, key] = np.mean(df[field][-n:])
 
 def STDEV(df, n, field = 'close'):
     return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
 
 def stdev(df, n, field = 'close'):
-    key = 'MA_' + field[0].upper() + str(n)
+    key = 'STDEV_' + field[0].upper() + str(n)
     df.ix[-1, key] = np.std(df[field][-n:])
 
 #Exponential Moving Average

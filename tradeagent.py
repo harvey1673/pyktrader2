@@ -18,7 +18,7 @@ import backtest
 from eventType import *
 from eventEngine import *
 
-min_data_list = ['datetime', 'min_id', 'open', 'high','low', 'close', 'volume', 'openInterest'] 
+min_data_list = ['datetime', 'date', 'min_id', 'open', 'high','low', 'close', 'volume', 'openInterest']
 day_data_list = ['date', 'open', 'high','low', 'close', 'volume', 'openInterest']
 
 def get_tick_num(dt):
@@ -53,6 +53,7 @@ class MktDataMixin(object):
         self.day_data_func[name] = []
         self.min_data_func[name] = {}
         self.cur_min[name]['datetime'] = datetime.datetime.fromordinal(self.scur_day.toordinal())
+        self.cur_min[name]['date'] = self.scur_day
         self.cur_day[name]['date'] = self.scur_day
 
     def register_data_func(self, inst, freq, fobj):
@@ -123,6 +124,7 @@ class MktDataMixin(object):
             self.cur_min[inst]['volume']  = last_vol
             self.cur_min[inst]['openInterest'] = tick.openInterest
             self.cur_min[inst]['datetime'] = tick_dt.replace(second=0, microsecond=0)
+            self.cur_min[inst]['date'] = self.scur_day
             if ((tick_min>0) and (tick.price>0)): 
                 self.tick_data[inst].append(tick)
         return True
@@ -138,14 +140,15 @@ class MktDataMixin(object):
         bar_id = self.conv_bar_id(min_id)
         df = self.min_data[inst][1]
         mysqlaccess.insert_min_data_to_df(df, self.cur_min[inst])
-        for m in self.min_data_func[inst]:
+        for m in sorted(self.min_data_func[inst]):
             df_m = self.min_data[inst][m]
             if m > 1 and bar_id % m == 0:
-                s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m)
-                slices = df[df.index>s_start]
+                s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m-1)
+                slices = df[(df.index>=s_start) & (df.index<=self.cur_min[inst]['datetime'])]
                 new_data = {'open':slices['open'][0],'high':max(slices['high']), \
                             'low': min(slices['low']),'close': slices['close'][-1],\
-                            'volume': sum(slices['volume']), 'min_id':slices['min_id'][0]}
+                            'volume': sum(slices['volume']), 'openInterest':slices['openInterest'][-1],\
+                            'min_id':slices['min_id'][0], 'date':slices['date'][-1]}
                 df_m.loc[s_start] = pd.Series(new_data)
             if bar_id % m == 0:
                 for fobj in self.min_data_func[inst][m]:
@@ -242,7 +245,7 @@ class Agent(MktDataMixin):
         self.scur_day = tday
         super(Agent, self).__init__(config)
         self.event_period = config.get('event_period', 1.0)
-        self.eventEngine = EventEngine(self.event_period)
+        self.eventEngine = PriEventEngine(self.event_period)
         self.instruments = {}
         self.positions = {}
         self.gateways = {}
@@ -478,7 +481,7 @@ class Agent(MktDataMixin):
                     self.instruments[inst].price = float(mindata.ix[-1,'close'])
                     self.instruments[inst].last_update = 0
                     self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
-                for m in self.min_data_func[inst]:
+                for m in sorted(self.min_data_func[inst]):
                     if m != 1:
                         self.min_data[inst][m] = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min')
                     df = self.min_data[inst][m]
@@ -882,6 +885,8 @@ class SaveAgent(Agent):
                     self.add_instrument(symbol)
 
     def exit(self):
+        for inst in self.instruments:
+            self.min_switch(inst)
         self.eventEngine.stop()
         for name in self.gateways:
             gateway = self.gateways[name]

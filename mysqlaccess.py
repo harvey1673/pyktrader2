@@ -274,8 +274,7 @@ def load_tick_data(dbtable, insts, d_start, d_end):
     return all_ticks
     
 def insert_min_data_to_df(df, min_data):
-    new_data = { key: min_data[key] for key in min_columns[2:] }
-    new_data['date'] = min_data['datetime'].date()
+    new_data = { key: min_data[key] for key in min_columns[1:] }
     df.loc[min_data['datetime']] = pd.Series(new_data)
 
 def insert_daily_data_to_df(df, daily_data):

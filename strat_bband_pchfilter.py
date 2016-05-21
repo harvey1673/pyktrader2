@@ -120,7 +120,7 @@ class BbandPChanTrader(Strategy):
                 buysell = -1
             if buysell != 0:
                 msg = 'BbandPchTrader to open position for inst = %s, chan_high=%s, chan_low=%s, upper_band=%s, lower_band=%s, curr_price= %s, direction=%s, volume=%s' \
-                                        % (inst, self.chan_high[idx], self.chan_low[idx], self.chan_lower_band[idx], self.upper_band[idx], self.curr_prices[idx], buysell, self.trade_unit[idx])
+                                        % (inst, self.chan_high[idx], self.chan_low[idx], self.upper_band[idx], self.lower_band[idx], self.curr_prices[idx], buysell, self.trade_unit[idx])
                 self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
                 save_status = True
