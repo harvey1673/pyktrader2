@@ -79,7 +79,16 @@ def tr(df_tup):
     df, idx = df_tup
     val = max(df.at[idx,'high'], df.at[idx-1,'close']) - min(df.at[idx,'low'], df.at[idx-1,'close'])
     df.set_value(idx, 'TR', val)
-    
+
+def CMI(df, n):
+    ts = pd.Series(abs(df['close'] - df['close'].shift(n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name='CMI'+str(n))
+    return ts
+
+def cmi(df_tup, n):
+    df, idx = df_tup
+    val = abs(df.at[idx, 'close'] - df.at[idx-n, 'close'])/(max(df['high'].iloc[-n:]) - min(df['low'].iloc[-n:]))*100
+    df.set_value(idx, 'CMI'+str(n), val)
+
 def ATR(df, n = 20):
     tr = TR(df)
     ts_atr = pd.ewma(tr, span=n,  min_periods = n-1, adjust = False)

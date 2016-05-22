@@ -152,12 +152,10 @@ class MktDataMixin(object):
             if m > 1 and bar_id % m == 0:
                 s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m-1)
                 slices = df[(df.datetime>=s_start) & (df.datetime<=self.cur_min[inst]['datetime'])]
-                idx0 = slices.index[0]
-                idx1 = slices.index[-1]
-                new_data = {'datetime':slices.at[idx0, 'datetime'], 'open':slices.at[idx0, 'open'],'high':max(slices['high']), \
-                            'low': min(slices['low']),'close': slices.at[idx1, 'close'],\
-                            'volume': sum(slices['volume']), 'openInterest':slices.at[idx1, 'openInterest'],\
-                            'min_id':slices.at[idx0, 'min_id'], 'date':slices.at[idx0, 'date']}
+                new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
+                            'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
+                            'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
+                            'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
                 df_m.loc[self.min_store_idx[inst][m]] = pd.Series(new_data)
                 self.min_store_idx[inst][m] += 1
                 self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
@@ -204,7 +202,8 @@ class MktDataMixin(object):
                 mysqlaccess.insert_daily_data_to_df(self.day_data[inst], self.cur_day[inst])
                 df = self.day_data[inst]
                 for fobj in self.day_data_func[inst]:
-                    fobj.rfunc(df)
+                    df_tup = (df, self.cur_day[inst]['date'])
+                    fobj.rfunc(df_tup)
                 if self.save_flag:
                     event = Event(type=EVENT_DB_WRITE, priority = 500)
                     event.dict['data'] = self.cur_day[inst]
