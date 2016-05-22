@@ -213,7 +213,7 @@ def load_inst_marginrate(instID):
     cnx.close()
     return out
         
-def load_min_data_to_df(dbtable, inst, d_start, d_end, minid_start=1500, minid_end = 2114, database = 'blueshale'):
+def load_min_data_to_df(dbtable, inst, d_start, d_end, minid_start=1500, minid_end = 2114, database = 'blueshale', index_col = 'datetime'):
     db_conf = copy.deepcopy(dbconfig)
     db_conf['database'] = database
     cnx = mysql.connector.connect(**db_conf)
@@ -223,11 +223,11 @@ def load_min_data_to_df(dbtable, inst, d_start, d_end, minid_start=1500, minid_e
     stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
     stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by date, min_id"
-    df = pd.io.sql.read_sql(stmt, cnx, index_col = 'datetime')
+    df = pd.io.sql.read_sql(stmt, cnx, index_col = index_col)
     cnx.close()
     return df    
 
-def load_daily_data_to_df(dbtable, inst, d_start, d_end, database = 'blueshale'):
+def load_daily_data_to_df(dbtable, inst, d_start, d_end, database = 'blueshale', index_col = 'date'):
     db_conf = copy.deepcopy(dbconfig)
     db_conf['database'] = database
     cnx = mysql.connector.connect(**db_conf)
@@ -235,7 +235,7 @@ def load_daily_data_to_df(dbtable, inst, d_start, d_end, database = 'blueshale')
     stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
     stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by date" 
-    df = pd.io.sql.read_sql(stmt, cnx, index_col = 'date')
+    df = pd.io.sql.read_sql(stmt, cnx, index_col = index_col)
     cnx.close()
     return df
 

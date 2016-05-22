@@ -45,8 +45,8 @@ def dual_thrust_sim( mdf, config):
     ddf['H1'] = eval(chan_func['high']['func'])(ddf, chan, **chan_func['high']['args']).shift(1)
     ddf['L1'] = eval(chan_func['low']['func'])(ddf, chan, **chan_func['low']['args']).shift(1)
     ll = mdf.shape[0]
-    mdf['pos'] = pd.Series([0]*ll, index = mdf.index)
-    mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
+    mdf['pos'] = 0
+    mdf['cost'] = 0
     curr_pos = []
     closed_trades = []
     start_d = ddf.index[0]
@@ -54,17 +54,17 @@ def dual_thrust_sim( mdf, config):
     prev_d = start_d - datetime.timedelta(days=1)
     tradeid = 0
     for dd in mdf.index:
-        mslice = mdf.ix[dd]
+        mslice = mdf.loc[dd]
         min_id = mslice.min_id
         d = mslice.date
-        dslice = ddf.ix[d]
+        dslice = ddf.loc[d]
         if np.isnan(dslice.TR) or (mslice.close == 0):
             continue
         if len(curr_pos) == 0:
             pos = 0
         else:
             pos = curr_pos[0].pos
-        mdf.ix[dd, 'pos'] = pos
+        mdf.set_value(dd, 'pos', pos)
         d_open = dslice.open
         if (d_open <= 0):
             continue
@@ -94,7 +94,7 @@ def dual_thrust_sim( mdf, config):
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost) 
+                mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                 pos = 0
         elif min_id not in no_trade_set:
             if (pos!=0) and (SL>0):
@@ -105,7 +105,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos[0].exit_tradeid = tradeid
                     closed_trades.append(curr_pos[0])
                     curr_pos = []
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)    
+                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                     pos = 0
             if (mslice.high >= buytrig) and (pos <=0 ):
                 if len(curr_pos) > 0:
@@ -114,7 +114,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos[0].exit_tradeid = tradeid
                     closed_trades.append(curr_pos[0])
                     curr_pos = []
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
+                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                 if mslice.high >= dslice.H1:
                     new_pos = strat.TradePos([mslice.contract], [1], unit, mslice.close + offset, mslice.close + offset)
                     tradeid += 1
@@ -122,7 +122,7 @@ def dual_thrust_sim( mdf, config):
                     new_pos.open(mslice.close + offset, dd)
                     curr_pos.append(new_pos)
                     pos = unit
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
+                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
             elif (mslice.low <= selltrig) and (pos >=0 ):
                 if len(curr_pos) > 0:
                     curr_pos[0].close(mslice.close-offset, dd)
@@ -130,7 +130,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos[0].exit_tradeid = tradeid
                     closed_trades.append(curr_pos[0])
                     curr_pos = []
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
+                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                 if mslice.low <= dslice.L1:
                     new_pos = strat.TradePos([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset)
                     tradeid += 1
@@ -138,8 +138,8 @@ def dual_thrust_sim( mdf, config):
                     new_pos.open(mslice.close - offset, dd)
                     curr_pos.append(new_pos)
                     pos = -unit
-                    mdf.ix[dd, 'cost'] -= abs(pos) * (offset + mslice.close*tcost)
-        mdf.ix[dd, 'pos'] = pos
+                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
+        mdf.set_value(dd, 'pos', pos)
             
     (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )

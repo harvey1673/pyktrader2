@@ -44,19 +44,19 @@ def bband_chan_sim( mdf, config):
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
     ll = xdf.shape[0]
-    xdf['pos'] = pd.Series([0]*ll, index = xdf.index)
-    xdf['cost'] = pd.Series([0]*ll, index = xdf.index)
+    xdf['pos'] = 0
+    xdf['cost'] = 0
     xdf['traded_price'] = xdf.open
     curr_pos = []
     closed_trades = []
     tradeid = 0
     for idx, dd in enumerate(xdf.index):
-        mslice = xdf.ix[dd]
+        mslice = xdf.loc[dd]
         if len(curr_pos) == 0:
             pos = 0
         else:
             pos = curr_pos[0].pos
-        xdf.ix[dd, 'pos'] = pos
+        xdf.set_value(dd, 'pos', pos)
         if np.isnan(mslice.boll_ma) or np.isnan(mslice.chan_h):
             continue
         if mslice.close_ind:
@@ -66,8 +66,8 @@ def bband_chan_sim( mdf, config):
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                xdf.ix[dd, 'cost'] -=  abs(pos) * ( mslice.open * tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.open - misc.sign(pos) * offset
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
             if ((mslice.open > mslice.boll_ma) and (pos<0)) or ((mslice.open < mslice.boll_ma) and (pos>0)):
@@ -76,8 +76,8 @@ def bband_chan_sim( mdf, config):
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                xdf.ix[dd, 'cost'] -= abs(pos) * (mslice.open * tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.open - misc.sign(pos) * offset
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
             if ((mslice.open >= mslice.high_band) or (mslice.open <= mslice.low_band)) and (pos==0):
                 target_pos = ( mslice.open >= mslice.high_band) * unit - (mslice.open <= mslice.low_band) * unit
@@ -87,9 +87,9 @@ def bband_chan_sim( mdf, config):
                 new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
                 curr_pos.append(new_pos)
                 pos = target_pos
-                xdf.ix[dd, 'cost'] -=  abs(target_pos) * (mslice.open * tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.open + misc.sign(target_pos)*offset
-        xdf.ix[dd, 'pos'] = pos
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
+        xdf.set_value(dd, 'pos', pos)
     (res_pnl, ts) = backtest.get_pnl_stats( xdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
     res = dict( res_pnl.items() + res_trade.items())

@@ -74,24 +74,30 @@ def get_asset_tradehrs(asset):
             hrs = [misc.night_trading_hrs[night_idx]] + hrs
     return hrs
     
-def cleanup_mindata(df, asset):
+def cleanup_mindata(df, asset, index_col = 'datetime'):
     cond = None
+    if index_col == None:
+        xdf = df.set_index('datetime')
+    else:
+        xdf = df
     tradehrs = get_asset_tradehrs(asset)
     for idx, hrs in enumerate(tradehrs):
         if idx == 0:
-            cond = (df.min_id>= tradehrs[idx][0]) & (df.min_id < tradehrs[idx][1])
+            cond = (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
         else:
-            cond = cond | (df.min_id>= tradehrs[idx][0]) & (df.min_id < tradehrs[idx][1])
+            cond = cond | (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
     if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'jm']:
-        cond = cond | ((df.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (df.min_id>=300) & (df.min_id<830))
+        cond = cond | ((xdf.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id<830))
     if asset in ['rb', 'hc', 'bu']:
-        cond = cond | ((df.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (df.min_id>=300) & (df.min_id < 700))
+        cond = cond | ((xdf.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id < 700))
     if asset in ['IF', 'IH', 'IC']:
-        cond = cond | ((df.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (df.min_id>=1515) & (df.min_id < 1530))
-        cond = cond | ((df.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (df.min_id>=2100) & (df.min_id < 2115))
-    df = df.ix[cond]
-    df = df[(df.close > 0) & (df.high > 0) & (df.open > 0) & (df.low > 0)]
-    return df
+        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=1515) & (xdf.min_id < 1530))
+        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=2100) & (xdf.min_id < 2115))
+    xdf = xdf.ix[cond]
+    xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
+    if index_col == None:
+        xdf = xdf.reset_index()
+    return xdf
 
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
@@ -244,7 +250,7 @@ def simlauncher_min(config_file):
     if 'proc_func' in sim_config:
         config['proc_func'] = eval(sim_config['proc_func'])
     file_prefix = file_prefix + sim_config['sim_name']
-    if config['close_daily']:
+    if 'close_daily' in config and config['close_daily']:
         file_prefix = file_prefix + 'daily_'
     config['file_prefix'] = file_prefix
     summary_df = pd.DataFrame()

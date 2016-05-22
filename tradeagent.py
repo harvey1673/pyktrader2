@@ -32,6 +32,8 @@ class MktDataMixin(object):
     def __init__(self, config):
         self.tick_data  = {}
         self.day_data  = {}
+        self.min_store = {}
+        self.min_store_idx = {}
         self.min_data  = {}
         self.cur_min = {}
         self.cur_day = {}  		
@@ -47,7 +49,9 @@ class MktDataMixin(object):
     def add_instrument(self, name):
         self.tick_data[name] = []
         self.day_data[name]  = pd.DataFrame(columns=['open', 'high','low','close','volume','openInterest'])
-        self.min_data[name]  = {1: pd.DataFrame(columns=['open', 'high','low','close','volume','openInterest','min_id'])}
+        self.min_store[name] =  {1: pd.DataFrame(columns=['open', 'high','low','close','volume','openInterest','min_id', 'bar_id', 'date'])}
+        self.min_store_idx[name] = {1: 0}
+        self.min_data[name]  = {1: self.min_store[name][1]}
         self.cur_day[name]   = dict([(item, 0) for item in day_data_list])
         self.cur_min[name]   = dict([(item, 0) for item in min_data_list])
         self.day_data_func[name] = []
@@ -138,21 +142,30 @@ class MktDataMixin(object):
             self.cur_min[inst]['high'] = self.cur_min[inst]['close']
         min_id = self.cur_min[inst]['min_id']
         bar_id = self.conv_bar_id(min_id)
-        df = self.min_data[inst][1]
-        mysqlaccess.insert_min_data_to_df(df, self.cur_min[inst])
+        df = self.min_store[inst][1]
+        new_min = { key: self.cur_min[inst][key] for key in min_data_list }
+        df.loc[self.min_store_idx[inst][1]] = pd.Series(new_min)
+        self.min_store_idx[inst][1] += 1
+        self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
         for m in sorted(self.min_data_func[inst]):
-            df_m = self.min_data[inst][m]
+            df_m = self.min_store[inst][m]
             if m > 1 and bar_id % m == 0:
                 s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m-1)
-                slices = df[(df.index>=s_start) & (df.index<=self.cur_min[inst]['datetime'])]
-                new_data = {'open':slices['open'][0],'high':max(slices['high']), \
-                            'low': min(slices['low']),'close': slices['close'][-1],\
-                            'volume': sum(slices['volume']), 'openInterest':slices['openInterest'][-1],\
-                            'min_id':slices['min_id'][0], 'date':slices['date'][-1]}
-                df_m.loc[s_start] = pd.Series(new_data)
+                slices = df[(df.datetime>=s_start) & (df.datetime<=self.cur_min[inst]['datetime'])]
+                idx0 = slices.index[0]
+                idx1 = slices.index[-1]
+                new_data = {'datetime':slices.at[idx0, 'datetime'], 'open':slices.at[idx0, 'open'],'high':max(slices['high']), \
+                            'low': min(slices['low']),'close': slices.at[idx1, 'close'],\
+                            'volume': sum(slices['volume']), 'openInterest':slices.at[idx1, 'openInterest'],\
+                            'min_id':slices.at[idx0, 'min_id'], 'date':slices.at[idx0, 'date']}
+                df_m.loc[self.min_store_idx[inst][m]] = pd.Series(new_data)
+                self.min_store_idx[inst][m] += 1
+                self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
             if bar_id % m == 0:
                 for fobj in self.min_data_func[inst][m]:
-                    fobj.rfunc(df_m)
+                    df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m]-1)
+                    fobj.rfunc(df_tup)
+
         #event = Event(type=EVENT_MIN_BAR, priority = 10)
         #event.dict['min_id'] = min_id
         #event.dict['bar_id'] = bar_id
@@ -204,10 +217,15 @@ class MktDataMixin(object):
                 df = self.day_data[inst]
                 self.day_data[inst] = df[df.index >= d_start]
             m_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
-            for m in self.min_data[inst]:
-                if len(self.min_data[inst][m]) > 0:
-                    mdf = self.min_data[inst][m]
-                    self.min_data[inst][m] = mdf[mdf.index.date >= m_start]
+            num_min = 600 * (self.min_data_days +1)
+            for m in self.min_store[inst]:
+                if len(self.min_store[inst][m]) > 0:
+                    mdf = self.min_store[inst][m]
+                    mdf = mdf[(mdf['date'] >= m_start)]
+                    idx = len(mdf)
+                    self.min_store[inst][m] = pd.DataFrame(mdf, index = range(int(num_min/m)+1))
+                    self.min_store_idx[inst][m] = idx
+                    self.min_data[inst][m] = self.min_store[inst][m][:idx]
 
     def write_mkt_data(self, event):
         inst = event.dict['instID']
@@ -443,7 +461,6 @@ class Agent(MktDataMixin):
             daily_end = self.scur_day
             self.day_data[inst] = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end)
             df = self.day_data[inst]
-            print inst
             if len(df) > 0:
                 self.instruments[inst].price = df['close'][-1]
                 self.instruments[inst].last_update = 0
@@ -457,37 +474,44 @@ class Agent(MktDataMixin):
             d_end = self.scur_day
             min_start = int(self.instruments[inst].start_tick_id/1000)
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
-            mindata = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale')
-            mindata = backtest.cleanup_mindata(mindata, self.instruments[inst].product)
-            self.min_data[inst][1] = mindata
+            mindata = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
+            mindata = backtest.cleanup_mindata(mindata, self.instruments[inst].product, index_col = None)
+            self.min_store[inst][1] = pd.DataFrame(mindata, index=range(600*(self.min_data_days+1)))
+            idx = len(self.min_store[inst][1].dropna())
+            self.min_data[inst][1] = self.min_store[inst][1][:idx]
             if len(mindata)>0:
-                min_date = mindata.index[-1].date()
+                idx = mindata.index[-1]
+                min_date = mindata['date'][idx]
                 if (len(self.day_data[inst].index)==0) or (min_date > self.day_data[inst].index[-1]):
-                    ddf = data_handler.conv_ohlc_freq(mindata, 'd')
+                    ddf = data_handler.conv_ohlc_freq(mindata, 'd', index_col = None)
                     self.cur_day[inst]['open'] = float(ddf.open[-1])
                     self.cur_day[inst]['close'] = float(ddf.close[-1])
                     self.cur_day[inst]['high'] = float(ddf.high[-1])
                     self.cur_day[inst]['low'] = float(ddf.low[-1])
                     self.cur_day[inst]['volume'] = int(ddf.volume[-1])
                     self.cur_day[inst]['openInterest'] = int(ddf.openInterest[-1])
-                    self.cur_min[inst]['datetime'] = pd.datetime(*mindata.index[-1].timetuple()[0:-3])
-                    self.cur_min[inst]['open'] = float(mindata.ix[-1,'open'])
-                    self.cur_min[inst]['close'] = float(mindata.ix[-1,'close'])
-                    self.cur_min[inst]['high'] = float(mindata.ix[-1,'high'])
-                    self.cur_min[inst]['low'] = float(mindata.ix[-1,'low'])
+                    self.cur_min[inst]['datetime'] = pd.datetime(*mindata['datetime'][idx].timetuple()[0:-3])
+                    self.cur_min[inst]['date'] = mindata.at[idx,'date']
+                    self.cur_min[inst]['open'] = float(mindata.at[idx,'open'])
+                    self.cur_min[inst]['close'] = float(mindata.at[idx,'close'])
+                    self.cur_min[inst]['high'] = float(mindata.at[idx,'high'])
+                    self.cur_min[inst]['low'] = float(mindata.at[idx,'low'])
                     self.cur_min[inst]['volume'] = self.cur_day[inst]['volume']
                     self.cur_min[inst]['openInterest'] = self.cur_day[inst]['openInterest']
-                    self.cur_min[inst]['min_id'] = int(mindata.ix[-1,'min_id'])
-                    self.instruments[inst].price = float(mindata.ix[-1,'close'])
+                    self.cur_min[inst]['min_id'] = int(mindata.at[idx,'min_id'])
+                    self.instruments[inst].price = float(mindata.at[idx,'close'])
                     self.instruments[inst].last_update = 0
                     self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
                 for m in sorted(self.min_data_func[inst]):
                     if m != 1:
-                        self.min_data[inst][m] = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min')
-                    df = self.min_data[inst][m]
+                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None)
+                        self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+1)/m)))
+                        self.min_store_idx[inst][m] = len(df)
+                    df = self.min_store[inst][m]
                     for fobj in self.min_data_func[inst][m]:
                         ts = fobj.sfunc(df)
-                        df[ts.name]= pd.Series(ts, index=df.index)
+                        df[ts.name]= ts
+                    self.min_data[inst][m] = self.min_store[inst][m][:self.min_store_idx[inst][m]]
 
     def restart(self):
         self.logger.debug('Prepare trade environment for %s' % self.scur_day.strftime('%y%m%d'))
