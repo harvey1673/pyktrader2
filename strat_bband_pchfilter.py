@@ -60,14 +60,15 @@ class BbandPChanTrader(Strategy):
     def update_mkt_state(self, idx):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]]
+        midx = xdf.index[-1]
         key = self.channel_keys[0] + str(self.channels[idx])
-        self.chan_high[idx] = xdf.ix[-1, key]
+        self.chan_high[idx] = xdf.at[midx, key]
         key = self.channel_keys[1] + str(self.channels[idx])
-        self.chan_low[idx]  = xdf.ix[-1, key]
+        self.chan_low[idx]  = xdf.at[midx, key]
         key = self.band_keys[0] + str(self.band_win[idx])
-        self.mid_band[idx] = xdf.ix[-1, key]
+        self.mid_band[idx] = xdf.at[midx, key]
         key = self.band_keys[1] + str(self.band_win[idx])
-        stdev = xdf.ix[-1, key]
+        stdev = xdf.at[midx, key]
         self.upper_band[idx] = self.mid_band[idx] + self.ratios[idx] * stdev
         self.lower_band[idx] = self.mid_band[idx] - self.ratios[idx] * stdev
 
