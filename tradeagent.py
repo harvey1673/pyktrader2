@@ -48,8 +48,8 @@ class MktDataMixin(object):
 
     def add_instrument(self, name):
         self.tick_data[name] = []
-        self.day_data[name]  = pd.DataFrame(columns=['open', 'high','low','close','volume','openInterest'])
-        self.min_store[name] =  {1: pd.DataFrame(columns=['open', 'high','low','close','volume','openInterest','min_id', 'bar_id', 'date'])}
+        self.day_data[name]  = pd.DataFrame(columns=['date', 'open', 'high','low','close','volume','openInterest'])
+        self.min_store[name] =  {1: pd.DataFrame(columns=['datetime', 'date', 'open', 'high','low','close','volume','openInterest','min_id', 'bar_id'])}
         self.min_store_idx[name] = {1: 0}
         self.min_data[name]  = {1: self.min_store[name][1]}
         self.cur_day[name]   = dict([(item, 0) for item in day_data_list])
@@ -143,9 +143,7 @@ class MktDataMixin(object):
         min_id = self.cur_min[inst]['min_id']
         bar_id = self.conv_bar_id(min_id)
         df = self.min_store[inst][1]
-        new_min = { key: self.cur_min[inst][key] for key in min_data_list }
-        df.loc[self.min_store_idx[inst][1]] = pd.Series(new_min)
-        self.min_store_idx[inst][1] += 1
+        self.min_store_idx[inst][1] = mysqlaccess.insert_new_min_to_df(df, self.min_store_idx[inst][1], self.cur_min[inst])
         self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
         for m in sorted(self.min_data_func[inst]):
             df_m = self.min_store[inst][m]
@@ -156,14 +154,12 @@ class MktDataMixin(object):
                             'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
                             'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
                             'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
-                df_m.loc[self.min_store_idx[inst][m]] = pd.Series(new_data)
-                self.min_store_idx[inst][m] += 1
-                self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
+                self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
             if bar_id % m == 0:
                 for fobj in self.min_data_func[inst][m]:
-                    df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m]-1)
+                    df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
                     fobj.rfunc(df_tup)
-
+            self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
         #event = Event(type=EVENT_MIN_BAR, priority = 10)
         #event.dict['min_id'] = min_id
         #event.dict['bar_id'] = bar_id
@@ -199,10 +195,11 @@ class MktDataMixin(object):
                 self.cur_min[inst]['openInterest'] = last_tick.openInterest
                 self.min_switch(inst)
             if (self.cur_day[inst]['close']>0):
-                mysqlaccess.insert_daily_data_to_df(self.day_data[inst], self.cur_day[inst])
+                new_day = { key: self.cur_day[inst][key] for key in day_data_list }
                 df = self.day_data[inst]
+                df.loc[df.index[-1]+1] = pd.Series(new_day)
                 for fobj in self.day_data_func[inst]:
-                    df_tup = (df, self.cur_day[inst]['date'])
+                    df_tup = (df, df.index[-1])
                     fobj.rfunc(df_tup)
                 if self.save_flag:
                     event = Event(type=EVENT_DB_WRITE, priority = 500)
@@ -214,7 +211,7 @@ class MktDataMixin(object):
             if len(self.day_data[inst]) > 0:
                 d_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
                 df = self.day_data[inst]
-                self.day_data[inst] = df[df.index >= d_start]
+                self.day_data[inst] = df[df['date'] >= d_start]
             m_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
             num_min = 600 * (self.min_data_days +1)
             for m in self.min_store[inst]:
@@ -458,15 +455,15 @@ class Agent(MktDataMixin):
             self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             daily_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
             daily_end = self.scur_day
-            self.day_data[inst] = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end)
+            self.day_data[inst] = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)
             df = self.day_data[inst]
             if len(df) > 0:
-                self.instruments[inst].price = df['close'][-1]
+                self.instruments[inst].price = df['close'].iloc[-1]
                 self.instruments[inst].last_update = 0
-                self.instruments[inst].prev_close = df['close'][-1]
+                self.instruments[inst].prev_close = df['close'].iloc[-1]
                 for fobj in self.day_data_func[inst]:
                     ts = fobj.sfunc(df)
-                    df[ts.name]= pd.Series(ts, index=df.index)
+                    df[ts.name]= ts
         if self.min_data_days > 0 or mid_day:
             self.logger.debug('Updating historical min data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             d_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
@@ -476,12 +473,13 @@ class Agent(MktDataMixin):
             mindata = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
             mindata = backtest.cleanup_mindata(mindata, self.instruments[inst].product, index_col = None)
             self.min_store[inst][1] = pd.DataFrame(mindata, index=range(600*(self.min_data_days+1)))
-            idx = len(self.min_store[inst][1].dropna())
+            idx = len(mindata)
+            self.min_store_idx[inst][1] = idx
             self.min_data[inst][1] = self.min_store[inst][1][:idx]
             if len(mindata)>0:
                 idx = mindata.index[-1]
                 min_date = mindata['date'][idx]
-                if (len(self.day_data[inst].index)==0) or (min_date > self.day_data[inst].index[-1]):
+                if (len(self.day_data[inst])==0) or (min_date > self.day_data[inst]['date'].iloc[-1]):
                     ddf = data_handler.conv_ohlc_freq(mindata, 'd', index_col = None)
                     self.cur_day[inst]['open'] = float(ddf.open[-1])
                     self.cur_day[inst]['close'] = float(ddf.close[-1])
@@ -505,7 +503,7 @@ class Agent(MktDataMixin):
                     if m != 1:
                         df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None)
                         self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+1)/m)))
-                        self.min_store_idx[inst][m] = len(df)
+                        self.min_store_idx[inst][m] = len(df.dropna())
                     df = self.min_store[inst][m]
                     for fobj in self.min_data_func[inst][m]:
                         ts = fobj.sfunc(df)

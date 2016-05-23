@@ -277,6 +277,18 @@ def insert_min_data_to_df(df, min_data):
     new_data = { key: min_data[key] for key in min_columns[1:] }
     df.loc[min_data['datetime']] = pd.Series(new_data)
 
+def insert_new_min_to_df(df, idx, min_data):
+    idy = idx
+    need_update = True
+    new_min = { key: min_data[key] for key in min_columns }
+    if min_data['datetime'] < df.at[idx-1, 'datetime']:
+        need_update = False
+    elif min_data['datetime'] > df.at[idx-1, 'datetime']:
+        idy += 1
+    if need_update:
+        df.loc[idy-1] = pd.Series(new_min)
+    return idy
+
 def insert_daily_data_to_df(df, daily_data):
     if (daily_data['date'] not in df.index):
         new_data = {key: daily_data[key] for key in daily_columns[1:]}

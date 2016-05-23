@@ -77,8 +77,8 @@ def TR(df):
 
 def tr(df_tup):
     df, idx = df_tup
-    val = max(df.at[idx,'high'], df.at[idx-1,'close']) - min(df.at[idx,'low'], df.at[idx-1,'close'])
-    df.set_value(idx, 'TR', val)
+    val = max(df.at[idx-1,'high']-df.at[idx-1, 'low'], abs(df.at[idx-1, 'high'] - df.at[idx-2,'close']),  abs(df.at[idx-1, 'low'] - df.at[idx-2,'close']))
+    df.set_value(idx-1, 'TR', val)
 
 def CMI(df, n):
     ts = pd.Series(abs(df['close'] - df['close'].shift(n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name='CMI'+str(n))
@@ -86,8 +86,8 @@ def CMI(df, n):
 
 def cmi(df_tup, n):
     df, idx = df_tup
-    val = abs(df.at[idx, 'close'] - df.at[idx-n, 'close'])/(max(df['high'].iloc[-n:]) - min(df['low'].iloc[-n:]))*100
-    df.set_value(idx, 'CMI'+str(n), val)
+    val = abs(df.at[idx-1, 'close'] - df.at[idx-n, 'close'])/(max(df['high'].iloc[idx-n:idx]) - min(df['low'].iloc[idx-n:idx]))*100
+    df.set_value(idx-1, 'CMI'+str(n), val)
 
 def ATR(df, n = 20):
     tr = TR(df)
@@ -97,9 +97,9 @@ def ATR(df, n = 20):
 
 def atr(df_tup, n = 20):
     df, idx = df_tup
-    new_tr = max(df.at[idx,'high'], df.at[idx-1,'close']) - min(df.at[idx,'low'], df.at[idx-1,'close'])
+    new_tr = max(df.at[idx-1,'high']-df.at[idx-1, 'low'], abs(df.at[idx-1, 'high'] - df.at[idx-2,'close']),  abs(df.at[idx-1, 'low'] - df.at[idx-2,'close']))
     alpha = 2.0/(n+1)
-    df.set_value(idx,'ATR'+str(n), df.at[idx-1, 'ATR'+str(n)] * (1-alpha) + alpha * new_tr)
+    df.set_value(idx-1,'ATR'+str(n), df.at[idx-2, 'ATR'+str(n)] * (1-alpha) + alpha * new_tr)
     
 def tsMA(ts, n):
     return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
@@ -110,7 +110,7 @@ def MA(df, n, field = 'close'):
 def ma(df_tup, n, field = 'close'):
     key = 'MA_' + field[0].upper() + str(n)
     df, idx = df_tup
-    df.set_value(idx, key, np.mean(df[field][-n:]))
+    df.set_value(idx-1, key, np.mean(df[field][idx-n:idx]))
 
 def STDEV(df, n, field = 'close'):
     return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
@@ -118,7 +118,7 @@ def STDEV(df, n, field = 'close'):
 def stdev(df_tup, n, field = 'close'):
     key = 'STDEV_' + field[0].upper() + str(n)
     df, idx = df_tup
-    df.set_value(idx, key, np.std(df[field][-n:]))
+    df.set_value(idx-1, key, np.std(df[field][idx-n:idx]))
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
@@ -127,7 +127,7 @@ def EMA(df, n, field = 'close'):
 def ema(df_tup, n, field =  'close'):
     df, idx = df_tup
     alpha = 2.0/(n+1)
-    df.set_value(idx, 'EMA_' + field[0].upper() + str(n), df.at[idx-1, 'EMA_' + field[0].upper() + str(n)] * (1-alpha) + df.at[idx, field] * alpha)
+    df.set_value(idx-1, 'EMA_' + field[0].upper() + str(n), df.at[idx-2, 'EMA_' + field[0].upper() + str(n)] * (1-alpha) + df.at[idx-1, field] * alpha)
     
 #Momentum
 def MOM(df, n):
@@ -366,11 +366,11 @@ def DONCH_L(df, n, field = 'low'):
 
 def donch_h(df_tup, n, field = 'high'):
     df, idx = df_tup
-    df.set_value(idx, 'DONCH_H'+ field[0].upper() + str(n), max(df[field][-n:]))
+    df.set_value(idx-1, 'DONCH_H'+ field[0].upper() + str(n), max(df[field][idx-n:idx]))
  
 def donch_l(df_tup, n, field = 'low'):
     df, idx = df_tup
-    df.set_value(idx, 'DONCH_L'+ field[0].upper() + str(n), min(df[field][-n:]))
+    df.set_value(idx-1, 'DONCH_L'+ field[0].upper() + str(n), min(df[field][idx-n:idx]))
     
 #Standard Deviation
 #def STDDEV(df, n):
@@ -393,14 +393,14 @@ def HEIKEN_ASHI(df, period1):
     
 def heiken_ashi(df_tup, period):
     df, idx = df_tup
-    ma_o = sum(df['open'][-period:])/float(period)
-    ma_c = sum(df['close'][-period:])/float(period)
-    ma_h = sum(df['high'][-period])/float(period)
-    ma_l = sum(df['low'][-period:])/float(period)
-    df.set_value(idx,'HAclose', (ma_o + ma_c + ma_h + ma_l)/4.0)
-    df.set_value(idx, 'HAopen', (df.at[idx-1,'HAopen'] + df.at[idx-1, 'HAclose'])/2.0)
-    df.set_value(idx, 'HAhigh', max(ma_h, df.at[idx, 'HAopen'], df.at[idx, 'HAclose']))
-    df.set_value(idx, 'HAlow', min(ma_l, df.at[idx, 'HAopen'], df.at[idx, 'HAclose']))
+    ma_o = sum(df['open'][idx-period:idx])/float(period)
+    ma_c = sum(df['close'][idx-period:idx])/float(period)
+    ma_h = sum(df['high'][idx-period:idx])/float(period)
+    ma_l = sum(df['low'][idx-period:idx])/float(period)
+    df.set_value(idx-1,'HAclose', (ma_o + ma_c + ma_h + ma_l)/4.0)
+    df.set_value(idx-1, 'HAopen', (df.at[idx-2,'HAopen'] + df.at[idx-2, 'HAclose'])/2.0)
+    df.set_value(idx-1, 'HAhigh', max(ma_h, df.at[idx-1, 'HAopen'], df.at[idx-1, 'HAclose']))
+    df.set_value(idx-1, 'HAlow', min(ma_l, df.at[idx-1, 'HAopen'], df.at[idx-1, 'HAclose']))
 
 def BBANDS_STOP(df, n, nstd):
     MA = pd.Series(pd.rolling_mean(df['close'], n))
@@ -423,19 +423,19 @@ def BBANDS_STOP(df, n, nstd):
 
 def bbands_stop(df_tup, n, nstd):
     df, idx = df_tup
-    ma = df.close[-n:].mean()
-    msd = df.close[-n:].std()
-    df.set_value(idx, 'BBSTOP_upper', ma + nstd * msd)
-    df.set_value(idx, 'BBSTOP_lower', ma - nstd * msd)
-    df.set_value(idx, 'BBSTOP_trend', df.at[idx-1, 'BBSTOP_trend'])
-    if df.at[idx, 'close'] > df.at[idx-1, 'BBSTOP_upper']:
-        df.set_value(idx, 'BBSTOP_trend', 1)
-    if df.at[idx, 'close'] < df.at[idx-1, 'BBSTOP_lower']:
-        df.set_value(idx, 'BBSTOP_trend', -1)
-    if (df.at[idx, 'BBSTOP_trend'] == 1) and (df.at[idx, 'BBSTOP_lower'] < df.at[idx-1, 'BBSTOP_lower']):
-        df.set_value(idx, 'BBSTOP_lower', df.at[idx-1, 'BBSTOP_lower'])
-    if (df.at[idx, 'BBSTOP_trend'] == -1) and (df.at[idx, 'BBSTOP_upper'] > df.at[idx-1, 'BBSTOP_upper']):
-        df.set_value(idx, 'BBSTOP_upper', df.at[idx-1, 'BBSTOP_upper'])
+    ma = df.close[idx-n:idx].mean()
+    msd = df.close[idx-n:idx].std()
+    df.set_value(idx-1, 'BBSTOP_upper', ma + nstd * msd)
+    df.set_value(idx-1, 'BBSTOP_lower', ma - nstd * msd)
+    df.set_value(idx-1, 'BBSTOP_trend', df.at[idx-2, 'BBSTOP_trend'])
+    if df.at[idx-1, 'close'] > df.at[idx-2, 'BBSTOP_upper']:
+        df.set_value(idx-1, 'BBSTOP_trend', 1)
+    if df.at[idx-1, 'close'] < df.at[idx-2, 'BBSTOP_lower']:
+        df.set_value(idx-1, 'BBSTOP_trend', -1)
+    if (df.at[idx-1, 'BBSTOP_trend'] == 1) and (df.at[idx-1, 'BBSTOP_lower'] < df.at[idx-2, 'BBSTOP_lower']):
+        df.set_value(idx-1, 'BBSTOP_lower', df.at[idx-2, 'BBSTOP_lower'])
+    if (df.at[idx-1, 'BBSTOP_trend'] == -1) and (df.at[idx-1, 'BBSTOP_upper'] > df.at[idx-2, 'BBSTOP_upper']):
+        df.set_value(idx-1, 'BBSTOP_upper', df.at[idx-2, 'BBSTOP_upper'])
 
 def FISHER(df, n, smooth_p = 0.7, smooth_i = 0.7):
     roll_high = pd.rolling_max(df.high, n)
@@ -448,12 +448,12 @@ def FISHER(df, n, smooth_p = 0.7, smooth_i = 0.7):
 
 def fisher(df_tup, n, smooth_p = 0.7, smooth_i = 0.7):
     df, idx = df_tup
-    roll_high = max(df.high[-n:])
-    roll_low  = min(df.low[-n:])
-    price_loc = (df.at[idx, 'close'] - roll_low)*2.0/(roll_high - roll_low) - 1
-    df.set_value(idx, 'FISHER_P', df.at[idx-1, 'FISHER_P'] * (1 - smooth_p) + smooth_p * price_loc)
-    fisher_ind = 0.5 * np.log((1 + df.at[idx, 'FISHER_P'])/(1 - df.at[idx, 'FISHER_P']))
-    df.set_value(idx, 'FISHER_I', df.at[idx-1, 'FISHER_I'] * (1 - smooth_i) + smooth_i * fisher_ind)
+    roll_high = max(df.high[idx-n:idx])
+    roll_low  = min(df.low[idx-n:idx])
+    price_loc = (df.at[idx-1, 'close'] - roll_low)*2.0/(roll_high - roll_low) - 1
+    df.set_value(idx-1, 'FISHER_P', df.at[idx-2, 'FISHER_P'] * (1 - smooth_p) + smooth_p * price_loc)
+    fisher_ind = 0.5 * np.log((1 + df.at[idx-1, 'FISHER_P'])/(1 - df.at[idx-1, 'FISHER_P']))
+    df.set_value(idx-1, 'FISHER_I', df.at[idx-2, 'FISHER_I'] * (1 - smooth_i) + smooth_i * fisher_ind)
 
 def PCT_CHANNEL(df, n = 20, pct = 50, field = 'close'):
     out = pd.Series(index=df.index, name = 'PCT%sCH%s' % (pct, n))
@@ -465,7 +465,7 @@ def PCT_CHANNEL(df, n = 20, pct = 50, field = 'close'):
 def pct_channel(df_tup, n = 20, pct = 50, field = 'close'):
     key =  'PCT%sCH%s' % (pct, n)
     df, idx = df_tup
-    df.set_value(idx, key, np.percentile(df[field].iloc[(-n):], pct))
+    df.set_value(idx-1, key, np.percentile(df[field].iloc[(idx-n):idx], pct))
 
 def COND_PCT_CHAN(df, n = 20, pct = 50, field = 'close', direction=1):
     out = pd.Series(index=df.index, name = 'C_CH%s_PCT%s' % (n, pct))
