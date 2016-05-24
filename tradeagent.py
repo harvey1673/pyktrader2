@@ -149,12 +149,13 @@ class MktDataMixin(object):
             df_m = self.min_store[inst][m]
             if m > 1 and bar_id % m == 0:
                 s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m-1)
-                slices = df[(df.datetime>=s_start) & (df.datetime<=self.cur_min[inst]['datetime'])]
-                new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
+                slices = df[(df['datetime']>=s_start) & (df['datetime']<=self.cur_min[inst]['datetime'])]
+                if len(slices) > 0:
+                    new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
                             'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
                             'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
                             'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
-                self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
+                    self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
             if bar_id % m == 0:
                 for fobj in self.min_data_func[inst][m]:
                     df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
