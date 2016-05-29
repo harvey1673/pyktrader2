@@ -198,7 +198,11 @@ class MktDataMixin(object):
             if (self.cur_day[inst]['close']>0):
                 new_day = { key: self.cur_day[inst][key] for key in day_data_list }
                 df = self.day_data[inst]
-                df.loc[df.index[-1]+1] = pd.Series(new_day)
+                if len(df) == 0:
+                    idy = 0
+                else:
+                    idy = df.index[-1] + 1
+                df.loc[idy] = pd.Series(new_day)
                 for fobj in self.day_data_func[inst]:
                     df_tup = (df, df.index[-1])
                     fobj.rfunc(df_tup)
