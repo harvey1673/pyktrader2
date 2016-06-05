@@ -102,11 +102,11 @@ class TargetTrailTradePos(TradePos):
 
     def update_price(self, curr_price):
         if self.trailing:
-            TradePos.update_price(curr_price)
+            super(TargetTrailTradePos, self).update_price(curr_price)
         else:
             if self.check_profit(curr_price, self.reset_margin):
                 self.trailing = True
-                self.exit_target = self.curr_price
+                self.exit_target = curr_price
 
 def tradepos2dict(tradepos):
     trade = {}

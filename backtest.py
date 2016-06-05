@@ -246,7 +246,8 @@ def simlauncher_min(config_file):
                     'profit_per_win', 'profit_per_loss']
     scenarios = [list(s) for s in np.ndindex(tuple(scen_dim))]
     config.update(sim_config['config'])
-    config['pos_class'] = eval(sim_config['pos_class'])
+    if 'pos_class' in sim_config:
+        config['pos_class'] = eval(sim_config['pos_class'])
     if 'proc_func' in sim_config:
         config['proc_func'] = eval(sim_config['proc_func'])
     file_prefix = file_prefix + sim_config['sim_name']

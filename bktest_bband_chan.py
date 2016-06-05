@@ -27,7 +27,7 @@ def bband_chan_sim( mdf, config):
     freq = config['freq']
     xdf = dh.conv_ohlc_freq(mdf, freq)
     xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
-    boll_std = dh.STDDEV(xdf, win).shift(1)
+    boll_std = dh.STDEV(xdf, win).shift(1)
     xdf['upbnd'] = xdf['boll_ma'] + boll_std * k
     xdf['lowbnd'] = xdf['boll_ma'] - boll_std * k
     if chan > 0:
