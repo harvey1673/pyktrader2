@@ -81,8 +81,8 @@ class TradePos(object):
 
 
 class ParSARTradePos(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, price_unit)
+    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, price_unit)
         self.af = af
         self.af_incr = incr
         self.af_cap = cap

@@ -31,7 +31,7 @@ def dual_thrust_sim( mdf, config):
     use_chan = config['use_chan']
     tcost = config['trans_cost']
     unit = config['unit']
-    stoploss = config['stoploss']
+    SL = config['stoploss']
     min_rng = config['min_range']
     if win == -1:
         tr= pd.concat([ddf.high - ddf.low, ddf.close - ddf.close.shift(1)], 
@@ -91,13 +91,20 @@ def dual_thrust_sim( mdf, config):
         prev_d = d
         buytrig  = d_open + rng
         selltrig = d_open - rng
+        stoploss = SL * dslice.ATR
+        tmp_args = pos_args.copy()
+        if 'reset_margin' in pos_args:
+            tmp_args['reset_margin'] = dslice.ATR * pos_args['reset_margin']
+            stoploss =  pos_args['reset_margin'] * stoploss
+        close_pos = False
         if pos != 0:
-            close_pos = False
             if (update_freq > 0) and ((mslice.min_id + 1) % update_freq == 0):
                 xslice = conv_xslice(mslice)
                 curr_pos[0].update_bar(xslice)
-                close_pos = curr_pos[0].check_exit(mslice.close, stoploss * dslice.ATR)
-            if close_pos or (mslice.min_id >= config['exit_min'] and (close_daily or (d == end_d))):
+                close_flag = curr_pos[0].check_exit(mslice.close, stoploss)
+                if close_flag and (((pos > 0) and (mslice.high < buytrig)) or ((pos < 0) and (mslice.low > selltrig))):
+                    close_pos = True
+            if close_pos or ((mslice.min_id >= config['exit_min']) and (close_daily or (d == end_d))):
                 curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -115,9 +122,6 @@ def dual_thrust_sim( mdf, config):
                     curr_pos = []
                     mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
                 if (use_chan == False) or (use_chan and (mslice.high >= dslice.CH_H)):
-                    tmp_args = pos_args.copy()
-                    if 'reset_margin' in pos_args:
-                        tmp_args['reset_margin'] = dslice.ATR * pos_args['reset_margin']
                     new_pos = eval(pos_class)([mslice.contract], [1], unit, mslice.close + offset, mslice.close + offset, **tmp_args)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
@@ -134,7 +138,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos = []
                     mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
                 if (use_chan == False) or (use_chan and (mslice.low <= dslice.CH_L)):
-                    new_pos = eval(pos_class)([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset)
+                    new_pos = eval(pos_class)([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset, **tmp_args)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(mslice.close - offset, dd)
@@ -142,7 +146,7 @@ def dual_thrust_sim( mdf, config):
                     pos = -unit
                     mdf.ix[dd, 'cost'] -= abs(pos) * (offset + mslice.close*tcost)
         mdf.ix[dd, 'pos'] = pos
-            
+
     (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
     res = dict( res_pnl.items() + res_trade.items())
