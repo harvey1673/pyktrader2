@@ -457,7 +457,13 @@ class CtpGateway(Gateway):
         if last and self.auto_db_update:
             print "update contract table, new inst # = %s" % len(self.qry_instruments)
             for instID in self.qry_instruments:
-                mysqlaccess.insert_cont_data(self.qry_instruments[instID])
+                expiry = self.qry_instruments[instID]['expiry']
+                try:
+                    expiry_date = datetime.datetime.strptime(expiry, '%Y%m%d')
+                    mysqlaccess.insert_cont_data(self.qry_instruments[instID])
+                except:
+                    print instID, expiry
+                    continue
             #print "logout TD"
             #self.tdApi.logout()
 
