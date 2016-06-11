@@ -53,7 +53,7 @@ def bband_chan_sim( mdf, config):
     tradeid = 0
     holding_period = 0
     for idx, dd in enumerate(xdf.index):
-        mslice = xdf.ix[dd]
+        mslice = xdf.loc[dd]
         if len(curr_pos) == 0:
             pos = 0
         else:
@@ -66,19 +66,19 @@ def bband_chan_sim( mdf, config):
                 stop_line = min(mslice.upbnd, stop_line)
             else:
                 stop_line = max(mslice.lowbnd, stop_line)
-            curr_pos.set_exit(stop_line)
-        xdf.ix[dd, 'pos'] = pos
+            curr_pos[0].set_exit(stop_line)
+        xdf.set_value(dd, 'pos', pos)
         if np.isnan(mslice.boll_ma) or np.isnan(mslice.chan_h):
             continue
-        if mslice.close_ind or (pos !=0 and currpos[0].check_exit(mslice.open, 0)):
+        if mslice.close_ind or (pos !=0 and curr_pos[0].check_exit(mslice.open, 0)):
             if pos!=0:
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                xdf.ix[dd, 'cost'] -=  abs(pos) * ( mslice.open * tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.open - misc.sign(pos) * offset
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
             if ((mslice.open >= mslice.high_band) or (mslice.open <= mslice.low_band)) and (pos==0):
@@ -89,8 +89,8 @@ def bband_chan_sim( mdf, config):
                 new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
                 curr_pos.append(new_pos)
                 pos = target_pos
-                xdf.ix[dd, 'cost'] -=  abs(target_pos) * (mslice.open * tcost)
-                xdf.ix[dd, 'traded_price'] = mslice.open + misc.sign(target_pos)*offset
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(target_pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
         xdf.ix[dd, 'pos'] = pos
     (res_pnl, ts) = backtest.get_pnl_stats( xdf, start_equity, marginrate, 'm')
     res_trade = backtest.get_trade_stats( closed_trades )
@@ -101,8 +101,8 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_boll_bandit.bband_chan_sim'
     sim_config['scen_keys'] = ['close_daily', 'param']
-    sim_config['sim_name']   = 'bbands_chan_30min_HL'
-    sim_config['products']   = ['rb', 'i', 'j', 'ZC', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al']
+    sim_config['sim_name']   = 'boll_bandit_30min_HL'
+    sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'zn', 'ru']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160513'
     sim_config['need_daily'] = False
@@ -118,7 +118,6 @@ def gen_config_file(filename):
               'freq': '30min',
               'min_win': 10,
               'trans_cost': 0.0,
-              'close_daily': False,
               'unit': 1,
               'stoploss': 0.0,
               'pos_args': {},

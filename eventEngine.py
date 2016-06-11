@@ -46,7 +46,7 @@ class RepeatTimer2(threading.Thread):
         self.event.clear()
 
 ########################################################################
-class EventEngine:
+class EventEngine(object):
     def __init__(self, timerFreq = 1.0):
         """初始化事件引擎"""
         # 事件队列
