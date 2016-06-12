@@ -41,7 +41,9 @@ def bband_chan_sim( mdf, config):
         xdf['chan_l'] = 10000000
     xdf['high_band'] = xdf[['chan_h', 'upbnd']].max(axis=1)
     xdf['low_band'] = xdf[['chan_l', 'lowbnd']].min(axis=1)
-
+    xdf['filter'] = eval(filter_func)(xdf, filter_param[0], **filter_args)
+    xdf['filter_ma'] = pd.rolling_mean(xdf['filter'], filter_param[1])
+    xdf['filter_ind'] = xdf['filter_ma'] >= filter_param[2]
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
@@ -116,7 +118,7 @@ def gen_config_file(filename):
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
                   'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
-    filter_func = {'func': 'dh.CMI', 'args':{}}
+    filter_func = {'func': 'dh.CMI', 'args':{}, 'param':[10, 5, 25]}
     config = {'capital': 10000,
               'freq': '30min',
               'trans_cost': 0.0,

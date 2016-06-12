@@ -15,6 +15,7 @@ def bband_chan_sim( mdf, config):
     pos_class = config['pos_class']
     pos_args  = config['pos_args']
     param = config['param']
+    std_func = eval(config['std_func'])
     #tick_base = config['tick_base']
     close_daily = config['close_daily']
     win = param[0]
@@ -27,7 +28,7 @@ def bband_chan_sim( mdf, config):
     freq = config['freq']
     xdf = dh.conv_ohlc_freq(mdf, freq)
     xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
-    boll_std = dh.STDEV(xdf, win).shift(1)
+    boll_std = std_func(xdf, win).shift(1)
     xdf['upbnd'] = xdf['boll_ma'] + boll_std * k
     xdf['lowbnd'] = xdf['boll_ma'] - boll_std * k
     if chan > 0:
@@ -99,26 +100,29 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_bband_chan.bband_chan_sim'
     sim_config['scen_keys'] = ['close_daily', 'param']
-    sim_config['sim_name']   = 'bbands_chan_30min_HL'
-    sim_config['products']   = ['rb', 'i', 'j', 'ZC', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al']
+    sim_config['sim_name']   = 'BBandChan_3min_HL'
+    sim_config['products']   = ['ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160513'
+    sim_config['end_date']   = '20160608'
     sim_config['need_daily'] = False
     sim_config['close_daily']  =  [ False, True]
-    sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), \
-                           (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), \
-                           (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80)]
+    sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.25, 5), (20, 1.25, 10), (20, 1.25, 20), (20, 1.25, 40), \
+                           (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), (20, 2, 5), (20, 2, 10), (20, 2, 20), (20, 2, 40),\
+                           (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.25, 10), (40, 1.25, 20), (40, 1.25, 40), (40, 1.25, 80), \
+                           (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), (40, 2, 10), (40, 2, 20), (40, 2, 40), (40, 2, 80), \
+                           (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.25, 10), (80, 1.25, 20), (80, 1.25, 40), (80, 1.25, 80), \
+                           (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80), (80, 2, 10), (80, 2, 20), (80, 2, 40), (80, 2, 80) ]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
                   'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
     config = {'capital': 10000,
-              'freq': '30min',
+              'freq': '3min',
               'trans_cost': 0.0,
-              'close_daily': False,
               'unit': 1,
               'stoploss': 0.0,
               'pos_args': {},
+              'std_func': 'dh.STDEV',
               'exit_min': 2055,
               'chan_func': chan_func,
               }

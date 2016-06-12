@@ -286,6 +286,7 @@ class Agent(MktDataMixin):
         strat_files = config.get('strat_files', [])
         for sfile in strat_files:
             strat_conf = {}
+            print "loading from ", sfile
             with open(sfile, 'r') as fp:
                 strat_conf = json.load(fp)
             class_str = strat_conf['class']
