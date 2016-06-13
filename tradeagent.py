@@ -204,7 +204,7 @@ class MktDataMixin(object):
                     idy = df.index[-1] + 1
                 df.loc[idy] = pd.Series(new_day)
                 for fobj in self.day_data_func[inst]:
-                    df_tup = (df, df.index[-1])
+                    df_tup = (df, idy + 1)
                     fobj.rfunc(df_tup)
                 if self.save_flag:
                     event = Event(type=EVENT_DB_WRITE, priority = 500)
