@@ -94,6 +94,32 @@ class ParSARTradePos(TradePos):
             self.af = max(self.af_cap, self.af + self.af_incr)
             self.ep = curr_ep
 
+class ParSARProfitTrig(TradePos):
+    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, price_unit)
+        self.af = af
+        self.af_incr = incr
+        self.af_cap = cap
+        self.ep = entry_target
+        self.trailing = False
+
+    def check_exit(self, curr_price, margin = 0):
+        if self.trailing and (self.direction * (self.exit_target - curr_price) >= margin):
+            return True
+        else:
+            return False
+
+    def update_price(self, curr_ep):
+        if self.trailing:
+            self.exit_target = self.exit_target + self.af_incr * (self.ep - self.exit_target)
+            if (curr_ep - self.ep) * self.direction > 0:
+                self.af = max(self.af_cap, self.af + self.af_incr)
+                self.ep = curr_ep
+        else:
+            if self.check_profit(curr_ep, self.reset_margin):
+                self.trailing = True
+                self.exit_target = curr_ep
+
 class TargetTrailTradePos(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10):
         TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, price_unit)

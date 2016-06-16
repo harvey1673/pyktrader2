@@ -1,5 +1,4 @@
 import misc
-import agent
 import data_handler as dh
 import pandas as pd
 import numpy as np
@@ -10,35 +9,6 @@ import sys
 
 def count_min_id(dt):
     return ((dt.hour+6)%24)*60+dt.minute + 1
-
-def chanbreak( asset, start_date, end_date, freqs, windows, config):
-    nearby  = config['nearby']
-    rollrule = config['rollrule']
-    file_prefix = config['file_prefix'] + '_' + asset + '_'
-    #ddf = misc.nearby(asset, nearby, start_d, end_date, rollrule, 'd', need_shift=True)
-    mdf = misc.nearby(asset, nearby, start_d, end_date, rollrule, 'm', need_shift=True)    
-    mdf = backtest.cleanup_mindata(mdf, asset)
-    output = {}
-    for ix, freq in enumerate(freqs):
-        config['freq'] = freq
-        for iy, win in enumerate(windows):
-            idx = ix*10+iy
-            config['win'] = win
-            (res, closed_trades, ts) = chanbreak_sim( mdf, config)
-            output[idx] = res
-            print 'saving results for scen = %s' % str(idx)
-            all_trades = {}
-            for i, tradepos in enumerate(closed_trades):
-                all_trades[i] = strat.tradepos2dict(tradepos)
-            fname = file_prefix + str(idx) + '_trades.csv'
-            trades = pd.DataFrame.from_dict(all_trades).T  
-            trades.to_csv(fname)
-            fname = file_prefix + str(idx) + '_dailydata.csv'
-            ts.to_csv(fname)
-    fname = file_prefix + 'stats.csv'
-    res = pd.DataFrame.from_dict(output)
-    res.to_csv(fname)
-    return 
 
 def chanbreak_sim( mdf, config):
     freq = config['freq']

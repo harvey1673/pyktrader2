@@ -95,15 +95,14 @@ def dual_thrust_sim( mdf, config):
         tmp_args = pos_args.copy()
         if 'reset_margin' in pos_args:
             tmp_args['reset_margin'] = dslice.ATR * pos_args['reset_margin']
-            stoploss =  pos_args['reset_margin'] * stoploss
+            stoploss =  tmp_args['reset_margin'] * stoploss
         close_pos = False
         if pos != 0:
-            if (update_freq > 0) and ((mslice.min_id + 1) % update_freq == 0):
+            if ((pos > 0) and (mslice.high < buytrig)) or ((pos < 0) and (mslice.low > selltrig)):
+                close_pos = curr_pos[0].check_exit(mslice.close, stoploss)
+            if (close_pos == False) and (update_freq > 0) and ((mslice.min_id + 1) % update_freq == 0):
                 xslice = conv_xslice(mslice)
                 curr_pos[0].update_bar(xslice)
-                close_flag = curr_pos[0].check_exit(mslice.close, stoploss)
-                if close_flag and (((pos > 0) and (mslice.high < buytrig)) or ((pos < 0) and (mslice.low > selltrig))):
-                    close_pos = True
             if close_pos or ((mslice.min_id >= config['exit_min']) and (close_daily or (d == end_d))):
                 curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
                 tradeid += 1
@@ -156,15 +155,18 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_dt_stop.dual_thrust_sim'
     sim_config['scen_keys'] = ['pos_param', 'update_freq']
-    sim_config['sim_name']   = 'DTdchan_'
+    sim_config['sim_name']   = 'DT_PSARStop_'
     sim_config['products']   = ['y', 'p', 'l', 'pp', 'cs', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'j', 'jd', 'jm', 'ag', 'cu', 'm', 'RM', 'ru']
     sim_config['start_date'] = '20150105'
     sim_config['end_date']   = '20160603'
     sim_config['need_daily'] = True
     sim_config['pos_param'] = [('strat.TradePos', {}), \
-                               ('strat.ParSARTradePos', {'af': 0.02, 'incr': 0.02, 'cap': 0.2}), \
-                               ('strat.ParSARTradePos', {'af': 0.02, 'incr': 0.01, 'cap': 0.2}), \
-                               ('strat.ParSARTradePos', {'af': 0.02, 'incr': 0.01, 'cap': 0.1}),]
+                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1.5}), \
+                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 2}), \
+                               ('strat.ParSARProfitTrig', {'af': 0.01, 'incr': 0.01, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('strat.ParSARProfitTrig', {'af': 0.01, 'incr': 0.005, 'cap': 0.2, 'reset_margin': 1}) ]
     sim_config['update_freq'] = [15, 30, 60]
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
@@ -178,7 +180,7 @@ def gen_config_file(filename):
               'min_range': 0.0035,
               'proc_args': {'minlist':[]},
               'pos_args': {},
-              'param': (0.8, 0, 0.5, 0),
+              'param': (0.3, 2, 0.5, 0),
               'chan_func': chan_func,
               'close_daily': False,
               'stoploss': 0.0,
