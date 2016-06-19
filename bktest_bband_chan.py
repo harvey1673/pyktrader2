@@ -14,6 +14,8 @@ def bband_chan_sim( mdf, config):
     offset = config['offset']
     pos_class = config['pos_class']
     pos_args  = config['pos_args']
+    pos_update = config.get('pos_update', False)
+    stoploss = config.get('stoploss', 0.0)
     param = config['param']
     std_func = eval(config['std_func'])
     #tick_base = config['tick_base']
@@ -28,9 +30,9 @@ def bband_chan_sim( mdf, config):
     freq = config['freq']
     xdf = dh.conv_ohlc_freq(mdf, freq)
     xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
-    boll_std = std_func(xdf, win).shift(1)
-    xdf['upbnd'] = xdf['boll_ma'] + boll_std * k
-    xdf['lowbnd'] = xdf['boll_ma'] - boll_std * k
+    xdf['boll_std'] = std_func(xdf, win).shift(1)
+    xdf['upbnd'] = xdf['boll_ma'] + xdf['boll_std'] * k
+    xdf['lowbnd'] = xdf['boll_ma'] - xdf['boll_std'] * k
     if chan > 0:
         xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
         xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
@@ -90,38 +92,54 @@ def bband_chan_sim( mdf, config):
                 pos = target_pos
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
+        if pos_update and pos != 0:
+            if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
+                tradeid += 1
+                curr_pos[0].exit_tradeid = tradeid
+                closed_trades.append(curr_pos[0])
+                curr_pos = []
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
+                pos = 0
+            else:
+                curr_pos[0].update_bar(mslice)
         xdf.set_value(dd, 'pos', pos)
-    (res_pnl, ts) = backtest.get_pnl_stats( xdf, start_equity, marginrate, 'm')
-    res_trade = backtest.get_trade_stats( closed_trades )
-    res = dict( res_pnl.items() + res_trade.items())
-    return (res, closed_trades, ts)
+    return (xdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_bband_chan.bband_chan_sim'
-    sim_config['scen_keys'] = ['close_daily', 'param']
-    sim_config['sim_name']   = 'BBandChan_3min_HL'
-    sim_config['products']   = ['ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
+    sim_config['scen_keys'] = ['param', 'pos_args']
+    sim_config['sim_name']   = 'BandChan_sar_30min_HL'
+    sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160608'
     sim_config['need_daily'] = False
-    sim_config['close_daily']  =  [ False, True]
+    #sim_config['close_daily']  =  [ False, True]
     sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.25, 5), (20, 1.25, 10), (20, 1.25, 20), (20, 1.25, 40), \
                            (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), (20, 2, 5), (20, 2, 10), (20, 2, 20), (20, 2, 40),\
                            (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.25, 10), (40, 1.25, 20), (40, 1.25, 40), (40, 1.25, 80), \
                            (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), (40, 2, 10), (40, 2, 20), (40, 2, 40), (40, 2, 80), \
                            (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.25, 10), (80, 1.25, 20), (80, 1.25, 40), (80, 1.25, 80), \
                            (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80), (80, 2, 10), (80, 2, 20), (80, 2, 40), (80, 2, 80) ]
-    sim_config['pos_class'] = 'strat.TradePos'
+    sim_config['pos_class'] = 'strat.ParSARTradePos'
+    sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+                                {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+                                {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+                                {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+                                {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+                                {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
                   'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
     config = {'capital': 10000,
-              'freq': '3min',
+              'freq': '30min',
               'trans_cost': 0.0,
               'unit': 1,
               'stoploss': 0.0,
-              'pos_args': {},
+              'close_daily': False,
+              'pos_update': True,
               'std_func': 'dh.STDEV',
               'exit_min': 2055,
               'chan_func': chan_func,

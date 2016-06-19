@@ -152,11 +152,7 @@ def dual_thrust_sim( mdf, config):
                     mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                     mdf.set_value(dd, 'traded_price', mslice.close + misc.sign(pos) * offset)
         mdf.ix[dd, 'pos'] = pos
-            
-    (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
-    res_trade = backtest.get_trade_stats( closed_trades )
-    res = dict( res_pnl.items() + res_trade.items())
-    return (res, closed_trades, ts)
+    return (mdf, closed_trades)
 
 
 def gen_config_file(filename):

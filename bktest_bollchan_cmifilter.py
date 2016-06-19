@@ -30,7 +30,7 @@ def bband_chan_sim( mdf, config):
     freq = config['freq']
     xdf = dh.conv_ohlc_freq(mdf, freq)
     xdf['boll_ma'] = dh.MA(xdf, win).shift(1)
-    boll_std = dh.STDDEV(xdf, win).shift(1)
+    boll_std = dh.STDEV(xdf, win).shift(1)
     xdf['upbnd'] = xdf['boll_ma'] + boll_std * k
     xdf['lowbnd'] = xdf['boll_ma'] - boll_std * k
     if chan > 0:
@@ -96,10 +96,7 @@ def bband_chan_sim( mdf, config):
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
         xdf.set_value(dd, 'pos', pos)
-    (res_pnl, ts) = backtest.get_pnl_stats( xdf, start_equity, marginrate, 'm')
-    res_trade = backtest.get_trade_stats( closed_trades )
-    res = dict( res_pnl.items() + res_trade.items())
-    return (res, closed_trades, ts)
+    return (xdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}

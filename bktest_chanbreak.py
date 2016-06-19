@@ -97,10 +97,7 @@ def chanbreak_sim( mdf, config):
                     curr_pos.append(new_pos)
                     mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
             mdf.ix[dd, 'pos'] = pos
-    (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
-    res_trade = backtest.get_trade_stats( closed_trades )
-    res = dict( res_pnl.items() + res_trade.items())
-    return (res, closed_trades, ts)
+    return (mdf, closed_trades)
     
 def run_sim(start_date, end_date):
     #sim_list = [ 'm', 'y', 'l', 'p', 'rb', 'TA', 'SR', 'RM', 'cu', 'i', 'a', 'ag']

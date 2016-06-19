@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import data_handler as dh
 import strategy as strat
+import mysqlaccess
 import misc
 import platform
 
@@ -102,11 +103,21 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
-def get_pnl_stats(df, start_capital, marginrate, freq):
-    df['pnl'] = df['pos'].shift(1).fillna(0.0)*(df['close'] - df['close'].shift(1)).fillna(0.0)
-    if 'traded_price' in df.columns:
-        df['pnl'] = df['pnl'] + (df['pos'] - df['pos'].shift(1).fillna(0.0))*(df['close'] - df['traded_price'])
-    df['margin'] = pd.concat([df.pos*marginrate[0]*df.close, -df.pos*marginrate[1]*df.close], join='outer', axis=1).max(1)
+def get_pnl_stats(df_list, start_capital, marginrate, freq):
+    cum_pnl = pd.Series()
+    cum_margin = pd.Series()
+    cum_cost = pd.Series()
+    date_col = pd.Series()
+    for df in df_list:
+        pnl = df['pos'].shift(1).fillna(0.0)*(df['close'] - df['close'].shift(1)).fillna(0.0)
+        if 'traded_price' in df.columns:
+            pnl = pnl + (df['pos'] - df['pos'].shift(1).fillna(0.0))*(df['close'] - df['traded_price'])
+        cum_pnl = cum_pnl.add(pnl, fill_value = 0)
+        cum_margin = cum_margin.add( pd.concat([df.pos*marginrate[0]*df.close, -df.pos*marginrate[1]*df.close], join='outer', axis=1).max(1), fill_value = 0)
+        cum_cost = cum_cost.add( df['cost'], fill_value = 0)
+        date_col = date_col.append(df['date'])
+    df = pd.concat([cum_pnl, cum_margin, cum_cost, date_col], axis = 1, join = 'inner')
+    df.columns = ['pnl', 'margin', 'cost', 'date']
     if freq == 'm':
         res = df.groupby([df['date']]).apply(stat_min2daily).reset_index().set_index(['date'])
         daily_pnl = pd.Series(res['pnl'])
@@ -233,6 +244,7 @@ def simnearby_min(config_file):
     if not os.path.exists(file_prefix):
         os.makedirs(file_prefix)
     sim_list = sim_config['products']
+    need_daily = sim_config.get('need_daily', False)
     config = {}
     start_date = datetime.datetime.strptime(sim_config['start_date'], '%Y%m%d').date()
     config['start_date'] = start_date
@@ -297,7 +309,7 @@ def simnearby_min(config_file):
             if nearby > 0:
                 mdf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'm', need_shift=True, database = 'hist_data')
             mdf = cleanup_mindata(mdf, asset)
-            if 'need_daily' in sim_config:
+            if need_daily:
                 ddf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'd', need_shift=True, database = 'hist_data')
                 config['ddf'] = ddf
             for ix, s in enumerate(scenarios):
@@ -308,7 +320,10 @@ def simnearby_min(config_file):
                 for key, seq in zip(sim_config['scen_keys'], s):
                     config[key] = sim_config[key][seq]
                 df = mdf.copy(deep = True)
-                (res, closed_trades, ts) = run_sim( df, config)
+                df, closed_trades = run_sim( df, config)
+                (res_pnl, ts) = get_pnl_stats( [df], config['capital'], config['marginrate'], 'm')
+                res_trade = get_trade_stats( closed_trades )
+                res = dict( res_pnl.items() + res_trade.items())
                 res.update(dict(zip(sim_config['scen_keys'], s)))
                 res['asset'] = asset
                 output[ix] = res
@@ -352,6 +367,14 @@ def simcontract_min(config_file):
     if not os.path.exists(file_prefix):
         os.makedirs(file_prefix)
     sim_list = sim_config['products']
+    if type(sim_list[0]).__name__ != 'list':
+        sim_list = [[str(asset)] for asset in sim_list]
+    sim_mode = sim_config.get('sim_mode', 'OR')
+    cont_maplist = sim_config.get('cont_maplist', [])
+    sim_period = sim_config.get('sim_period', '-6m')
+    need_daily = sim_config.get('need_daily', False)
+    if len(cont_maplist) == 0:
+        cont_maplist = [[0]] * len(sim_list)
     config = {}
     start_date = datetime.datetime.strptime(sim_config['start_date'], '%Y%m%d').date()
     config['start_date'] = start_date
@@ -377,106 +400,158 @@ def simcontract_min(config_file):
     fname = config['file_prefix'] + 'summary.csv'
     if os.path.isfile(fname):
         summary_df = pd.DataFrame.from_csv(fname)
-    for asset in sim_list:
-        # cont_mth, exch = mysqlaccess.prod_main_cont_exch(prodcode)
-        # contlist = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, roll_rule[1:]))
-        # exp_dates = [day_shift(contract_expiry(cont), roll_rule) for cont in contlist]
-        # #print contlist, exp_dates
-        # sdate = start_date
-        # is_new = True
-        # for idx, exp in enumerate(exp_dates):
-        #     if exp < start_date:
-        #         continue
-        #     elif sdate > end_date:
-        #         break
-        #     nb_cont = contlist[idx+n-1]
-        #     if freq == 'd':
-        #         new_df = mysqlaccess.load_daily_data_to_df('fut_daily', nb_cont, sdate, min(exp,end_date), database = database)
-        #     else:
-        #         minid_start = 1500
-        #         minid_end = 2114
-        #         if prodcode in night_session_markets:
-        #             minid_start = 300
-        #         new_df = mysqlaccess.load_min_data_to_df('fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end, database = database)
-        file_prefix = config['file_prefix'] + '_' + asset + '_'
+    for assets, cont_map in zip(sim_list, cont_maplist):
+        file_prefix = config['file_prefix'] + '_' + sim_mode + '_' + '_'.join(assets) + '_'
         fname = file_prefix + 'stats.json'
-        output = {}
+        output = {'total': {}, 'cont': {}}
         if os.path.isfile(fname):
             with open(fname, 'r') as fp:
                 output = json.load(fp)
-        if len(output.keys()) < len(scenarios):
-            if asset in sim_start_dict:
-                start_date =  max(sim_start_dict[asset], config['start_date'])
-            else:
-                start_date = config['start_date']
-            config['tick_base'] = trade_offset_dict[asset]
-            if 'offset' in sim_config:
-                config['offset'] = sim_config['offset'] * trade_offset_dict[asset]
-            else:
-                config['offset'] = trade_offset_dict[asset]
-            config['marginrate'] = ( sim_margin_dict[asset], sim_margin_dict[asset])
-            config['nearby'] = 1
-            config['rollrule'] = config.get('rollrule', '-50b')
-            config['exit_min'] = config.get('exit_min', 2057)
-            config['no_trade_set'] = config.get('no_trade_set', range(300, 301) + range(1500, 1501) + range(2059, 2100))
-            if asset in ['cu', 'al', 'zn']:
-                config['nearby'] = 3
-                config['rollrule'] = '-1b'
-            elif asset in ['IF', 'IH', 'IC']:
-                config['rollrule'] = '-2b'
-                config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
-            elif asset in ['au', 'ag']:
-                config['rollrule'] = '-25b'
-            elif asset in ['TF', 'T']:
-                config['rollrule'] = '-20b'
-                config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
-            config['no_trade_set'] = []
-            nearby   = config['nearby']
-            rollrule = config['rollrule']
-            if nearby > 0:
-                mdf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'm', need_shift=True, database = 'hist_data')
-            mdf = cleanup_mindata(mdf, asset)
-            if 'need_daily' in sim_config:
-                ddf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'd', need_shift=True, database = 'hist_data')
-                config['ddf'] = ddf
-            for ix, s in enumerate(scenarios):
-                fname1 = file_prefix + str(ix) + '_trades.csv'
-                fname2 = file_prefix + str(ix) + '_dailydata.csv'
-                if os.path.isfile(fname1) and os.path.isfile(fname2):
-                    continue
-                for key, seq in zip(sim_config['scen_keys'], s):
-                    config[key] = sim_config[key][seq]
+        #if len(output['total'].keys()) == len(scenarios):
+        #    continue
+        min_data = {}
+        day_data = {}
+        config['tick_base'] = 0
+        config['marginrate'] = (0, 0)
+        rollrule = config.get('rollrule', '-50b')
+        config['exit_min'] = config.get('exit_min', 2057)
+        config['no_trade_set'] = config.get('no_trade_set', [])
+        if assets[0] in ['cu', 'al', 'zn']:
+            rollrule = '-1b'
+        elif assets[0] in ['IF', 'IH', 'IC']:
+            rollrule = '-2b'
+            #config['no_trade_set'] = range(1500, 1514) + range(2100, 2115)
+        elif assets[0] in ['au', 'ag']:
+            rollrule = '-25b'
+        elif assets[0] in ['TF', 'T']:
+            rollrule = '-20b'
+            #config['no_trade_set'] = range(1500, 1514) + range(2110, 2115)
+        contlist = {}
+        exp_dates = {}
+        for i, prod in enumerate(assets):
+            cont_mth, exch = mysqlaccess.prod_main_cont_exch(prod)
+            contlist[prod] = misc.contract_range(prod, exch, cont_mth, start_date,end_date)
+            exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
+            edates = [ misc.day_shift(d, rollrule) for d in exp_dates[prod] ]
+            sdates = [ misc.day_shift(d, sim_period) for d in exp_dates[prod] ]
+            config['tick_base'] += trade_offset_dict[prod]
+            config['marginrate'] = ( max(config['marginrate'][0], sim_margin_dict[prod]), max(config['marginrate'][1], sim_margin_dict[prod]))
+            min_data[prod] = {}
+            day_data[prod] = {}
+            for cont, sd, ed in zip(contlist[prod], sdates, edates):
+                minid_start = 1500
+                minid_end = 2114
+                if prod in misc.night_session_markets:
+                    minid_start = 300
+                tmp_df = mysqlaccess.load_min_data_to_df('fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
+                tmp_df['contract'] = cont
+                min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
+                if need_daily:
+                    tmp_df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, sd, ed, database = 'hist_data')
+                    day_data[prod][cont] = tmp_df
+        if 'offset' in sim_config:
+            config['offset'] = sim_config['offset'] * config['tick_base']
+        else:
+            config['offset'] = config['tick_base']
+        for ix, s in enumerate(scenarios):
+            fname1 = file_prefix + str(ix) + '_trades.csv'
+            fname2 = file_prefix + str(ix) + '_dailydata.csv'
+            if os.path.isfile(fname1) and os.path.isfile(fname2):
+                continue
+            for key, seq in zip(sim_config['scen_keys'], s):
+                config[key] = sim_config[key][seq]
+            df_list = []
+            trade_list = []
+            for idx in range(abs(min(cont_map)), len(contlist[assets[0]]) - max(cont_map)):
+                cont = contlist[assets[0]][idx]
+                edate = misc.day_shift(exp_dates[assets[0]][idx], rollrule)
+                if sim_mode == 'OR':
+                    mdf = min_data[assets[0]][cont]
+                    mdf = mdf[mdf.date <= edate]
+                    if need_daily:
+                        ddf = day_data[assets[0]][cont]
+                        config['ddf'] = ddf[ddf.index <= edate]
+                        if len(config['ddf']) < 10:
+                            continue
+                else:
+                    if sim_mode == 'TS':
+                        all_data = [min_data[assets[0]][contlist[assets[0]][idx+i]] for i in cont_map]
+                    else:
+                        all_data = [min_data[asset][contlist[asset][idx+i]] for asset, i in zip(assets, cont_map)]
+                    mdf = pd.concat(all_data, axis = 1, join = 'inner')
+                    mdf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
+                    mdf = mdf[ mdf.date0 < edate]
+                    if need_daily:
+                        if sim_mode == 'TS':
+                            all_data = [day_data[assets[0]][contlist[assets[0]][idx+i]] for i in cont_map]
+                        else:
+                            all_data = [day_data[asset][contlist[asset]][idx+i] for asset, i in zip(assets, cont_map)]
+                        ddf = pd.concat(all_data, axis = 1, join = 'inner')
+                        ddf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
+                        config['ddf'] = ddf[ddf.index <= edate]
+                        if len(config['ddf']) < 10:
+                            continue
                 df = mdf.copy(deep = True)
-                (res, closed_trades, ts) = run_sim( df, config)
+                df, closed_trades = run_sim( df, config)
+                df_list.append(df)
+                trade_list = trade_list + closed_trades
+                (res_pnl, ts) = get_pnl_stats( [df], config['capital'], config['marginrate'], 'm')
+                res_trade = get_trade_stats( trade_list )
+                res = dict( res_pnl.items() + res_trade.items())
                 res.update(dict(zip(sim_config['scen_keys'], s)))
-                res['asset'] = asset
-                output[ix] = res
-                print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
-                all_trades = {}
-                for i, tradepos in enumerate(closed_trades):
-                    all_trades[i] = strat.tradepos2dict(tradepos)
-                trades = pd.DataFrame.from_dict(all_trades).T
-                trades.to_csv(fname1)
-                ts.to_csv(fname2)
-                fname = file_prefix + 'stats.json'
-                try:
-                    with open(fname, 'w') as ofile:
-                        json.dump(output, ofile)
-                except:
-                    continue
-        res = pd.DataFrame.from_dict(output, orient = 'index')
-        res.index.name = 'scenario'
-        res = res.sort_values(by = ['sharp_ratio'], ascending=False)
-        res = res.reset_index()
-        res.set_index(['asset', 'scenario'])
+                res['asset'] = cont
+                if cont not in output['cont']:
+                    output['cont'][cont] = {}
+                output['cont'][cont][ix] = res
+            (res_pnl, ts) = get_pnl_stats( df_list, config['capital'], config['marginrate'], 'm')
+            res_trade = get_trade_stats( trade_list )
+            res = dict( res_pnl.items() + res_trade.items())
+            res.update(dict(zip(sim_config['scen_keys'], s)))
+            res['asset'] = '_'.join(assets)
+            output['total'][ix] = res
+            print 'saving results for asset = %s, scen = %s' % ('_'.join(assets), str(ix))
+            all_trades = {}
+            for i, tradepos in enumerate(trade_list):
+                all_trades[i] = strat.tradepos2dict(tradepos)
+            trades = pd.DataFrame.from_dict(all_trades).T
+            trades.to_csv(fname1)
+            ts.to_csv(fname2)
+            fname = file_prefix + 'stats.json'
+            try:
+                with open(fname, 'w') as ofile:
+                    json.dump(output, ofile)
+            except:
+                continue
+        cont_df = pd.DataFrame()
+        for idx in range(abs(min(cont_map)), len(contlist[assets[0]]) - max(cont_map)):
+            cont = contlist[assets[0]][idx]
+            if cont not in output['cont']:
+                continue
+            res = scen_dict_to_df(output['cont'][cont])
+            out_res = res[outcol_list]
+            if len(cont_df) == 0:
+                cont_df = out_res[:20].copy(deep = True)
+            else:
+                cont_df = cont_df.append(out_res[:20])
+        fname = file_prefix + 'cont_stat.csv'
+        cont_df.to_csv(fname)
+        res = scen_dict_to_df(output['total'])
         out_res = res[outcol_list]
         if len(summary_df) == 0:
-            summary_df = out_res[:15].copy(deep = True)
+            summary_df = out_res[:20].copy(deep = True)
         else:
-            summary_df = summary_df.append(out_res[:15])
+            summary_df = summary_df.append(out_res[:20])
         fname = config['file_prefix'] + 'summary.csv'
         summary_df.to_csv(fname)
     return
+
+def scen_dict_to_df(data):
+    res = pd.DataFrame.from_dict(data, orient = 'index')
+    res.index.name = 'scenario'
+    res = res.sort_values(by = ['sharp_ratio'], ascending=False)
+    res = res.reset_index()
+    res.set_index(['asset', 'scenario'])
+    return res
 
 
 if __name__=="__main__":

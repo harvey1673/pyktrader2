@@ -19,13 +19,11 @@ def dual_thrust_sim( mdf, config):
     update_freq = config.get('update_freq', 0)
     ddf = config['ddf']
     close_daily = config['close_daily']
-    marginrate = config['marginrate']
     offset = config['offset']
     k = config['param'][0]
     win = config['param'][1]
     multiplier = config['param'][2]
     f = config['param'][3]
-    start_equity = config['capital']
     chan = config['chan']
     chan_func = config['chan_func']
     use_chan = config['use_chan']
@@ -145,11 +143,7 @@ def dual_thrust_sim( mdf, config):
                     pos = -unit
                     mdf.ix[dd, 'cost'] -= abs(pos) * (offset + mslice.close*tcost)
         mdf.ix[dd, 'pos'] = pos
-
-    (res_pnl, ts) = backtest.get_pnl_stats( mdf, start_equity, marginrate, 'm')
-    res_trade = backtest.get_trade_stats( closed_trades )
-    res = dict( res_pnl.items() + res_trade.items())
-    return (res, closed_trades, ts)
+    return (mdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}

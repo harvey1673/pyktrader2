@@ -102,6 +102,7 @@ class ParSARProfitTrig(TradePos):
         self.af_cap = cap
         self.ep = entry_target
         self.trailing = False
+        self.reset_margin = reset_margin
 
     def check_exit(self, curr_price, margin = 0):
         if self.trailing and (self.direction * (self.exit_target - curr_price) >= margin):

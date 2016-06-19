@@ -373,8 +373,6 @@ def donch_l(df_tup, n, field = 'low'):
     df.set_value(idx-1, 'DONCH_L'+ field[0].upper() + str(n), min(df[field][idx-n:idx]))
     
 #Standard Deviation
-#def STDDEV(df, n):
-#    return pd.Series(pd.rolling_std(df['close'], n), name = 'STD' + str(n))
 def HEIKEN_ASHI(df, period1):
     SM_O = pd.rolling_mean(df['open'], period1)
     SM_H = pd.rolling_mean(df['high'], period1)
