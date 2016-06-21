@@ -104,29 +104,39 @@ def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
 def get_pnl_stats(df_list, start_capital, marginrate, freq):
-    cum_pnl = pd.Series()
-    cum_margin = pd.Series()
-    cum_cost = pd.Series()
-    date_col = pd.Series()
-    for df in df_list:
-        pnl = df['pos'].shift(1).fillna(0.0)*(df['close'] - df['close'].shift(1)).fillna(0.0)
-        if 'traded_price' in df.columns:
-            pnl = pnl + (df['pos'] - df['pos'].shift(1).fillna(0.0))*(df['close'] - df['traded_price'])
-        cum_pnl = cum_pnl.add(pnl, fill_value = 0)
-        cum_margin = cum_margin.add( pd.concat([df.pos*marginrate[0]*df.close, -df.pos*marginrate[1]*df.close], join='outer', axis=1).max(1), fill_value = 0)
-        cum_cost = cum_cost.add( df['cost'], fill_value = 0)
-        date_col = date_col.append(df['date'])
-    df = pd.concat([cum_pnl, cum_margin, cum_cost, date_col], axis = 1, join = 'inner')
-    df.columns = ['pnl', 'margin', 'cost', 'date']
+    sum_pnl = pd.Series(name = 'pnl')
+    sum_margin = pd.Series(name='margin')
+    sum_cost = pd.Series(name='cost')
     if freq == 'm':
-        res = df.groupby([df['date']]).apply(stat_min2daily).reset_index().set_index(['date'])
-        daily_pnl = pd.Series(res['pnl'])
-        daily_margin = pd.Series(res['margin'])
-        daily_cost = pd.Series(res['cost'])
+        index_col = ['date', 'min_id']
     else:
-        daily_pnl = pd.Series(df['pnl'])
-        daily_margin = pd.Series(df['margin'])
-        daily_cost = pd.Series(df['cost'])
+        index_col = ['date']
+    for df in df_list:
+        xdf = df.reset_index().set_index(index_col)
+        pnl = xdf['pos'].shift(1).fillna(0.0)*(xdf['close'] - xdf['close'].shift(1)).fillna(0.0)
+        if 'traded_price' in xdf.columns:
+            pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0))*(xdf['close'] - xdf['traded_price'])
+        if len(sum_pnl) == 0:
+            sum_pnl = pd.Series(pnl, name = 'pnl')
+        else:
+            sum_pnl = sum_pnl.add(pnl, fill_value = 0)
+        margin = pd.Series(pd.concat([xdf.pos*marginrate[0]*xdf.close, -xdf.pos*marginrate[1]*xdf.close], join='outer', axis=1).max(1), name='margin')
+        if len(sum_margin) == 0:
+            sum_margin = margin
+        else:
+            sum_margin = sum_margin.add( margin, fill_value = 0)
+        if len(sum_cost) == 0:
+            sum_cost = xdf['cost']
+        else:
+            sum_cost = sum_cost.add(xdf['cost'], fill_value = 0)
+    if freq == 'm':
+        daily_pnl = pd.Series(sum_pnl.groupby(level=0).sum(), name = 'daily_pnl')
+        daily_margin = pd.Series(sum_margin.groupby(level=0).last(), name = 'daily_margin')
+        daily_cost = pd.Series(sum_cost.groupby(level=0).sum(), name = 'daily_cost')
+    else:
+        daily_pnl = sum_pnl
+        daily_margin = sum_margin
+        daily_cost = sum_cost
     daily_pnl.name = 'daily_pnl'
     daily_margin.name = 'daily_margin'
     daily_cost.name = 'daily_cost'
