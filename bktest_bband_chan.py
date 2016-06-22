@@ -23,6 +23,8 @@ def bband_chan_sim( mdf, config):
     win = param[0]
     k = param[1]
     chan = param[2]
+    stop_ratio = config.get('exit_stop', 0.0)
+    k_e = k * stop_ratio
     if chan > 0:
         chan_func = config['chan_func']
     tcost = config['trans_cost']
@@ -33,6 +35,8 @@ def bband_chan_sim( mdf, config):
     xdf['boll_std'] = std_func(xdf, win).shift(1)
     xdf['upbnd'] = xdf['boll_ma'] + xdf['boll_std'] * k
     xdf['lowbnd'] = xdf['boll_ma'] - xdf['boll_std'] * k
+    xdf['up_exit'] = xdf['boll_ma'] + xdf['boll_std'] * k_e
+    xdf['dn_exit'] = xdf['boll_ma'] - xdf['boll_std'] * k_e
     if chan > 0:
         xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
         xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
@@ -73,7 +77,7 @@ def bband_chan_sim( mdf, config):
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
-            if ((mslice.open > mslice.boll_ma) and (pos<0)) or ((mslice.open < mslice.boll_ma) and (pos>0)):
+            if ((mslice.open > mslice.up_exit) and (pos<0)) or ((mslice.open < mslice.dn_exit) and (pos>0)):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -116,7 +120,7 @@ def gen_config_file(filename):
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160608'
     sim_config['need_daily'] = False
-    #sim_config['close_daily']  =  [ False, True]
+
     sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.25, 5), (20, 1.25, 10), (20, 1.25, 20), (20, 1.25, 40), \
                            (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), (20, 2, 5), (20, 2, 10), (20, 2, 20), (20, 2, 40),\
                            (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.25, 10), (40, 1.25, 20), (40, 1.25, 40), (40, 1.25, 80), \
@@ -138,6 +142,7 @@ def gen_config_file(filename):
               'trans_cost': 0.0,
               'unit': 1,
               'stoploss': 0.0,
+              'exit_stop': 0.0,
               'close_daily': False,
               'pos_update': True,
               'std_func': 'dh.STDEV',
