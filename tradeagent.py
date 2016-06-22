@@ -85,7 +85,12 @@ class MktDataMixin(object):
         return int(tick_id/1000)
     
     def conv_bar_id(self, min_id):
-        return int(min_id/100)*60 + min_id % 100 + 1
+        bar_num = int(min_id/100)*60 + min_id % 100 + 1
+        if min_id >= 1500:
+            bar_num -= 15
+        if min_id >= 1800:
+            bar_num -= 90
+        return bar_num
             
     def update_min_bar(self, tick):
         inst = tick.instID
