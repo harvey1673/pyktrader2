@@ -62,18 +62,36 @@ def bulkinsert_tick_data(inst, ticks, dbtable = 'fut_tick'):
     cnx.commit()
     cnx.close()
 
-def insert_min_data(inst, min_data, dbtable = 'fut_min'):
+def insert_min_data(inst, min_data, dbtable = 'fut_min', option = 'IGNORE'):
     cnx = mysql.connector.connect(**dbconfig)
     cursor = cnx.cursor()
     exch = misc.inst2exch(inst)
     min_data['date'] = min_data['datetime'].date()
     col_list = min_data.keys()
-    stmt = "INSERT IGNORE INTO {table} (instID,exch,{variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(table=dbtable,variables=','.join(col_list))
+    stmt = "INSERT {opt} INTO {table} (instID,exch,{variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(opt = option, table=dbtable,variables=','.join(col_list))
     args = tuple([inst, exch]+[min_data[col] for col in col_list])
     cursor.execute(stmt, args)
     cnx.commit()
     cnx.close()
     pass
+
+def bulkinsert_min_data(inst, mindata_list, dbtable = 'fut_min', is_replace = False):
+    if len(mindata_list) == 0:
+        return
+    cnx = mysql.connector.connect(**dbconfig)
+    cursor = cnx.cursor()
+    exch = misc.inst2exch(inst)
+    if is_replace:
+        cmd = "REPLACE"
+    else:
+        cmd = "INSERT IGNORE"
+    stmt = "{cmd} INTO {table} (instID,exch,{variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(cmd = cmd, table=dbtable,variables=','.join(min_columns))
+    args = []
+    for min_data in mindata_list:
+        args.append(tuple([inst, exch]+[min_data[col] for col in min_columns]))
+    cursor.executemany(stmt, args)
+    cnx.commit()
+    cnx.close()
 
 def insert_daily_data(inst, daily_data, is_replace = False, dbtable = 'fut_daily'):
     cnx = mysql.connector.connect(**dbconfig)

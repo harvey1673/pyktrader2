@@ -2,129 +2,34 @@ import datetime
 import csv
 import os.path
 import mysql.connector
+import mysqlaccess as db
 import math
 import pandas as pd
 import misc
 from WindPy import w
 w.start()
     
-def import_csv_data(filename):
-    reader = csv.reader(file(filename, 'rb'))
-    contList = []
-    datapath = 'C:\\dev\\src\\ktlib\\data2\\'
-    
-    for line in reader:
-        contList.append(line[0])
-
-    cnx = mysql.connector.connect(**dbconfig)
-    cursor = cnx.cursor()
-
-    for cont in contList:
-        
-        if cont[1].isalpha(): key = cont[:2]
-        elif cont[0].isalpha(): key = cont[:1]
-        else: key = cont
-
-        ex = 'SH'
-        for exch in product_code.keys():
-            if key in product_code[exch]:
-                ex = exch
-        
-        if ex == 'SHF':
-            ex = 'SHFE'
-        elif ex == 'CZC':
-            ex = 'CZCE'
-        elif ex == 'CFE':
-            ex = 'CFFEX'
-        minfile = datapath + cont + '_min.csv'
-        if os.path.isfile(minfile):
-            dbtable = 'fut_min'
-            data_reader = csv.reader(file(minfile, 'rb'))
-            fields = ['instID', 'exch', 'datetime', 'min_id', 'open', 'close', 'high', 'low', 'volume', 'openInterest']
-            data = []
-            for idx, line in enumerate(data_reader):
-                if idx > 0:
-                    if 'nan' in [line[0],line[2],line[3],line[4], line[6]]: continue
-                    vol   = int(float(line[0]))
-                    if vol <= 0: continue
-                    dtime = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S.%f')
-                    dtime_str = dtime.strftime('%Y-%m-%d %H:%M:%S')
-                    high  = float(line[2])
-                    low   = float(line[3])
-                    close = float(line[4])
-                    if line[5] == 'nan':
-                        oi = 0
-                    else:
-                        oi = int(float(line[5]))
-                    open  = float(line[6])
-                    min_id = get_min_id(dtime)
-                    data.append((cont, ex, dtime_str, min_id, open, close, high, low, vol, oi))
-            
-            if len(data)>0:
-                print "inserting minute data for contract %s with total rows %s" % (cont, len(data))
-                stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(table=dbtable,variables=','.join(fields))   
-                cursor.executemany(stmt, data)
-                cnx.commit()
-            else:
-                print "no minute data for contract %s" % (cont)
-        else:
-            print "no minute csv file for contract %s" % (cont)
-            
-        dayfile = datapath + cont + '_daily.csv'
-        if os.path.isfile(dayfile):
-            dbtable = 'fut_daily'
-            data_reader = csv.reader(file(dayfile, 'rb'))
-            fields = ['instID', 'exch', 'date', 'open', 'close', 'high', 'low', 'volume', 'openInterest']
-            data = []
-            for idx, line in enumerate(data_reader):
-                if idx > 0 :
-                    if 'nan' in [line[0],line[2],line[3],line[4], line[6]]: continue
-                    vol   = int(float(line[0]))
-                    if vol <= 0: continue
-                    dtime = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S.%f')
-                    dtime_str = dtime.strftime('%Y-%m-%d')
-                    high  = float(line[2])
-                    low   = float(line[3])
-                    close = float(line[4])
-                    if line[5] == 'nan':
-                        oi = 0
-                    else:
-                        oi = int(float(line[5]))
-                    open  = float(line[6])
-                    data.append((cont, ex, dtime_str, open, close, high, low, vol, oi))
-            
-            if len(data)>0:
-                print "inserting daily data for contract %s with total rows %s" % (cont, len(data))
-                stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(table=dbtable,variables=','.join(fields))   
-                cursor.executemany(stmt, data)
-                cnx.commit()
-            else:
-                print "no daily data for contract %s" % (cont)
-        else:
-            print "no daily csv file for contract %s" % (cont)
-                                
-    cursor.close()
-    cnx.close()
-    return True
-    
 wind_exch_map = {'SHF': 'SHFE', 'CZC': 'CZCE', 'DCE': 'DCE', 'CFE': 'CFFEX'}     
 
+def get_min_id(dt):
+    return ((dt.hour+6)%24)*100+dt.minute
+
 def get_wind_data(inst_list, start_date, end_date, save_loc = 'C:\\dev\\data\\', freq = 'm'):
-    exch_map = {v: k for k, v in win_exch_map.items()}
+    exch_map = {v: k for k, v in wind_exch_map.items()}
     for instID in inst_list:
         exch = misc.inst2exch(instID)
         ex = exch_map[exch]
         ticker = instID + '.' + ex
-        product = inst2product(instID)
+        product = misc.inst2product(instID)
         sdate = start_date
         edate = end_date
-        stime = datetime.time( 9, 0, 0)
+        stime = datetime.time( 8, 59, 0)
         etime = datetime.time(15, 0, 0)
         if product in ['T', 'TF']:
             stime = datetime.time(9, 14, 0)
             etime = datetime.time(15, 15, 0)
         elif product in misc.night_session_markets:
-            stime = datetime.time(21, 0, 0)
+            stime = datetime.time(20, 59, 0)
             sdate = misc.day_shift(sdate, '-1b')
         smin = datetime.datetime.combine(sdate, stime)
         emin = datetime.datetime.combine(edate, etime)
@@ -163,123 +68,53 @@ def get_wind_data(inst_list, start_date, end_date, save_loc = 'C:\\dev\\data\\',
     w.stop()
     return True
 
-def load_csv_to_db( sdate, edate, save_loc = 'C:\\dev\\data\\'):
-    df = load_live_cont(d_start, d_end)
-    inst_list = misc.filter_main_cont(edate, False)
-    cnx = mysql.connector.connect(**misc.dbconfig)
-    cursor = cnx.cursor()
-    for cont in contList:
-        minfile = save_loc + cont + '_min.csv'
-        if not os.path.isfile(minfile):
+def load_csv_to_db( edate, save_loc = 'C:\\dev\\data\\', freq = 'm', is_replace = False):
+    cont_list = misc.filter_main_cont(edate, False)
+    if freq not in ['m', 'd']:
+        return False
+    for cont in cont_list:
+        if freq == 'm':
+            filename = save_loc + cont + '_min.csv'
+        else:
+            filename = save_loc + cont + '_daily.csv'
+        if not os.path.isfile(filename):
             continue
-        data_reader = csv.reader(file(minfile, 'rb'))
+        data_reader = csv.reader(file(filename, 'rb'))
+        mindata_list = []
         for idx, line in enumerate(data_reader):
             if idx > 0:
-                if 'nan' in [line[0],line[2],line[3],line[4], line[6]]: continue
-                #min_data = 
-                vol   = int(float(line[0]))
-                if vol <= 0: continue
+                if 'nan' in [line[0],line[2],line[3],line[4], line[6]]:
+                    continue
+                min_data = {}
+                min_data['volume']   = int(float(line[0]))
+                if min_data['volume'] <= 0: continue
                 dtime = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S.%f')
-                dtime_str = dtime.strftime('%Y-%m-%d %H:%M:%S')
-                high  = float(line[2])
-                low   = float(line[3])
-                close = float(line[4])
+                if freq == 'm':
+                    min_data['datetime'] = dtime.replace(microsecond=0)
+                else:
+                    min_data['date'] = dtime.date()
+                min_data['high']  = float(line[2])
+                min_data['low']   = float(line[3])
+                min_data['close'] = float(line[4])
                 if line[5] == 'nan':
                     oi = 0
                 else:
                     oi = int(float(line[5]))
-                open  = float(line[6])
-                min_id = get_min_id(dtime)
-                tdate = dtime.date()
-                data.append((cont, ex, dtime_str, min_id, open, close, high, low, vol, oi))
-        if cont[1].isalpha(): key = cont[:2]
-        elif cont[0].isalpha(): key = cont[:1]
-        else: key = cont
-        ex = 'SH'
-        for exch in product_code.keys():
-            if key in product_code[exch]:
-                ex = exch
-        if ex == 'SHF':
-            ex = 'SHFE'
-        elif ex == 'CZC':
-            ex = 'CZCE'
-        elif ex == 'CFE':
-            ex = 'CFFEX'
-            
-        mth = int(cont[-2:])
-        if (key not in contMonth):
-            continue
-        if mth not in contMonth[key]:
-            continue
-        minfile = datapath + cont + '_min.csv'
-        if os.path.isfile(minfile):
-            dbtable = 'fut_min'
-            
-            fields = ['instID', 'exch', 'datetime', 'min_id', 'open', 'close', 'high', 'low', 'volume', 'openInterest']
-            data = []
-            for idx, line in enumerate(data_reader):
-                if idx > 0:
-                    if 'nan' in [line[0],line[2],line[3],line[4], line[6]]: continue
-                    vol   = int(float(line[0]))
-                    if vol <= 0: continue
-                    dtime = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S.%f')
-                    dtime_str = dtime.strftime('%Y-%m-%d %H:%M:%S')
-                    high  = float(line[2])
-                    low   = float(line[3])
-                    close = float(line[4])
-                    if line[5] == 'nan':
-                        oi = 0
-                    else:
-                        oi = int(float(line[5]))
-                    open  = float(line[6])
-                    min_id = get_min_id(dtime)
-                    data.append((cont, ex, dtime_str, min_id, open, close, high, low, vol, oi))
-            
-            if len(data)>0:
-                print "inserting minute data for contract %s with total rows %s" % (cont, len(data))
-                stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(table=dbtable,variables=','.join(fields))   
-                cursor.executemany(stmt, data)
-                cnx.commit()
-            else:
-                print "no minute data for contract %s" % (cont)
-        else:
-            print "no minute csv file for contract %s" % (cont)
-            
-        dayfile = datapath + cont + '_daily.csv'
-        if os.path.isfile(dayfile):
-            dbtable = 'fut_daily'
-            data_reader = csv.reader(file(dayfile, 'rb'))
-            fields = ['instID', 'exch', 'date', 'open', 'close', 'high', 'low', 'volume', 'openInterest']
-            data = []
-            for idx, line in enumerate(data_reader):
-                if idx > 0 :
-                    if 'nan' in [line[0],line[2],line[3],line[4], line[6]]: continue
-                    vol   = int(float(line[0]))
-                    if vol <= 0: continue
-                    dtime = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S.%f')
-                    dtime_str = dtime.strftime('%Y-%m-%d')
-                    high  = float(line[2])
-                    low   = float(line[3])
-                    close = float(line[4])
-                    if line[5] == 'nan':
-                        oi = 0
-                    else:
-                        oi = int(float(line[5]))
-                    open  = float(line[6])
-                    data.append((cont, ex, dtime_str, open, close, high, low, vol, oi))
-            
-            if len(data)>0:
-                print "inserting daily data for contract %s with total rows %s" % (cont, len(data))
-                stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(table=dbtable,variables=','.join(fields))   
-                cursor.executemany(stmt, data)
-                cnx.commit()
-            else:
-                print "no daily data for contract %s" % (cont)
-        else:
-            print "no daily csv file for contract %s" % (cont)
-                                
-    cursor.close()
-    cnx.close()
+                min_data['openInterest'] = oi
+                min_data['open']  = float(line[6])
+                if freq == 'm':
+                    min_data['min_id'] = get_min_id(dtime)
+                    trading_date = dtime.date()
+                    if min_data['min_id'] < 600:
+                        trading_date = misc.day_shift(trading_date, '1b')
+                    min_data['date'] = trading_date
+                    mindata_list.append(min_data)
+                else:
+                    print cont
+                    db.insert_daily_data(cont, min_data, is_replace = is_replace, dbtable = 'fut_daily')
+        if freq == 'm':
+            print cont
+            db.bulkinsert_min_data(cont, mindata_list, is_replace = is_replace)
     return True
 
 def dump2csvfile(data, outfile):
