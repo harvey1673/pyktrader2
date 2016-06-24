@@ -349,8 +349,8 @@ class GrossPosition(Position):
     def update_can_close(self, tday_opened, tday_c_locked, yday_c_locked):
         self.can_yclose.long  = 0
         self.can_yclose.short = 0
-        self.can_close.long  = max(self.pos_yday.short + tday_opened.short * self.intraday_close_ratio - tday_c_locked.long, 0) 
-        self.can_close.short = max(self.pos_yday.long  + tday_opened.long * self.intraday_close_ratio  - tday_c_locked.short,0) 
+        self.can_close.long  = max(self.pos_yday.short + int(tday_opened.short * self.intraday_close_ratio) - tday_c_locked.long, 0) 
+        self.can_close.short = max(self.pos_yday.long  + int(tday_opened.long * self.intraday_close_ratio)  - tday_c_locked.short,0) 
         
     def re_calc(self): #
         tday_opened = BaseObject(long=0, short=0)
@@ -424,5 +424,5 @@ class SHFEPosition(GrossPosition):
     def update_can_close(self, tday_opened, tday_c_locked, yday_c_locked):
         self.can_yclose.long  = max(self.pos_yday.short - yday_c_locked.long, 0)
         self.can_yclose.short = max(self.pos_yday.long  - yday_c_locked.short,0)
-        self.can_close.long  = max(tday_opened.short * self.intraday_close_ratio - tday_c_locked.long, 0) 
-        self.can_close.short = max(tday_opened.long * self.intraday_close_ratio - tday_c_locked.short, 0)   
+        self.can_close.long  = max(int(tday_opened.short * self.intraday_close_ratio) - tday_c_locked.long, 0) 
+        self.can_close.short = max(int(tday_opened.long * self.intraday_close_ratio) - tday_c_locked.short, 0)   
