@@ -23,22 +23,24 @@ def get_wind_data(inst_list, start_date, end_date, save_loc = 'C:\\dev\\data\\',
         product = misc.inst2product(instID)
         sdate = start_date
         edate = end_date
-        stime = datetime.time( 8, 59, 0)
+        stime = datetime.time( 9, 0, 0)
         etime = datetime.time(15, 0, 0)
         if product in ['T', 'TF']:
-            stime = datetime.time(9, 14, 0)
+            stime = datetime.time(9, 15, 0)
             etime = datetime.time(15, 15, 0)
         elif product in misc.night_session_markets:
-            stime = datetime.time(20, 59, 0)
+            stime = datetime.time(21, 0, 0)
             sdate = misc.day_shift(sdate, '-1b')
         smin = datetime.datetime.combine(sdate, stime)
         emin = datetime.datetime.combine(edate, etime)
         fields = 'open,high,low,close,volume,oi'
         try:
             if freq == 'm':
+                outfile = save_loc + instID +'_min.csv'
+                if os.path.isfile(outfile):
+                    continue
                 raw_data = w.wsi(ticker,fields,smin,emin)
                 if len(raw_data.Data)>1:
-                    outfile = save_loc + instID +'_min.csv'
                     output={'datetime':raw_data.Times, 
                             'open':raw_data.Data[0],
                             'high':raw_data.Data[1],
@@ -50,9 +52,11 @@ def get_wind_data(inst_list, start_date, end_date, save_loc = 'C:\\dev\\data\\',
                 else:
                     print "no min data obtained for ticker=%s" % ticker
             elif freq == 'd':
+                outfile = save_loc + instID + '_daily.csv'
+                if os.path.isfile(outfile):
+                    continue
                 raw_data = w.wsd(ticker, fields, start_date, end_date)
                 if len(raw_data.Data)>1:
-                    outfile = save_loc + instID + '_daily.csv'
                     output={'datetime':raw_data.Times, 
                             'open':raw_data.Data[0],                            
                             'high':raw_data.Data[1],

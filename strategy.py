@@ -12,6 +12,9 @@ import os
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
                    'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'price_unit']
 
+STRAT_POS_CANCEL = 0
+STRAT_POS_MUST_EXEC = 1
+
 class TrailLossType:
     Ratio, Level = range(2)
 
@@ -162,7 +165,7 @@ def tradepos2dict(tradepos):
 
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
-                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
+                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, 'pos_exec_flag': 0, \
                      'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, \
                     'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0}
@@ -240,55 +243,60 @@ class Strategy(object):
         save_status = False
         under_key = '_'.join(sorted(etrade.instIDs))
         idx = self.under2idx[under_key]
+        entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
+        exit_ids = [tp.entry_tradeid for tp in self.positions[idx]]
+        i = 0
+        if etrade.id in entry_ids:
+            i = entry_ids.index(etrade.id)
+            is_entry = True
+        elif etrade.id in exit_ids:
+            i = exit_ids.index(etrade.id)
+            is_entry = False
+        else:
+            self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (etrade.id, etrade.status, self.name))
+            etrade.status = order.ETradeStatus.StratConfirm
+            return
+        tradepos = self.positions[idx][i]
         if etrade.status == order.ETradeStatus.Done:
             traded_price = etrade.final_price()
-            for tradepos in self.positions[idx]:
-                if tradepos.entry_tradeid == etrade.id:
-                    tradepos.open( traded_price, datetime.datetime.now())
-                    self.logger.info('strat %s successfully opened a position on %s after tradeid=%s is done, trade status is changed to confirmed' %
-                                     (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                    etrade.status = order.ETradeStatus.StratConfirm
-                    self.num_entries[idx] += 1
-                    save_status = True
-                    break
-                elif tradepos.exit_tradeid == etrade.id:
-                    tradepos.close( traded_price, datetime.datetime.now())
-                    self.save_closed_pos(tradepos)
-                    self.logger.info('strat %s successfully closed a position on %s after tradeid=%s is done, the closed trade position is saved' %
-                                     (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                    etrade.status = order.ETradeStatus.StratConfirm
-                    self.num_exits[idx] += 1
-                    save_status = True
-                    break
-            if etrade.status != order.ETradeStatus.StratConfirm:
+            if is_entry:
+                tradepos.open( traded_price, datetime.datetime.now())
+                self.logger.info('strat %s successfully opened a position on %s after tradeid=%s is done, trade status is changed to confirmed' %
+                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
                 etrade.status = order.ETradeStatus.StratConfirm
-                save_status = True
-                self.logger.warning('the trade %s is done but not found in the strat=%s tradepos table' % (etrade.id, self.name))
+                self.num_entries[idx] += 1
+            else:
+                tradepos.close( traded_price, datetime.datetime.now())
+                self.save_closed_pos(tradepos)
+                self.logger.info('strat %s successfully closed a position on %s after tradeid=%s is done, the closed trade position is saved' %
+                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
+                etrade.status = order.ETradeStatus.StratConfirm
+                self.num_exits[idx] += 1
         elif etrade.status == order.ETradeStatus.Cancelled:
-            for tradepos in self.positions[idx]:
-                if tradepos.entry_tradeid == etrade.id:
+            if self.pos_exec_flag == STRAT_POS_CANCEL:
+                if is_entry:
                     tradepos.cancel_open()
                     self.logger.info('strat %s cancelled an open position on %s after tradeid=%s is cancelled. Both the trade and the position will be removed.' %
-                                     (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
+                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
                     etrade.status = order.ETradeStatus.StratConfirm
-                    save_status = True
-                    break
-                elif tradepos.exit_tradeid == etrade.id:
+                else:
                     tradepos.cancel_close()
                     self.logger.info('strat %s cancelled closing a position on %s after tradeid=%s is cancelled. The position is still open.' %
-                                     (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
+                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
                     etrade.status = order.ETradeStatus.StratConfirm
-                    save_status = True
-                    break
-            if etrade.status != order.ETradeStatus.StratConfirm:
-                self.logger.warning('the trade %s is cancelled but not found in the strat=%s tradepos table' % (etrade.id, self.name))
+            if self.pos_exec_flag == STRAT_POS_MUST_EXEC:
                 etrade.status = order.ETradeStatus.StratConfirm
-                save_status = True
+                valid_time = self.agent.tick_id + self.trade_valid_time
+                new_trade = order.ETrade( etrade.insts, etrade.volumes, etrade.order_types, etrade.limit_price, etrade.slip_ticks,  \
+                                valid_time, self.name, self.agent.name, etrade.price_unit, etrade.conv_f)
+                if is_entry:
+                    tradepos.entry_tradeid = new_trade.id
+                else:
+                    tradepos.exit_tradeid = new_trade.id
+                self.submitted_trades[idx].append(new_trade)
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
         self.submitted_trades[idx] = [etrade for etrade in self.submitted_trades[idx] if etrade.status!=order.ETradeStatus.StratConfirm]
-        if save_status:
-            self.save_state()
-        return
+        self.save_state()
 
     def check_tradepos(self, idx):
         save_status = False

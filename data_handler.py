@@ -30,9 +30,13 @@ def day_split(mdf, minlist = [1500], index_col = 'datetime'):
         xdf = xdf.set_index('datetime')
     return xdf
 
-def min2daily(df):
-    return pd.Series([df.index[0], df['min_id'][0], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]],
-                  index = ['datetime', 'min_id', 'open','high','low','close','volume', 'openInterest'])
+def min2daily(df, extra_cols = []):
+    ts = [df.index[0], df['min_id'][0], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]]
+    col_idx = ['datetime', 'min_id', 'open','high','low','close','volume', 'openInterest']
+    for col in extra_cols:
+        ts.append(df[col][0])
+        col_idx.append(col)
+    return pd.Series(ts, index = col_idx)
 
 def bar_conv_func1(min_ts):
     bar_ts = (min_ts/100).astype('int')*60 + min_ts % 100
@@ -40,26 +44,31 @@ def bar_conv_func1(min_ts):
     bar_ts[min_ts >= 1800] -= 90
     return bar_ts
 
-def conv_ohlc_freq2(mdf, freq, index_col = 'datetime', bar_func = 'bar_conv_func1'):
+def bar_conv_func2(min_ts):
+    bar_ts = (min_ts/100).astype('int')*60 + min_ts % 100
+    return bar_ts
+
+def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = 'bar_conv_func1', extra_cols = []):
     df = mdf.copy(deep=True)
+    min_func = lambda df: min2daily(df, extra_cols)
     if index_col == None:
         df = df.set_index('datetime')
     if freq in ['d', 'D']:
-        res = df.groupby([df['date']]).apply(min2daily).reset_index().set_index(['date'])
+        res = df.groupby([df['date']]).apply(min_func).reset_index().set_index(['date'])
     else:
         if freq[-3:] in ['min', 'Min']:
             f = int(freq[:-3])
         elif freq[-1:] in ['m', 'M']:
             f = int(freq[:-1])
         df['grp_id'] = pd.Series((eval(bar_func)(df['min_id'])/f).astype('int'), name = 'grp_id')
-        res = df.groupby([df['date'], df['grp_id']]).apply(min2daily).reset_index()
+        res = df.groupby([df['date'], df['grp_id']]).apply(min_func).reset_index()
         res.drop('grp_id', axis = 1, inplace=True)
         if index_col == 'datetime':
             res.set_index(index_col, inplace = True)
     return res
     #xdf = df.reset_index().set_index(['date', 'min_id'])v
 
-def conv_ohlc_freq(df, freq, index_col = 'datetime'):
+def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
     if index_col == None:
         df = df.set_index('datetime')
     if freq in ['d', 'D']:
