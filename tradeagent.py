@@ -18,7 +18,7 @@ import backtest
 from eventType import *
 from eventEngine import *
 
-min_data_list = ['datetime', 'date', 'min_id', 'tick_min', 'open', 'high','low', 'close', 'volume', 'openInterest']
+min_data_list = ['datetime', 'date', 'min_id', 'tick_min', 'bar_id', 'open', 'high','low', 'close', 'volume', 'openInterest']
 day_data_list = ['date', 'open', 'high','low', 'close', 'volume', 'openInterest']
 
 def get_tick_num(dt):
@@ -104,6 +104,8 @@ class MktDataMixin(object):
         self.cur_day[inst]['openInterest'] = tick.openInterest
         self.cur_day[inst]['volume'] = tick.volume
         self.cur_day[inst]['date'] = tick_dt.date()
+        for strat_name in self.inst2strat[inst]:
+            self.strategies[strat_name].run_tick(tick)
         if (self.cur_min[inst]['tick_min'] == self.cur_min[inst]['min_id']):
             self.tick_data[inst].append(tick)
             self.cur_min[inst]['close'] = tick.price
@@ -118,7 +120,7 @@ class MktDataMixin(object):
                 self.cur_min[inst]['volume'] = last_tick.volume - self.cur_min[inst]['volume']
                 self.cur_min[inst]['openInterest'] = last_tick.openInterest
                 last_vol = last_tick.volume
-            self.min_switch(inst, False)
+            self.cur_min[inst]['bar_id'] = self.min_switch(inst, False)
             self.tick_data[inst] = []
             self.cur_min[inst]['open']  = tick.price
             self.cur_min[inst]['close'] = tick.price
@@ -138,7 +140,7 @@ class MktDataMixin(object):
             self.cur_min[inst]['low'] = self.cur_min[inst]['close']
         if self.cur_min[inst]['high'] >= MKT_DATA_BIGNUMBER - 1000:
             self.cur_min[inst]['high'] = self.cur_min[inst]['close']
-        prev_bar = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
+        prev_bar = self.cur_min[inst]['bar_id']
         bar_id = self.conv_bar_id(self.cur_min[inst]['tick_min'], inst)
         if prev_bar > 0:
             df = self.min_store[inst][1]
@@ -147,19 +149,20 @@ class MktDataMixin(object):
             df = self.min_data[inst][1]
             for m in sorted(self.min_data_func[inst]):
                 df_m = self.min_store[inst][m]
-                if (m > 1) and ((int(bar_id/m)>int(prev_bar/m)) or forced):
-                    slices = df[(df['date'] == self.cur_min[inst]['date'] ) & (self.conv_bar_id(df['min_id'], inst)/m).astype('int') == int(prev_bar/m)]
-                    if len(slices) > 0:
-                        new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
-                                'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
-                                'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
-                                'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
-                        self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
-                if (int(bar_id/ m) > int(prev_bar/m)) or forced:
+                if ((int(bar_id/m)>int(prev_bar/m)) or forced):
+                    if m > 1:
+                        last_bar = df_m['bar_id'][self.min_store_idx[inst][m]-1]
+                        slices = df[(df['date'] == self.cur_min[inst]['date'] ) & (df['bar_id'] >= bar_id - m)]
+                        if len(slices) > 0:
+                            new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
+                                    'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
+                                    'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
+                                    'min_id': slices['min_id'].iloc[0], 'bar_id': slices['bar_id'].iloc[0], 'date':slices['date'].iloc[0]}
+                            self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
+                            self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
                     for fobj in self.min_data_func[inst][m]:
                         df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
                         fobj.rfunc(df_tup)
-                self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
             if self.save_flag:
                 event1 = Event(type=EVENT_DB_WRITE, priority = 500)
                 event1.dict['data'] = self.tick_data[inst]
@@ -172,6 +175,7 @@ class MktDataMixin(object):
                 event2.dict['instID'] = inst
                 self.eventEngine.put(event2)
         self.run_min(inst, bar_id)
+        return bar_id
 
     def mkt_data_sod(self, tday):
         for inst in self.instruments:
@@ -205,19 +209,18 @@ class MktDataMixin(object):
                     event.dict['type'] = EVENT_MKTDATA_EOD
                     event.dict['instID'] = inst
                     self.eventEngine.put(event)
-
-            if len(self.day_data[inst]) > 0:
-                d_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
-                df = self.day_data[inst]
-                self.day_data[inst] = df[df['date'] >= d_start]
-            m_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
-            num_min = 600 * (self.min_data_days +1)
+            #if len(self.day_data[inst]) > 0:
+            #    d_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
+            #    df = self.day_data[inst]
+            #    self.day_data[inst] = df[df['date'] >= d_start]
+            m_start = workdays.workday(self.scur_day, -(self.min_data_days+1), CHN_Holidays)
+            num_min = 600 * (self.min_data_days + 50)
             for m in self.min_store[inst]:
-                if len(self.min_store[inst][m]) > 0:
-                    mdf = self.min_store[inst][m]
+                if int(len(self.min_data[inst][m])*m/600) > self.min_data_days + 40:
+                    mdf = self.min_data[inst][m]
                     mdf = mdf[(mdf['date'] >= m_start)]
                     idx = len(mdf)
-                    self.min_store[inst][m] = pd.DataFrame(mdf, index = range(int(num_min/m)+1))
+                    self.min_store[inst][m] = pd.DataFrame(mdf, index = range(int(num_min/m)))
                     self.min_store_idx[inst][m] = idx
                     self.min_data[inst][m] = self.min_store[inst][m][:idx]
 
@@ -279,7 +282,6 @@ class Agent(MktDataMixin):
         strat_files = config.get('strat_files', [])
         for sfile in strat_files:
             strat_conf = {}
-            print "loading from ", sfile
             with open(sfile, 'r') as fp:
                 strat_conf = json.load(fp)
             class_str = strat_conf['class']
@@ -471,6 +473,7 @@ class Agent(MktDataMixin):
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
             mindata = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
             mindata = backtest.cleanup_mindata(mindata, self.instruments[inst].product, index_col = None)
+            mindata['bar_id'] = self.conv_bar_id(mindata['min_id'], inst)
             self.min_store[inst][1] = pd.DataFrame(mindata, index=range(600*(self.min_data_days+1)))
             idx = len(mindata)
             self.min_store_idx[inst][1] = idx
@@ -495,14 +498,15 @@ class Agent(MktDataMixin):
                     self.cur_min[inst]['volume'] = self.cur_day[inst]['volume']
                     self.cur_min[inst]['openInterest'] = self.cur_day[inst]['openInterest']
                     self.cur_min[inst]['min_id'] = int(mindata.at[idx,'min_id'])
+                    self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
                     self.instruments[inst].price = float(mindata.at[idx,'close'])
                     self.instruments[inst].last_update = 0
                     self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
                 for m in sorted(self.min_data_func[inst]):
                     if m != 1:
                         bar_func = lambda ts: self.conv_bar_id(ts, inst)
-                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None, bar_func = bar_func)
-                        self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+1)/m)))
+                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None, bar_func = bar_func, extra_cols = ['bar_id'])
+                        self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+50)/m)))
                         self.min_store_idx[inst][m] = len(df.dropna())
                     df = self.min_store[inst][m]
                     for fobj in self.min_data_func[inst][m]:
@@ -641,6 +645,8 @@ class Agent(MktDataMixin):
         self.instruments[inst].bid_price1 = tick.bidPrice1
         self.instruments[inst].ask_price1 = tick.askPrice1
         self.instruments[inst].mid_price = (tick.askPrice1 + tick.bidPrice1)/2.0
+        if (self.instruments[inst].mid_price > tick.upLimit) or (self.instruments[inst].mid_price < tick.downLimit):
+            return False
         self.instruments[inst].bid_vol1   = tick.bidVol1
         self.instruments[inst].ask_vol1   = tick.askVol1
         self.instruments[inst].open_interest = tick.openInterest
@@ -649,6 +655,7 @@ class Agent(MktDataMixin):
             self.instruments[inst].price  = tick.price
             self.instruments[inst].volume = tick.volume
             self.instruments[inst].last_traded = curr_tick
+        return True
 
     def run_tick(self, event):#行情处理主循环
         tick = event.dict['data']
@@ -657,10 +664,9 @@ class Agent(MktDataMixin):
             cur_ticknum = get_tick_num(tick.timestamp)
             if abs(cur_ticknum - now_ticknum)> self.realtime_tick_diff:
                 self.logger.warning('the tick timestamp has more than 10sec diff from the system time, inst=%s, ticknum= %s, now_ticknum=%s' % (tick.instID, cur_ticknum, now_ticknum))
-        self.update_instrument(tick)
-        if self.update_min_bar(tick):
-            for strat_name in self.inst2strat[tick.instID]:
-                self.strategies[strat_name].run_tick(tick)
+        if not self.update_instrument(tick):
+            return
+        self.update_min_bar(tick)
 
     def run_min(self, inst, bar_id):
         for strat_name in self.inst2strat[inst]:

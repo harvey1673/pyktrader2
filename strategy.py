@@ -35,7 +35,7 @@ class TradePos(object):
         self.exit_tradeid = 0
         self.is_closed = False
         self.profit = 0.0
-        self.trail_loss = 0
+        #self.trail_loss = 0
         self.close_comment = ''
 
     def check_exit(self, curr_price, margin):
@@ -165,7 +165,7 @@ def tradepos2dict(tradepos):
 
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
-                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, 'pos_exec_flag': 0, \
+                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, 'pos_exec_flag': STRAT_POS_CANCEL, \
                      'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, \
                     'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0}
@@ -244,7 +244,7 @@ class Strategy(object):
         under_key = '_'.join(sorted(etrade.instIDs))
         idx = self.under2idx[under_key]
         entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
-        exit_ids = [tp.entry_tradeid for tp in self.positions[idx]]
+        exit_ids = [tp.exit_tradeid for tp in self.positions[idx]]
         i = 0
         if etrade.id in entry_ids:
             i = entry_ids.index(etrade.id)
@@ -297,21 +297,20 @@ class Strategy(object):
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
         self.submitted_trades[idx] = [etrade for etrade in self.submitted_trades[idx] if etrade.status!=order.ETradeStatus.StratConfirm]
         self.save_state()
-
-    def check_tradepos(self, idx):
-        save_status = False
-        if self.trail_loss[idx] > 0:
-            for pos in self.positions[idx]:
-                if pos.trail_loss > 0:
-                    updated = pos.trail_update(self.curr_prices[idx])
-                    if pos.trail_check(self.curr_price[idx], pos.entry_price * pos.trail_loss):
-                        msg = 'Strat = %s to close position after hitting trail loss for underlier = %s, direction=%s, volume=%s, current tick_id = %s, current price = %s, exit_target = %s, trail_loss buffer = %s' \
-                                        % (self.name, '_'.join(sorted(pos.insts)), pos.direction, self.trade_unit[idx], self.agent.tick_id, self.curr_prices[idx], pos.exit_target, pos.entry_price * pos.trail_loss)
-                        self.close_tradepos(idx, pos, self.curr_prices[idx])
-                        self.status_notifier(msg)
-                        updated = True
-                    save_status = save_status or updated
-        return save_status
+    # def check_tradepos(self, idx):
+    #     save_status = False
+    #     if self.trail_loss[idx] > 0:
+    #         for pos in self.positions[idx]:
+    #             if pos.trail_loss > 0:
+    #                 updated = pos.trail_update(self.curr_prices[idx])
+    #                 if pos.trail_check(self.curr_price[idx], pos.entry_price * pos.trail_loss):
+    #                     msg = 'Strat = %s to close position after hitting trail loss for underlier = %s, direction=%s, volume=%s, current tick_id = %s, current price = %s, exit_target = %s, trail_loss buffer = %s' \
+    #                                     % (self.name, '_'.join(sorted(pos.insts)), pos.direction, self.trade_unit[idx], self.agent.tick_id, self.curr_prices[idx], pos.exit_target, pos.entry_price * pos.trail_loss)
+    #                     self.close_tradepos(idx, pos, self.curr_prices[idx])
+    #                     self.status_notifier(msg)
+    #                     updated = True
+    #                 save_status = save_status or updated
+    #     return save_status
 
     def liquidate_tradepos(self, idx):
         save_status = False
@@ -341,7 +340,7 @@ class Strategy(object):
     def day_finalize(self):
         self.update_trade_unit()
         for idx in range(len(self.underliers)):
-            self.check_tradepos(idx)
+            #self.check_tradepos(idx)
             self.check_submitted_trades(idx)
         self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
         self.num_entries = [0] * len(self.underliers)
@@ -362,7 +361,7 @@ class Strategy(object):
         for idx in idx_list:
             self.calc_curr_price(idx)
             if self.run_flag[idx] == 1:
-                save_status = save_status or self.check_tradepos(idx)
+                #save_status = save_status or self.check_tradepos(idx)
                 save_status = save_status or self.on_tick(idx, ctick)
             elif self.run_flag[idx] == 2:
                 save_status = save_status or self.liquidate_tradepos(idx)

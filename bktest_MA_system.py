@@ -23,6 +23,7 @@ def MA_sim( mdf, config):
     xdf = dh.conv_ohlc_freq(mdf, freq)
     for idx, win in enumerate(win_list):
         xdf['MA'+str(idx)] = MA_func(xdf, win).shift(1)
+    tot_MA = len(win_list)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
@@ -37,12 +38,15 @@ def MA_sim( mdf, config):
     tradeid = 0
     for idx, dd in enumerate(xdf.index):
         mslice = xdf.loc[dd]
+        ma_list = [getattr(mslice, 'MA'+str(i)) for i in range(len(win_list))]
+        ma_short = ma_list[0]
+        ma_last = ma_list[-1]
         if len(curr_pos) == 0:
             pos = 0
         else:
             pos = curr_pos[0].pos
         xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.boll_ma) or np.isnan(mslice.chan_h):
+        if np.isnan(getattr(mslice, "MA"+str(tot_MA-1))):
             continue
         if mslice.close_ind:
             if pos!=0:
@@ -55,7 +59,7 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
-            if ((mslice.open > mslice.boll_ma) and (pos<0)) or ((mslice.open < mslice.boll_ma) and (pos>0)):
+            if ((ma_short >= ma_last) and (pos<0)) or ((ma_short <= ma_last) and (pos>0)):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -64,8 +68,8 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
-            if ((mslice.open >= mslice.high_band) or (mslice.open <= mslice.low_band)) and (pos==0):
-                target_pos = ( mslice.open >= mslice.high_band) * unit - (mslice.open <= mslice.low_band) * unit
+            if ((ma_short >= max(ma_list)) or (ma_short <= min(ma_list))) and (pos==0):
+                target_pos = (ma_short >= max(ma_list)) * unit - (ma_short <= min(ma_list)) * unit
                 new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
@@ -74,18 +78,6 @@ def MA_sim( mdf, config):
                 pos = target_pos
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        if pos_update and pos != 0:
-            if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-            else:
-                curr_pos[0].update_bar(mslice)
         xdf.set_value(dd, 'pos', pos)
     return (xdf, closed_trades)
 
@@ -96,7 +88,7 @@ def gen_config_file(filename):
     sim_config['sim_name']   = 'MAsim_30min'
     sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160608'
+    sim_config['end_date']   = '20160708'
     sim_config['need_daily'] = False
     sim_config['param'] = [ [5, 20, 80], [10, 20, 40], ]
     sim_config['pos_class'] = 'strat.TradePos'

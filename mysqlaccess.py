@@ -67,9 +67,8 @@ def insert_min_data(inst, min_data, dbtable = 'fut_min', option = 'IGNORE'):
     cursor = cnx.cursor()
     exch = misc.inst2exch(inst)
     min_data['date'] = min_data['datetime'].date()
-    col_list = min_data.keys()
-    stmt = "INSERT {opt} INTO {table} (instID,exch,{variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(opt = option, table=dbtable,variables=','.join(col_list))
-    args = tuple([inst, exch]+[min_data[col] for col in col_list])
+    stmt = "INSERT {opt} INTO {table} (instID,exch,{variables}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(opt = option, table=dbtable,variables=','.join(min_columns))
+    args = tuple([inst, exch]+[min_data[col] for col in min_columns])
     cursor.execute(stmt, args)
     cnx.commit()
     cnx.close()
@@ -297,7 +296,8 @@ def insert_min_data_to_df(df, min_data):
 
 def insert_new_min_to_df(df, idx, min_data):
     need_update = True
-    new_min = { key: min_data[key] for key in min_columns }
+    col_list = min_columns + ['bar_id']
+    new_min = { key: min_data[key] for key in col_list }
     if idx > 0:
         idy = idx - 1
         if min_data['datetime'] < df.at[idy, 'datetime']:

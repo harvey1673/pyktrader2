@@ -112,7 +112,7 @@ class DTSplitDChanFilter(Strategy):
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
         min_id = self.agent.cur_min[inst]['min_id']
-        curr_min = self.agent.instruments[inst].last_update/1000
+        curr_min = self.agent.cur_min[inst]['tick_min']
         pid = self.open_idx[idx]
         if pid < len(self.open_period)-1:
             if (self.open_period[pid+1] > min_id) and (self.open_period[pid+1] <= curr_min):

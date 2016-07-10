@@ -1,4 +1,5 @@
 import datetime
+import talib
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -77,7 +78,6 @@ def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = bar_conv_func2,
         if index_col == 'datetime':
             res.set_index(index_col, inplace = True)
     return res
-    #xdf = df.reset_index().set_index(['date', 'min_id'])v
 
 def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
     if index_col == None:
@@ -167,7 +167,7 @@ def stdev(df_tup, n, field = 'close'):
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
-    return pd.Series(pd.ewma(df[field], span = n, min_periods = n - 1, adjust = False), name = 'EMA_' + field[0].upper() + str(n))
+    return pd.Series(talib.EMA(df[field], n), name = 'EMA_' + field[0].upper() + str(n))
 
 def ema(df_tup, n, field =  'close'):
     df, idx = df_tup
