@@ -18,7 +18,7 @@ import backtest
 from eventType import *
 from eventEngine import *
 
-min_data_list = ['datetime', 'date', 'min_id', 'open', 'high','low', 'close', 'volume', 'openInterest']
+min_data_list = ['datetime', 'date', 'min_id', 'tick_min', 'open', 'high','low', 'close', 'volume', 'openInterest']
 day_data_list = ['date', 'open', 'high','low', 'close', 'volume', 'openInterest']
 
 def get_tick_num(dt):
@@ -83,32 +83,28 @@ class MktDataMixin(object):
 
     def get_min_id(self, tick_id):
         return int(tick_id/1000)
-    
-    def conv_bar_id(self, min_id):
-        bar_num = int(min_id/100)*60 + min_id % 100 + 1
-        if min_id >= 1500:
-            bar_num -= 15
-        if min_id >= 1800:
-            bar_num -= 90
-        return bar_num
+
+    def conv_bar_id(self, min_id, inst):
+        #trading_hrs = trading_hours(self.instruments[inst].product, self.instruments[inst].exchange)
+        #if prod in night_session_markets:
+        return data_handler.bar_conv_func2(min_id)
             
     def update_min_bar(self, tick):
         inst = tick.instID
         tick_dt = tick.timestamp
         tick_id = tick.tick_id
-        tick_min = self.get_min_id(tick_id)
-        if (self.cur_min[inst]['min_id'] > tick_min):
+        self.cur_min[inst]['tick_min'] = self.get_min_id(tick_id)
+        if (self.cur_min[inst]['min_id'] > self.cur_min[inst]['tick_min']):
             return False
         if (self.cur_day[inst]['open'] == 0.0):
             self.cur_day[inst]['open'] = tick.price
-            #self.logger.debug('open data is received for inst=%s, price = %s, tick_id = %s' % (inst, tick.price, tick.tick_id))
         self.cur_day[inst]['close'] = tick.price
         self.cur_day[inst]['high']  = tick.high
         self.cur_day[inst]['low']   = tick.low
         self.cur_day[inst]['openInterest'] = tick.openInterest
         self.cur_day[inst]['volume'] = tick.volume
         self.cur_day[inst]['date'] = tick_dt.date()
-        if (tick_min == self.cur_min[inst]['min_id']):
+        if (self.cur_min[inst]['tick_min'] == self.cur_min[inst]['min_id']):
             self.tick_data[inst].append(tick)
             self.cur_min[inst]['close'] = tick.price
             if self.cur_min[inst]['high'] < tick.price:
@@ -121,69 +117,61 @@ class MktDataMixin(object):
                 last_tick = self.tick_data[inst][-1]
                 self.cur_min[inst]['volume'] = last_tick.volume - self.cur_min[inst]['volume']
                 self.cur_min[inst]['openInterest'] = last_tick.openInterest
-                self.min_switch(inst)
                 last_vol = last_tick.volume
+            self.min_switch(inst, False)
             self.tick_data[inst] = []
-            self.cur_min[inst] = {}
             self.cur_min[inst]['open']  = tick.price
             self.cur_min[inst]['close'] = tick.price
             self.cur_min[inst]['high']  = tick.price
             self.cur_min[inst]['low']   = tick.price
-            self.cur_min[inst]['min_id']  = tick_min
+            self.cur_min[inst]['min_id']  = self.cur_min[inst]['tick_min']
             self.cur_min[inst]['volume']  = last_vol
             self.cur_min[inst]['openInterest'] = tick.openInterest
             self.cur_min[inst]['datetime'] = tick_dt.replace(second=0, microsecond=0)
             self.cur_min[inst]['date'] = self.scur_day
-            if ((tick_min>0) and (tick.price>0)): 
+            if (self.cur_min[inst]['tick_min']>0):
                 self.tick_data[inst].append(tick)
         return True
     
-    def min_switch(self, inst):
-        if self.cur_min[inst]['close'] == 0:
-            return
+    def min_switch(self, inst, forced = False):
         if self.cur_min[inst]['low'] == 0:
             self.cur_min[inst]['low'] = self.cur_min[inst]['close']
         if self.cur_min[inst]['high'] >= MKT_DATA_BIGNUMBER - 1000:
             self.cur_min[inst]['high'] = self.cur_min[inst]['close']
-        min_id = self.cur_min[inst]['min_id']
-        bar_id = self.conv_bar_id(min_id)
-        df = self.min_store[inst][1]
-        self.min_store_idx[inst][1] = mysqlaccess.insert_new_min_to_df(df, self.min_store_idx[inst][1], self.cur_min[inst])
-        self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
-        for m in sorted(self.min_data_func[inst]):
-            df_m = self.min_store[inst][m]
-            if m > 1 and bar_id % m == 0:
-                s_start = self.cur_min[inst]['datetime'] - datetime.timedelta(minutes=m-1)
-                slices = df[(df['datetime']>=s_start) & (df['datetime']<=self.cur_min[inst]['datetime'])]
-                if len(slices) > 0:
-                    new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
-                            'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
-                            'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
-                            'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
-                    self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
-            if bar_id % m == 0:
-                for fobj in self.min_data_func[inst][m]:
-                    df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
-                    fobj.rfunc(df_tup)
-            self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
-        #event = Event(type=EVENT_MIN_BAR, priority = 10)
-        #event.dict['min_id'] = min_id
-        #event.dict['bar_id'] = bar_id
-        #event.dict['instID'] = inst
-        #self.eventEngine.put(event)
+        prev_bar = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
+        bar_id = self.conv_bar_id(self.cur_min[inst]['tick_min'], inst)
+        if prev_bar > 0:
+            df = self.min_store[inst][1]
+            self.min_store_idx[inst][1] = mysqlaccess.insert_new_min_to_df(df, self.min_store_idx[inst][1], self.cur_min[inst])
+            self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
+            df = self.min_data[inst][1]
+            for m in sorted(self.min_data_func[inst]):
+                df_m = self.min_store[inst][m]
+                if (m > 1) and ((int(bar_id/m)>int(prev_bar/m)) or forced):
+                    slices = df[(df['date'] == self.cur_min[inst]['date'] ) & (self.conv_bar_id(df['min_id'], inst)/m).astype('int') == int(prev_bar/m)]
+                    if len(slices) > 0:
+                        new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
+                                'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
+                                'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
+                                'min_id': slices['min_id'].iloc[0], 'date':slices['date'].iloc[0]}
+                        self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
+                if (int(bar_id/ m) > int(prev_bar/m)) or forced:
+                    for fobj in self.min_data_func[inst][m]:
+                        df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
+                        fobj.rfunc(df_tup)
+                self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
+            if self.save_flag:
+                event1 = Event(type=EVENT_DB_WRITE, priority = 500)
+                event1.dict['data'] = self.tick_data[inst]
+                event1.dict['type'] = EVENT_TICK
+                event1.dict['instID'] = inst
+                self.eventEngine.put(event1)
+                event2 = Event(type=EVENT_DB_WRITE, priority = 500)
+                event2.dict['data'] = self.cur_min[inst]
+                event2.dict['type'] = EVENT_MIN_BAR
+                event2.dict['instID'] = inst
+                self.eventEngine.put(event2)
         self.run_min(inst, bar_id)
-        if self.save_flag:
-            event1 = Event(type=EVENT_DB_WRITE, priority = 500)
-            event1.dict['data'] = self.tick_data[inst]
-            event1.dict['type'] = EVENT_TICK
-            event1.dict['instID'] = inst
-            self.eventEngine.put(event1)
-            event2 = Event(type=EVENT_DB_WRITE, priority = 500)
-            event2.dict['data'] = self.cur_min[inst]
-            event2.dict['type'] = EVENT_MIN_BAR
-            event2.dict['instID'] = inst
-            self.eventEngine.put(event2)
-        return
 
     def mkt_data_sod(self, tday):
         for inst in self.instruments:
@@ -199,7 +187,7 @@ class MktDataMixin(object):
                 last_tick = self.tick_data[inst][-1]
                 self.cur_min[inst]['volume'] = last_tick.volume - self.cur_min[inst]['volume']
                 self.cur_min[inst]['openInterest'] = last_tick.openInterest
-                self.min_switch(inst)
+                self.min_switch(inst, True)
             if (self.cur_day[inst]['close']>0):
                 new_day = { key: self.cur_day[inst][key] for key in day_data_list }
                 df = self.day_data[inst]
@@ -512,7 +500,8 @@ class Agent(MktDataMixin):
                     self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
                 for m in sorted(self.min_data_func[inst]):
                     if m != 1:
-                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None)
+                        bar_func = lambda ts: self.conv_bar_id(ts, inst)
+                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None, bar_func = bar_func)
                         self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+1)/m)))
                         self.min_store_idx[inst][m] = len(df.dropna())
                     df = self.min_store[inst][m]
@@ -918,7 +907,7 @@ class SaveAgent(Agent):
 
     def exit(self):
         for inst in self.instruments:
-            self.min_switch(inst)
+            self.min_switch(inst, False)
         self.eventEngine.stop()
         for name in self.gateways:
             gateway = self.gateways[name]

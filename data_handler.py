@@ -38,17 +38,28 @@ def min2daily(df, extra_cols = []):
         col_idx.append(col)
     return pd.Series(ts, index = col_idx)
 
-def bar_conv_func1(min_ts):
-    bar_ts = (min_ts/100).astype('int')*60 + min_ts % 100
-    bar_ts[min_ts >= 1500] -= 15
-    bar_ts[min_ts >= 1800] -= 90
-    return bar_ts
+def bar_conv_func(min_ts, bar_shift = []):
+    if type(min_ts).__name__ == 'Series':
+        bar_ts = (min_ts/100).astype('int') * 60 + min_ts % 100
+        for pair in bar_shift:
+            bar_ts[min_ts >= pair[0]] += pair[1]
+        return bar_ts
+    else:
+        bar_id = int(min_ts/100)*60 + min_ts % 100
+        for pair in bar_shift:
+            if min_ts >= pair[0]:
+                bar_id += pair[1]
+        return bar_id
 
 def bar_conv_func2(min_ts):
-    bar_ts = (min_ts/100).astype('int')*60 + min_ts % 100
-    return bar_ts
+    if type(min_ts).__name__ == 'Series':
+        bar_ts = (min_ts/100).astype('int') * 60 + min_ts % 100
+        return bar_ts
+    else:
+        bar_id = int(min_ts/100) * 60 + min_ts % 100
+        return bar_id
 
-def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = 'bar_conv_func1', extra_cols = []):
+def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = bar_conv_func2, extra_cols = []):
     df = mdf.copy(deep=True)
     min_func = lambda df: min2daily(df, extra_cols)
     if index_col == None:
@@ -60,7 +71,7 @@ def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = 'bar_conv_func1
             f = int(freq[:-3])
         elif freq[-1:] in ['m', 'M']:
             f = int(freq[:-1])
-        df['grp_id'] = pd.Series((eval(bar_func)(df['min_id'])/f).astype('int'), name = 'grp_id')
+        df['grp_id'] = pd.Series((bar_func(df['min_id'])/f).astype('int'), name = 'grp_id')
         res = df.groupby([df['date'], df['grp_id']]).apply(min_func).reset_index()
         res.drop('grp_id', axis = 1, inplace=True)
         if index_col == 'datetime':
