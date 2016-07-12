@@ -287,7 +287,7 @@ class Strategy(object):
             if self.pos_exec_flag == STRAT_POS_MUST_EXEC:
                 etrade.status = order.ETradeStatus.StratConfirm
                 valid_time = self.agent.tick_id + self.trade_valid_time
-                new_trade = order.ETrade( etrade.insts, etrade.volumes, etrade.order_types, etrade.limit_price, etrade.slip_ticks,  \
+                new_trade = order.ETrade( etrade.instIDs, etrade.volumes, etrade.order_types, etrade.limit_price, etrade.slip_ticks,  \
                                 valid_time, self.name, self.agent.name, etrade.price_unit, etrade.conv_f)
                 if is_entry:
                     tradepos.entry_tradeid = new_trade.id

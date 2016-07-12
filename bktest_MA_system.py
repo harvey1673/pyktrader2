@@ -20,7 +20,7 @@ def MA_sim( mdf, config):
     tcost = config['trans_cost']
     unit = config['unit']
     freq = config['freq']
-    xdf = dh.conv_ohlc_freq(mdf, freq)
+    xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols=['contract'])
     for idx, win in enumerate(win_list):
         xdf['MA'+str(idx)] = MA_func(xdf, win).shift(1)
     tot_MA = len(win_list)
@@ -84,15 +84,19 @@ def MA_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_MA_system.MA_sim'
-    sim_config['scen_keys'] = ['param']
-    sim_config['sim_name']   = 'MAsim_30min'
+    sim_config['scen_keys'] = ['freq', 'param']
+    sim_config['sim_name']   = 'EMAsim_mixed'
     sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160708'
     sim_config['need_daily'] = False
-    sim_config['param'] = [ [5, 20, 80], [10, 20, 40], ]
+    sim_config['freq'] = ['3min', '5min', '15min', '30min', '60min']
+    sim_config['param'] = [ [5,  10, 20], [5, 10, 40], [5, 20, 40], [5, 20, 80], \
+                             [10, 20, 40], [10, 20, 80],[10, 30, 60],[10, 30, 120],\
+                             [10, 40, 80], [10, 40, 120],\
+                             [5, 10], [5, 20], [5, 40], \
+                             [10, 20], [10, 30], [10, 40] ]
     sim_config['pos_class'] = 'strat.TradePos'
-    sim_config['pos_args'] = {}
     #sim_config['pos_class'] = 'strat.ParSARTradePos'
     #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
     #                            {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
@@ -102,14 +106,14 @@ def gen_config_file(filename):
     #                            {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
     sim_config['offset']    = 1
     config = {'capital': 10000,
-              'freq': '30min',
               'trans_cost': 0.0,
               'unit': 1,
               'stoploss': 0.0,
               'close_daily': False,
               'pos_update': False,
-              'MA_func': 'dh.MA',
+              'MA_func': 'dh.EMA',
               'exit_min': 2055,
+              'pos_args': {},
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:

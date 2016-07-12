@@ -150,7 +150,7 @@ def tsMA(ts, n):
     return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
     
 def MA(df, n, field = 'close'):
-    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n))
+    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n), index = df.index)
 
 def ma(df_tup, n, field = 'close'):
     key = 'MA_' + field[0].upper() + str(n)
@@ -167,7 +167,7 @@ def stdev(df_tup, n, field = 'close'):
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
-    return pd.Series(talib.EMA(df[field], n), name = 'EMA_' + field[0].upper() + str(n))
+    return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field[0].upper() + str(n), index = df.index)
 
 def ema(df_tup, n, field =  'close'):
     df, idx = df_tup
