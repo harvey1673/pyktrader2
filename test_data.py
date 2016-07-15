@@ -5,6 +5,7 @@ import mysql.connector as mysqlconn
 import misc
 import backtest
 import os
+import talib
 import urllib2
 import pytz
 import patoolib
@@ -353,6 +354,15 @@ def copy_prod2hist(prod_db, hist_db, sdate, edate):
     cursor.execute(stmt)
     cnx.commit()
     cnx.close()
+
+def talib_get_functions_df():
+    lst_info = []
+    for f in talib.get_functions():
+        absf = talib.abstract.Function(f)
+        lst_info.append(absf.info)
+    df_absf = pd.DataFrame(lst_info)
+    df_absf = df_absf.set_index('name')
+    return(df_absf)
 
 if __name__ == '__main__':
     print

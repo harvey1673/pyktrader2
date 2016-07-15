@@ -173,7 +173,10 @@ def ema(df_tup, n, field =  'close'):
     df, idx = df_tup
     alpha = 2.0/(n+1)
     df.set_value(idx-1, 'EMA_' + field[0].upper() + str(n), df.at[idx-2, 'EMA_' + field[0].upper() + str(n)] * (1-alpha) + df.at[idx-1, field] * alpha)
-    
+
+def KAMA(df, n, field = 'close'):
+    return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field[0].upper() + str(n), index = df.index)
+
 #Momentum
 def MOM(df, n):
     return pd.Series(df['close'].diff(n), name = 'Momentum' + str(n))#Rate of Change
