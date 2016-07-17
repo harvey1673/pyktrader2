@@ -447,6 +447,15 @@ class Agent(MktDataMixin):
                 self.ref2order[key].conditionals = dict([(self.ref2order[o_id], iorder.conditionals[o_id]) 
                                                          for o_id in iorder.conditionals])
 
+    def risk_by_strats(self):
+        risk_dict = {'total': dict([(inst, 0) for inst in self.instruments])}
+        for strat_name in self.strat_list:
+            strat = self.strategies[strat_name]
+            risk_dict[strat_name] = strat.risk_summary()
+            for inst in risk_dict[strat_name]:
+                risk_dict['total'][inst] += risk_dict[strat_name][inst]
+        return risk_dict
+
     def prepare_data_env(self, inst, mid_day = True):
         if  self.instruments[inst].ptype == instrument.ProductType.Option:
             return

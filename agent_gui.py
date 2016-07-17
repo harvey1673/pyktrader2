@@ -646,7 +646,8 @@ class Gui(tk.Tk):
         menu = tk.Menu(self)
         toolmenu = tk.Menu(menu, tearoff=0)
         toolmenu.add_command(label = 'MarketViewer', command=self.market_view)
-        toolmenu.add_command(label = 'PositionViewer', command=self.position_view)        
+        toolmenu.add_command(label = 'PositionViewer', command=self.position_view)
+        toolmenu.add_command(label = 'TradePositionViewer', command=self.tradepos_view)
         menu.add_cascade(label="Tools", menu=toolmenu)
         menu.add_command(label="Reset", command=self.onReset)
         menu.add_command(label="Exit", command=self.onExit)
@@ -687,6 +688,36 @@ class Gui(tk.Tk):
         self.pos_canvas.create_window((4,4), window=self.pos_frame, anchor="nw", tags="self.pos_frame")
         self.pos_frame.bind("<Configure>", self.OnPosFrameConfigure)
         
+        fields = ['gateway', 'inst', 'currlong', 'currshort', 'locklong', 'lockshort', 'ydaylong', 'ydayshort']
+        for idx, field in enumerate(fields):
+            row_idx = 0
+            tk.Label(self.pos_frame, text = field).grid(row=row_idx, column=idx)
+            for gway in positions.keys():
+                for inst in positions[gway]:
+                    row_idx += 1
+                    if field == 'inst':
+                        txt = inst
+                    elif field == 'gateway':
+                        txt = str(gway)
+                    else:
+                        txt = positions[gway][inst][field]
+                    tk.Label(self.pos_frame, text = txt).grid(row=row_idx, column=idx)
+
+    def tradepos_view(self):
+        params = self.app.get_agent_params(['Positions'])
+        positions = params['Positions']
+        pos_win   = tk.Toplevel(self)
+        self.pos_canvas = tk.Canvas(pos_win)
+        self.pos_frame = tk.Frame(self.pos_canvas)
+        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.pos_canvas.yview)
+        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.pos_canvas.xview)
+        self.pos_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
+        pos_vsbx.pack(side="bottom", fill="x")
+        pos_vsby.pack(side="right", fill="y")
+        self.pos_canvas.pack(side="left", fill="both", expand=True)
+        self.pos_canvas.create_window((4,4), window=self.pos_frame, anchor="nw", tags="self.pos_frame")
+        self.pos_frame.bind("<Configure>", self.OnPosFrameConfigure)
+
         fields = ['gateway', 'inst', 'currlong', 'currshort', 'locklong', 'lockshort', 'ydaylong', 'ydayshort']
         for idx, field in enumerate(fields):
             row_idx = 0

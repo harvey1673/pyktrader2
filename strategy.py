@@ -505,3 +505,11 @@ class Strategy(object):
             tradedict = tradepos2dict(tradepos)
             file_writer.writerow([tradedict[itm] for itm in tradepos_header])
         return
+
+    def risk_summary(self):
+        sum_risk = {}
+        for idx, under in enumerate(self.underliers):
+            pos = sum([tp.pos for tp in self.positions[idx]])
+            for instID, v in zip(self.underliers[idx], self.volumes):
+                sum_risk[instID] += pos * v
+        return sum_risk
