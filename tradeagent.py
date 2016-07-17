@@ -93,8 +93,9 @@ class MktDataMixin(object):
         inst = tick.instID
         tick_dt = tick.timestamp
         tick_id = tick.tick_id
-        self.cur_min[inst]['tick_min'] = self.get_min_id(tick_id)
-        if (self.cur_min[inst]['min_id'] > self.cur_min[inst]['tick_min']):
+        tick_min = self.get_min_id(tick_id)
+        self.cur_min[inst]['tick_min'] = tick_min
+        if (self.cur_min[inst]['min_id'] > tick_min):
             return False
         if (self.cur_day[inst]['open'] == 0.0):
             self.cur_day[inst]['open'] = tick.price
@@ -106,13 +107,11 @@ class MktDataMixin(object):
         self.cur_day[inst]['date'] = tick_dt.date()
         for strat_name in self.inst2strat[inst]:
             self.strategies[strat_name].run_tick(tick)
-        if (self.cur_min[inst]['tick_min'] == self.cur_min[inst]['min_id']):
+        if (tick_min == self.cur_min[inst]['min_id']):
             self.tick_data[inst].append(tick)
             self.cur_min[inst]['close'] = tick.price
-            if self.cur_min[inst]['high'] < tick.price:
-                self.cur_min[inst]['high'] = tick.price
-            if self.cur_min[inst]['low'] > tick.price:
-                self.cur_min[inst]['low'] = tick.price
+            self.cur_min[inst]['high'] = max(self.cur_min[inst]['high'], tick.price)
+            self.cur_min[inst]['low'] = min(self.cur_min[inst]['low'], tick.price)
         else:
             last_vol = self.cur_min[inst]['volume']
             if (len(self.tick_data[inst]) > 0):
@@ -120,61 +119,60 @@ class MktDataMixin(object):
                 self.cur_min[inst]['volume'] = last_tick.volume - self.cur_min[inst]['volume']
                 self.cur_min[inst]['openInterest'] = last_tick.openInterest
                 last_vol = last_tick.volume
-            self.cur_min[inst]['bar_id'] = self.min_switch(inst, False)
+            bar_id = self.min_switch(inst, False)
+            self.run_min(inst, bar_id)
+            self.cur_min[inst]['bar_id'] = bar_id
             self.tick_data[inst] = []
             self.cur_min[inst]['open']  = tick.price
             self.cur_min[inst]['close'] = tick.price
             self.cur_min[inst]['high']  = tick.price
             self.cur_min[inst]['low']   = tick.price
-            self.cur_min[inst]['min_id']  = self.cur_min[inst]['tick_min']
+            self.cur_min[inst]['min_id']  = tick_min
             self.cur_min[inst]['volume']  = last_vol
             self.cur_min[inst]['openInterest'] = tick.openInterest
             self.cur_min[inst]['datetime'] = tick_dt.replace(second=0, microsecond=0)
             self.cur_min[inst]['date'] = self.scur_day
-            if (self.cur_min[inst]['tick_min']>0):
+            if tick_min>0:
                 self.tick_data[inst].append(tick)
         return True
     
     def min_switch(self, inst, forced = False):
-        if self.cur_min[inst]['low'] == 0:
-            self.cur_min[inst]['low'] = self.cur_min[inst]['close']
-        if self.cur_min[inst]['high'] >= MKT_DATA_BIGNUMBER - 1000:
-            self.cur_min[inst]['high'] = self.cur_min[inst]['close']
         prev_bar = self.cur_min[inst]['bar_id']
         bar_id = self.conv_bar_id(self.cur_min[inst]['tick_min'], inst)
-        if prev_bar > 0:
-            df = self.min_store[inst][1]
-            self.min_store_idx[inst][1] = mysqlaccess.insert_new_min_to_df(df, self.min_store_idx[inst][1], self.cur_min[inst])
-            self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
-            df = self.min_data[inst][1]
-            for m in sorted(self.min_data_func[inst]):
-                df_m = self.min_store[inst][m]
-                if ((int(bar_id/m)>int(prev_bar/m)) or forced):
-                    if m > 1:
-                        last_bar = df_m['bar_id'][self.min_store_idx[inst][m]-1]
-                        slices = df[(df['date'] == self.cur_min[inst]['date'] ) & (df['bar_id'] >= bar_id - m)]
-                        if len(slices) > 0:
-                            new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
-                                    'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
-                                    'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
-                                    'min_id': slices['min_id'].iloc[0], 'bar_id': slices['bar_id'].iloc[0], 'date':slices['date'].iloc[0]}
-                            self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
-                            self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
-                    for fobj in self.min_data_func[inst][m]:
-                        df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
-                        fobj.rfunc(df_tup)
-            if self.save_flag:
-                event1 = Event(type=EVENT_DB_WRITE, priority = 500)
-                event1.dict['data'] = self.tick_data[inst]
-                event1.dict['type'] = EVENT_TICK
-                event1.dict['instID'] = inst
-                self.eventEngine.put(event1)
+        if self.cur_min[inst]['min_id'] == 0:
+            return bar_id
+        df = self.min_store[inst][1]
+        self.min_store_idx[inst][1] = mysqlaccess.insert_new_min_to_df(df, self.min_store_idx[inst][1], self.cur_min[inst])
+        self.min_data[inst][1] = df[:self.min_store_idx[inst][1]]
+        df = self.min_data[inst][1]
+        for m in sorted(self.min_data_func[inst]):
+            df_m = self.min_store[inst][m]
+            if ((int(bar_id/m)>int(prev_bar/m)) or forced):
+                if m > 1:
+                    last_bar = df_m['bar_id'][self.min_store_idx[inst][m]-1]
+                    slices = df[(df['date'] == self.cur_min[inst]['date'] ) & (df['bar_id'] >= bar_id - m)]
+                    if len(slices) > 0:
+                        new_data = {'datetime':slices['datetime'].iloc[0], 'open':slices['open'].iloc[0], 'high':max(slices['high']), \
+                                'low': min(slices['low']), 'close': slices['close'].iloc[-1],\
+                                'volume': sum(slices['volume']), 'openInterest':slices['openInterest'].iloc[-1],\
+                                'min_id': slices['min_id'].iloc[0], 'bar_id': slices['bar_id'].iloc[0], 'date':slices['date'].iloc[0]}
+                        self.min_store_idx[inst][m] = mysqlaccess.insert_new_min_to_df(df_m, self.min_store_idx[inst][m], new_data)
+                        self.min_data[inst][m] = df_m[:self.min_store_idx[inst][m]]
+                for fobj in self.min_data_func[inst][m]:
+                    df_tup = (self.min_store[inst][m], self.min_store_idx[inst][m])
+                    fobj.rfunc(df_tup)
+        if self.save_flag:
+            event1 = Event(type=EVENT_DB_WRITE, priority = 500)
+            event1.dict['data'] = self.tick_data[inst]
+            event1.dict['type'] = EVENT_TICK
+            event1.dict['instID'] = inst
+            self.eventEngine.put(event1)
+            if self.cur_min[inst]['close'] > 0:
                 event2 = Event(type=EVENT_DB_WRITE, priority = 500)
                 event2.dict['data'] = self.cur_min[inst]
                 event2.dict['type'] = EVENT_MIN_BAR
                 event2.dict['instID'] = inst
                 self.eventEngine.put(event2)
-        self.run_min(inst, bar_id)
         return bar_id
 
     def mkt_data_sod(self, tday):

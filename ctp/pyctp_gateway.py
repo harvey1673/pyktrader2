@@ -130,9 +130,19 @@ class PyctpMdApi(py_ctp.MdApi):
     #----------------------------------------------------------------------  
     def OnRtnDepthMarketData(self, dp):
         """行情推送"""
-        if (dp.LastPrice > dp.UpperLimitPrice) or (dp.LastPrice < dp.LowerLimitPrice) or \
-                (dp.AskPrice1 >= dp.UpperLimitPrice and dp.BidPrice1 <= dp.LowerLimitPrice) or \
-                (dp.BidPrice1 >= dp.AskPrice1):
+        min_ba = min(dp.BidPrice1, dp.AskPrice1)
+        max_ba = max(dp.BidPrice1, dp.AskPrice1)
+        if (min_ba > dp.UpperLimitPrice) or (max_ba < dp.LowerLimitPrice) \
+                or (dp.LastPrice > dp.UpperLimitPrice) or (dp.LastPrice < dp.LowerLimitPrice):
+            logContent = u'MD:error in market data for %s LastPrice=%s, BidPrice=%s, AskPrice=%s' % \
+                             (dp.InstrumentID, dp.LastPrice, dp.BidPrice1, dp.AskPrice1)
+            self.gateway.onLog(logContent, level = logging.DEBUG)
+            return
+        if (dp.BidPrice1 > dp.UpperLimitPrice) or (dp.BidPrice1 < dp.LowerLimitPrice):
+            dp.BidPrice1 = dp.AskPrice1
+        elif (dp.AskPrice1 > dp.UpperLimitPrice) or (dp.AskPrice1 < dp.LowerLimitPrice):
+            dp.AskPrice1 = dp.BidPrice1
+        if (dp.BidPrice1 > dp.AskPrice1):
             logContent = u'MD:error in market data for %s LastPrice=%s, BidPrice=%s, AskPrice=%s' % \
                              (dp.InstrumentID, dp.LastPrice, dp.BidPrice1, dp.AskPrice1)
             self.gateway.onLog(logContent, level = logging.DEBUG)

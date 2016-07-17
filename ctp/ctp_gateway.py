@@ -266,66 +266,66 @@ class CtpGateway(Gateway):
             return
         local_id = int(newref)
         self.tdApi.orderRef = max(self.tdApi.orderRef, local_id)
-        if (local_id in self.id2order):
-            myorder = self.id2order[local_id]
-            # only update sysID,
-            status = myorder.on_order(sys_id = data['OrderSysID'], price = data['LimitPrice'], volume = 0)
-            if data['OrderStatus'] in [ '5', '2']:
-                myorder.on_cancel()
-                status = True
-            if myorder.trade_ref <= 0:
-                order = VtOrderData()
-                order.gatewayName = self.gatewayName
-                # 保存代码和报单号
-                order.symbol = data['InstrumentID']
-                order.exchange = exchangeMapReverse[data['ExchangeID']]
-                order.instID = order.symbol #'.'.join([order.symbol, order.exchange])
-                order.orderID = local_id
-                order.orderSysID = data['OrderSysID']
-                # 方向
-                if data['Direction'] == '0':
-                    order.direction = DIRECTION_LONG
-                elif data['Direction'] == '1':
-                    order.direction = DIRECTION_SHORT
-                else:
-                    order.direction = DIRECTION_UNKNOWN
-                # 开平
-                if data['CombOffsetFlag'] == '0':
-                    order.offset = OFFSET_OPEN
-                elif data['CombOffsetFlag'] == '1':
-                    order.offset = OFFSET_CLOSE
-                else:
-                    order.offset = OFFSET_UNKNOWN
-                # 状态
-                if data['OrderStatus'] == '0':
-                    order.status = STATUS_ALLTRADED
-                elif data['OrderStatus'] == '1':
-                    order.status = STATUS_PARTTRADED
-                elif data['OrderStatus'] == '3':
-                    order.status = STATUS_NOTTRADED
-                elif data['OrderStatus'] == '5':
-                    order.status = STATUS_CANCELLED
-                else:
-                    order.status = STATUS_UNKNOWN
-                # 价格、报单量等数值
-                order.price = data['LimitPrice']
-                order.totalVolume = data['VolumeTotalOriginal']
-                order.tradedVolume = data['VolumeTraded']
-                order.orderTime = data['InsertTime']
-                order.cancelTime = data['CancelTime']
-                order.frontID = data['FrontID']
-                order.sessionID = data['SessionID']
-                order.order_ref = myorder.order_ref
-                self.onOrder(order)
-                return
-            else:
-                if status:
-                    event = Event(type=EVENT_ETRADEUPDATE)
-                    event.dict['trade_ref'] = myorder.trade_ref
-                    self.eventEngine.put(event)
-        else:
+        if (local_id not in self.id2order):
             logContent = 'receive order update from other agents, InstID=%s, OrderRef=%s' % (data['InstrumentID'], local_id)
             self.onLog(logContent, level = logging.WARNING)
+            return
+        myorder = self.id2order[local_id]
+        # only update sysID,
+        status = myorder.on_order(sys_id = data['OrderSysID'], price = data['LimitPrice'], volume = 0)
+        if data['OrderStatus'] in [ '5', '2']:
+            myorder.on_cancel()
+            status = True
+        if myorder.trade_ref <= 0:
+            order = VtOrderData()
+            order.gatewayName = self.gatewayName
+            # 保存代码和报单号
+            order.symbol = data['InstrumentID']
+            order.exchange = exchangeMapReverse[data['ExchangeID']]
+            order.instID = order.symbol #'.'.join([order.symbol, order.exchange])
+            order.orderID = local_id
+            order.orderSysID = data['OrderSysID']
+            # 方向
+            if data['Direction'] == '0':
+                order.direction = DIRECTION_LONG
+            elif data['Direction'] == '1':
+                order.direction = DIRECTION_SHORT
+            else:
+                order.direction = DIRECTION_UNKNOWN
+            # 开平
+            if data['CombOffsetFlag'] == '0':
+                order.offset = OFFSET_OPEN
+            elif data['CombOffsetFlag'] == '1':
+                order.offset = OFFSET_CLOSE
+            else:
+                order.offset = OFFSET_UNKNOWN
+            # 状态
+            if data['OrderStatus'] == '0':
+                order.status = STATUS_ALLTRADED
+            elif data['OrderStatus'] == '1':
+                order.status = STATUS_PARTTRADED
+            elif data['OrderStatus'] == '3':
+                order.status = STATUS_NOTTRADED
+            elif data['OrderStatus'] == '5':
+                order.status = STATUS_CANCELLED
+            else:
+                order.status = STATUS_UNKNOWN
+            # 价格、报单量等数值
+            order.price = data['LimitPrice']
+            order.totalVolume = data['VolumeTotalOriginal']
+            order.tradedVolume = data['VolumeTraded']
+            order.orderTime = data['InsertTime']
+            order.cancelTime = data['CancelTime']
+            order.frontID = data['FrontID']
+            order.sessionID = data['SessionID']
+            order.order_ref = myorder.order_ref
+            self.onOrder(order)
+            return
+        else:
+            if status:
+                event = Event(type=EVENT_ETRADEUPDATE)
+                event.dict['trade_ref'] = myorder.trade_ref
+                self.eventEngine.put(event)
 
     def rtn_trade(self, event):
         data = event.dict['data']
@@ -574,10 +574,11 @@ class CtpGateway(Gateway):
             local_id = int(porder['OrderRef'])
             myorder = self.id2order[local_id]
             if int(error['ErrorID']) in [25,26] and myorder.status not in [order.OrderStatus.Cancelled, order.OrderStatus.Done]:
-                myorder.on_cancel()
-                event = Event(type=EVENT_ETRADEUPDATE)
-                event.dict['trade_ref'] = myorder.trade_ref
-                self.eventEngine.put(event)
+                #myorder.on_cancel()
+                #event = Event(type=EVENT_ETRADEUPDATE)
+                #event.dict['trade_ref'] = myorder.trade_ref
+                #self.eventEngine.put(event)
+                self.qry_commands.append(self.tdApi.qryOrder)
         else:
             self.qry_commands.append(self.tdApi.qryOrder)
         if inst not in self.order_stats:

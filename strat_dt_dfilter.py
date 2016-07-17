@@ -75,6 +75,7 @@ class DTSplitDChanFilter(Strategy):
             else:
                 df = mdf
                 self.tday_open[idx] = mdf.at[midx, 'close']
+                self.open_idx[idx] = 0
             self.recalc_rng(idx, df)
         self.update_trade_unit()
         self.save_state()
@@ -118,8 +119,9 @@ class DTSplitDChanFilter(Strategy):
             if (self.open_period[pid+1] > min_id) and (self.open_period[pid+1] <= curr_min):
                 self.recalc_rng(idx, self.agent.min_data[inst][1])
                 self.tday_open[idx] = self.agent.instruments[inst].price
+                self.open_idx[idx] += 1
                 self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
-        if (self.freq[idx]>0) and (freq == self.freq[idx]):
+        if (self.freq[idx]>0) and (freq == self.freq[idx]) and ((curr_min != 300) and (curr_min != 1500)):
             inst = self.underliers[idx][0]
             mslice = self.agent.min_data[inst][freq].iloc[-1]
             self.check_trigger(idx, mslice.high, mslice.low)

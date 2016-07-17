@@ -131,9 +131,19 @@ class VnctpMdApi(MdApi):
     #----------------------------------------------------------------------  
     def onRtnDepthMarketData(self, data):
         """行情推送"""
-        if (data['LastPrice'] > data['UpperLimitPrice']) or (data['LastPrice'] < data['LowerLimitPrice']) or \
-                (data['AskPrice1'] >= data['UpperLimitPrice'] and data['BidPrice1'] <= data['LowerLimitPrice']) or \
-                (data['BidPrice1'] >= data['AskPrice1']):
+        min_ba = min(data['BidPrice1'], data['AskPrice1'])
+        max_ba = max(data['BidPrice1'], data['AskPrice1'])
+        if (min_ba > data['UpperLimitPrice']) or (max_ba < data['LowerLimitPrice']) \
+                or (data['LastPrice'] > data['UpperLimitPrice']) or (data['LastPrice'] < data['LowerLimitPrice']):
+            logContent = u'MD:error in market data for %s LastPrice=%s, BidPrice=%s, AskPrice=%s' % \
+                             (data['InstrumentID'], data['LastPrice'], data['BidPrice1'], data['AskPrice1'])
+            self.gateway.onLog(logContent, level = logging.DEBUG)
+            return
+        if (data['BidPrice1'] > data['UpperLimitPrice']) or (data['BidPrice1'] < data['LowerLimitPrice']):
+            data['BidPrice1'] = data['AskPrice1']
+        elif (data['AskPrice1'] > data['UpperLimitPrice']) or (data['AskPrice1'] < data['LowerLimitPrice']):
+            data['AskPrice1'] = data['BidPrice1']
+        if (data['BidPrice1'] > data['AskPrice1']):
             logContent = u'MD:error in market data for %s LastPrice=%s, BidPrice=%s, AskPrice=%s' % \
                              (data['InstrumentID'], data['LastPrice'], data['BidPrice1'], data['AskPrice1'])
             self.gateway.onLog(logContent, level = logging.DEBUG)
