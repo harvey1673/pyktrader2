@@ -3,6 +3,7 @@ import workdays
 import json
 import datetime
 import logging
+import copy
 import bisect
 import mysqlaccess
 import order as order
@@ -110,8 +111,10 @@ class MktDataMixin(object):
         if (tick_min == self.cur_min[inst]['min_id']):
             self.tick_data[inst].append(tick)
             self.cur_min[inst]['close'] = tick.price
-            self.cur_min[inst]['high'] = max(self.cur_min[inst]['high'], tick.price)
-            self.cur_min[inst]['low'] = min(self.cur_min[inst]['low'], tick.price)
+            if self.cur_min[inst]['high'] < tick.price:
+                self.cur_min[inst]['high'] = tick.price
+            if self.cur_min[inst]['low'] > tick.price:
+                self.cur_min[inst]['low'] = tick.price
         else:
             last_vol = self.cur_min[inst]['volume']
             if (len(self.tick_data[inst]) > 0):
@@ -121,13 +124,11 @@ class MktDataMixin(object):
                 last_vol = last_tick.volume
             bar_id = self.min_switch(inst, False)
             self.run_min(inst, bar_id)
-            self.cur_min[inst]['bar_id'] = bar_id
             self.tick_data[inst] = []
-            self.cur_min[inst]['open']  = tick.price
-            self.cur_min[inst]['close'] = tick.price
-            self.cur_min[inst]['high']  = tick.price
-            self.cur_min[inst]['low']   = tick.price
-            self.cur_min[inst]['min_id']  = tick_min
+            self.cur_min[inst] = {}
+            self.cur_min[inst]['open']  = self.cur_min[inst]['close'] = self.cur_min[inst]['high'] = self.cur_min[inst]['low'] = tick.price
+            self.cur_min[inst]['min_id']  = self.cur_min[inst]['tick_min'] = tick_min
+            self.cur_min[inst]['bar_id'] = bar_id
             self.cur_min[inst]['volume']  = last_vol
             self.cur_min[inst]['openInterest'] = tick.openInterest
             self.cur_min[inst]['datetime'] = tick_dt.replace(second=0, microsecond=0)
