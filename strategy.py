@@ -506,10 +506,19 @@ class Strategy(object):
             file_writer.writerow([tradedict[itm] for itm in tradepos_header])
         return
 
-    def risk_summary(self):
+    def risk_agg(self, risk_list):
         sum_risk = {}
+        inst_risk = {}
+        for inst in self.instIDs:
+            inst_risk[inst] = dict([(risk, 0) for risk in risk_list])
+            for risk in risk_list:
+                try:
+                    inst_risk[inst][risk] = getattr(self.agent.instruments[inst], risk)
+                except:
+                    continue
         for idx, under in enumerate(self.underliers):
             pos = sum([tp.pos for tp in self.positions[idx]])
             for instID, v in zip(self.underliers[idx], self.volumes):
-                sum_risk[instID] += pos * v
+                for risk in risk_list:
+                    sum_risk[instID][risk] += pos * v * inst_risk[instID][risk]
         return sum_risk
