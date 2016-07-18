@@ -511,6 +511,7 @@ class Strategy(object):
         inst_risk = {}
         for inst in self.instIDs:
             inst_risk[inst] = dict([(risk, 0) for risk in risk_list])
+            sum_risk[inst] = dict([(risk, 0) for risk in risk_list])
             for risk in risk_list:
                 try:
                     inst_risk[inst][risk] = getattr(self.agent.instruments[inst], risk)
@@ -518,7 +519,7 @@ class Strategy(object):
                     continue
         for idx, under in enumerate(self.underliers):
             pos = sum([tp.pos for tp in self.positions[idx]])
-            for instID, v in zip(self.underliers[idx], self.volumes):
+            for instID, v in zip(self.underliers[idx], self.volumes[idx]):
                 for risk in risk_list:
                     sum_risk[instID][risk] += pos * v * inst_risk[instID][risk]
         return sum_risk

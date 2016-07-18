@@ -448,7 +448,7 @@ class Agent(MktDataMixin):
                 self.ref2order[key].conditionals = dict([(self.ref2order[o_id], iorder.conditionals[o_id]) 
                                                          for o_id in iorder.conditionals])
 
-    def risk_by_strats(self, risk_list):
+    def risk_by_strats(self, risk_list = ['pos']):
         # position = lots, delta, gamma, vega, theta in price
         risk_dict = {}
         sum_risk = dict([(inst, dict([(risk, 0) for risk in risk_list])) for inst in self.instruments])

@@ -596,6 +596,8 @@ class Gui(tk.Tk):
         self.status_win = None
         self.pos_frame = None
         self.pos_canvas = None
+        self.tp_frame = None
+        self.tp_canvas = None
         self.entries = {}
         self.stringvars = {'Insts':{}, 'Account':{}}
         self.status_ents = {}
@@ -656,9 +658,6 @@ class Gui(tk.Tk):
         self.settings_win = ttk.Frame(self.notebook)
         self.config_settings()
         self.notebook.add(self.settings_win, text = 'Settings')
-        #self.status_win = ttk.Frame(self.notebook)
-        #self.make_status_form()
-        #self.notebook.add(self.status_win, text = 'Orders')
         for prod in self.volgrid_gui:
             self.volgrid_frame[prod] = ttk.Frame(self)
             self.volgrid_gui[prod].set_frame(self.volgrid_frame[prod])
@@ -704,39 +703,44 @@ class Gui(tk.Tk):
                     tk.Label(self.pos_frame, text = txt).grid(row=row_idx, column=idx)
 
     def tradepos_view(self):
-        params = self.app.get_agent_params(['Positions'])
-        positions = params['Positions']
+        params = self.app.get_agent_params(['Risk.pos'])
+        res = params['Risk']
+        sum_risk = {}
+        sum_risk['total'] = res['total']
+        strat_list = res['strats'].keys()
+        for strat_name in strat_list:
+            sum_risk[strat_name] = res['strats'][strat_name]
         pos_win   = tk.Toplevel(self)
-        self.pos_canvas = tk.Canvas(pos_win)
-        self.pos_frame = tk.Frame(self.pos_canvas)
-        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.pos_canvas.yview)
-        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.pos_canvas.xview)
-        self.pos_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
+        self.tp_canvas = tk.Canvas(pos_win)
+        self.tp_frame = tk.Frame(self.tp_canvas)
+        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.tp_canvas.yview)
+        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.tp_canvas.xview)
+        self.tp_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
         pos_vsbx.pack(side="bottom", fill="x")
         pos_vsby.pack(side="right", fill="y")
-        self.pos_canvas.pack(side="left", fill="both", expand=True)
-        self.pos_canvas.create_window((4,4), window=self.pos_frame, anchor="nw", tags="self.pos_frame")
-        self.pos_frame.bind("<Configure>", self.OnPosFrameConfigure)
+        self.tp_canvas.pack(side="left", fill="both", expand=True)
+        self.tp_canvas.create_window((4,4), window=self.tp_frame, anchor="nw", tags="self.tp_frame")
+        self.tp_frame.bind("<Configure>", self.OnTPFrameConfigure)
 
-        fields = ['gateway', 'inst', 'currlong', 'currshort', 'locklong', 'lockshort', 'ydaylong', 'ydayshort']
+        fields = ['inst', 'total'] + strat_list
         for idx, field in enumerate(fields):
-            row_idx = 0
-            tk.Label(self.pos_frame, text = field).grid(row=row_idx, column=idx)
-            for gway in positions.keys():
-                for inst in positions[gway]:
-                    row_idx += 1
-                    if field == 'inst':
-                        txt = inst
-                    elif field == 'gateway':
-                        txt = str(gway)
-                    else:
-                        txt = positions[gway][inst][field]
-                    tk.Label(self.pos_frame, text = txt).grid(row=row_idx, column=idx)
+            tk.Label(self.tp_frame, text = field).grid(row=0, column=idx)
+            for idy, inst in enumerate(sum_risk['total'].keys()):
+                if field == 'inst':
+                    txt = inst
+                else:
+                    inst_risk = sum_risk[field].get(inst, {})
+                    txt = str(inst_risk.get('pos', 0))
+                tk.Label(self.tp_frame, text = txt).grid(row=idy+1, column=idx)
 
     def OnPosFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
         self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
-    
+
+    def OnTPFrameConfigure(self, event):
+        '''Reset the scroll region to encompass the inner frame'''
+        self.tp_canvas.configure(scrollregion=self.tp_canvas.bbox("all"))
+
     def qry_agent_inst(self):
         instfield = 'QryInst'
         ent = self.entries[instfield]
@@ -869,7 +873,7 @@ class Gui(tk.Tk):
         
     def onStatus(self):
         self.status_win = tk.Toplevel(self)
-        self.status_ents = self.make_status_form(self.status_win)        
+        self.status_ents = self.make_status_form(self.status_win)
         
     def onReset(self):
         self.app.restart()
@@ -917,6 +921,10 @@ class MainApp(object):
                                        'ydaylong':  pos.pos_yday.long,
                                        'ydayshort': pos.pos_yday.short}
                 res[field] = positions
+            elif field == 'Risk':
+                risk_list = field_list[1:]
+                sum_risk, risk_dict = self.agent.risk_by_strats(risk_list)
+                res[field] = {'total': sum_risk, 'strats': risk_dict }
             elif field == 'Account':
                 gateway = self.agent.gateways[field_list[1]]
                 res[field][gateway.gatewayName] = dict([(variable2field(var), gateway.account_info[var]) for var in gateway.account_info])
