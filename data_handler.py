@@ -1,14 +1,14 @@
 import datetime
-import talib
+#import talib
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
+#import scipy.stats as stats
 
 class DynamicRecArray(object):
-    def __init__(self, dtype):
+    def __init__(self, dtype, default_size = 300):
         self.dtype = np.dtype(dtype)
         self.length = 0
-        self.size = 10
+        self.size = default_size
         self._data = np.empty(self.size, dtype=self.dtype)
 
     def __len__(self):
@@ -145,19 +145,16 @@ def TR(df):
     ts_tr = pd.Series(tr_df.max(1), name='TR')
     return ts_tr
 
-def tr(df_tup):
-    df, idx = df_tup
-    val = max(df.at[idx-1,'high']-df.at[idx-1, 'low'], abs(df.at[idx-1, 'high'] - df.at[idx-2,'close']),  abs(df.at[idx-1, 'low'] - df.at[idx-2,'close']))
-    df.set_value(idx-1, 'TR', val)
+def tr(df):
+    df['TR'][-1] = max(df['high'][-1]-df['low'][-1], abs(df['high'][-1] - df['close'][-2]), abs(df['low'][-1] - df['close'][-2]))
 
 def CMI(df, n):
     ts = pd.Series(abs(df['close'] - df['close'].shift(n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name='CMI'+str(n))
     return ts
 
-def cmi(df_tup, n):
-    df, idx = df_tup
-    val = abs(df.at[idx-1, 'close'] - df.at[idx-n, 'close'])/(max(df['high'].iloc[idx-n:idx]) - min(df['low'].iloc[idx-n:idx]))*100
-    df.set_value(idx-1, 'CMI'+str(n), val)
+def cmi(df, n):
+    if len(df) >= n:
+        df['CMI'+str(n)][-1] = abs(df['close'][-1] - df['close'][-n])/(max(df['high'][-n:]) - min(df['low'][-n:]))*100
 
 def ATR(df, n = 20):
     tr = TR(df)
@@ -165,11 +162,10 @@ def ATR(df, n = 20):
     ts_atr.name = 'ATR'+str(n)
     return ts_atr
 
-def atr(df_tup, n = 20):
-    df, idx = df_tup
-    new_tr = max(df.at[idx-1,'high']-df.at[idx-1, 'low'], abs(df.at[idx-1, 'high'] - df.at[idx-2,'close']),  abs(df.at[idx-1, 'low'] - df.at[idx-2,'close']))
+def atr(df, n = 20):
+    new_tr = max(df['high'][-1]-df['low'][-1], abs(df['high'][-1] - df['close'][-2]), abs(df['low'][-1] - df['close'][-2]))
     alpha = 2.0/(n+1)
-    df.set_value(idx-1,'ATR'+str(n), df.at[idx-2, 'ATR'+str(n)] * (1-alpha) + alpha * new_tr)
+    df['ATR'+str(n)][-1] = df['ATR'+str(n)][-2] * (1-alpha) + alpha * new_tr
     
 def tsMA(ts, n):
     return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
@@ -177,27 +173,24 @@ def tsMA(ts, n):
 def MA(df, n, field = 'close'):
     return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n), index = df.index)
 
-def ma(df_tup, n, field = 'close'):
+def ma(df, n, field = 'close'):
     key = 'MA_' + field[0].upper() + str(n)
-    df, idx = df_tup
-    df.set_value(idx-1, key, np.mean(df[field][idx-n:idx]))
+    df[key][-1] = (df[key][-2]*n + df[field][-1] - df[field][-1-n])/n
 
 def STDEV(df, n, field = 'close'):
     return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
 
-def stdev(df_tup, n, field = 'close'):
-    key = 'STDEV_' + field[0].upper() + str(n)
-    df, idx = df_tup
-    df.set_value(idx-1, key, np.std(df[field][idx-n:idx]))
+def stdev(df, n, field = 'close'):
+    df['STDEV_' + field[0].upper() + str(n)][-1] = np.std(df[field][-n:])
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
     return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field[0].upper() + str(n), index = df.index)
 
-def ema(df_tup, n, field =  'close'):
-    df, idx = df_tup
+def ema(df, n, field =  'close'):
     alpha = 2.0/(n+1)
-    df.set_value(idx-1, 'EMA_' + field[0].upper() + str(n), df.at[idx-2, 'EMA_' + field[0].upper() + str(n)] * (1-alpha) + df.at[idx-1, field] * alpha)
+    key = 'EMA_' + field[0].upper() + str(n)
+    df[key][-1] = df[key][-2] * (1-alpha) + df[field][-1] * alpha
 
 def KAMA(df, n, field = 'close'):
     return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field[0].upper() + str(n), index = df.index)
@@ -437,13 +430,11 @@ def DONCH_L(df, n, field = 'low'):
     DC_L = pd.rolling_min(df[field], n)
     return pd.Series(DC_L, name = 'DONCH_L'+ field[0].upper() + str(n))
 
-def donch_h(df_tup, n, field = 'high'):
-    df, idx = df_tup
-    df.set_value(idx-1, 'DONCH_H'+ field[0].upper() + str(n), max(df[field][idx-n:idx]))
+def donch_h(df, n, field = 'high'):
+    df['DONCH_H'+ field[0].upper() + str(n)][-1] = max(df[field][-n:])
  
-def donch_l(df_tup, n, field = 'low'):
-    df, idx = df_tup
-    df.set_value(idx-1, 'DONCH_L'+ field[0].upper() + str(n), min(df[field][idx-n:idx]))
+def donch_l(df, n, field = 'low'):
+    df['DONCH_L'+ field[0].upper() + str(n)][-1] = min(df[field][-n:])
     
 #Standard Deviation
 def HEIKEN_ASHI(df, period1):
@@ -462,16 +453,15 @@ def HEIKEN_ASHI(df, period1):
         HA_L[idx] = min(SM_L[idx], HA_O[idx], HA_C[idx])
     return pd.concat([HA_O, HA_H, HA_L, HA_C], join='outer', axis=1)
     
-def heiken_ashi(df_tup, period):
-    df, idx = df_tup
-    ma_o = sum(df['open'][idx-period:idx])/float(period)
-    ma_c = sum(df['close'][idx-period:idx])/float(period)
-    ma_h = sum(df['high'][idx-period:idx])/float(period)
-    ma_l = sum(df['low'][idx-period:idx])/float(period)
-    df.set_value(idx-1,'HAclose', (ma_o + ma_c + ma_h + ma_l)/4.0)
-    df.set_value(idx-1, 'HAopen', (df.at[idx-2,'HAopen'] + df.at[idx-2, 'HAclose'])/2.0)
-    df.set_value(idx-1, 'HAhigh', max(ma_h, df.at[idx-1, 'HAopen'], df.at[idx-1, 'HAclose']))
-    df.set_value(idx-1, 'HAlow', min(ma_l, df.at[idx-1, 'HAopen'], df.at[idx-1, 'HAclose']))
+def heiken_ashi(df, period):
+    ma_o = sum(df['open'][-period:])/float(period)
+    ma_c = sum(df['close'][-period:])/float(period)
+    ma_h = sum(df['high'][-period:])/float(period)
+    ma_l = sum(df['low'][-period:])/float(period)
+    df['HAclose'][-1] = (ma_o + ma_c + ma_h + ma_l)/4.0
+    df['HAopen'][-1] = (df['HAopen'][-2] + df['HAclose'][-2])/2.0
+    df['HAhigh'][-1] = max(ma_h, df['HAopen'][-1], df['HAclose'][-1])
+    df['HAlow'][-1] = min(ma_l, df['HAopen'][-1], df['HAclose'][-1])
 
 def BBANDS_STOP(df, n, nstd):
     MA = pd.Series(pd.rolling_mean(df['close'], n))
@@ -492,21 +482,20 @@ def BBANDS_STOP(df, n, nstd):
                 Upper[idx] = Upper[idx-1]
     return pd.concat([Upper,Lower, Trend], join='outer', axis=1)
 
-def bbands_stop(df_tup, n, nstd):
-    df, idx = df_tup
-    ma = df.close[idx-n:idx].mean()
-    msd = df.close[idx-n:idx].std()
-    df.set_value(idx-1, 'BBSTOP_upper', ma + nstd * msd)
-    df.set_value(idx-1, 'BBSTOP_lower', ma - nstd * msd)
-    df.set_value(idx-1, 'BBSTOP_trend', df.at[idx-2, 'BBSTOP_trend'])
-    if df.at[idx-1, 'close'] > df.at[idx-2, 'BBSTOP_upper']:
-        df.set_value(idx-1, 'BBSTOP_trend', 1)
-    if df.at[idx-1, 'close'] < df.at[idx-2, 'BBSTOP_lower']:
-        df.set_value(idx-1, 'BBSTOP_trend', -1)
-    if (df.at[idx-1, 'BBSTOP_trend'] == 1) and (df.at[idx-1, 'BBSTOP_lower'] < df.at[idx-2, 'BBSTOP_lower']):
-        df.set_value(idx-1, 'BBSTOP_lower', df.at[idx-2, 'BBSTOP_lower'])
-    if (df.at[idx-1, 'BBSTOP_trend'] == -1) and (df.at[idx-1, 'BBSTOP_upper'] > df.at[idx-2, 'BBSTOP_upper']):
-        df.set_value(idx-1, 'BBSTOP_upper', df.at[idx-2, 'BBSTOP_upper'])
+def bbands_stop(df, n, nstd):
+    ma = df['close'][-n:].mean()
+    msd = df['close'][-n:].std()
+    df['BBSTOP_upper'][-1] = ma + nstd * msd
+    df['BBSTOP_lower'][-1] = ma - nstd * msd
+    df['BBSTOP_trend'][-1] = df['BBSTOP_trend'][-2]
+    if df['close'][-1] > df['BBSTOP_upper'][-2]:
+        df['BBSTOP_trend'][-1] = 1
+    if df['close'][-1] < df['BBSTOP_lower'][-2]:
+        df['BBSTOP_trend'][-1] = -1
+    if (df['BBSTOP_trend'][-1] == 1) and (df['BBSTOP_lower'][-1] < df['BBSTOP_lower'][-2]):
+        df['BBSTOP_lower'][-1] = df['BBSTOP_lower'][-2]
+    if (df['BBSTOP_trend'][-1] == -1) and (df['BBSTOP_upper'][-1] > df['BBSTOP_upper'][-2]):
+        df['BBSTOP_upper'][-1] = df['BBSTOP_upper'][-2]
 
 def FISHER(df, n, smooth_p = 0.7, smooth_i = 0.7):
     roll_high = pd.rolling_max(df.high, n)
@@ -517,14 +506,13 @@ def FISHER(df, n, smooth_p = 0.7, smooth_i = 0.7):
     sm_fisher = pd.Series(pd.ewma(fisher_ind, com = 1.0/smooth_i - 1, adjust = False), name = 'FISHER_I')
     return pd.concat([sm_price, sm_fisher], join='outer', axis=1)
 
-def fisher(df_tup, n, smooth_p = 0.7, smooth_i = 0.7):
-    df, idx = df_tup
-    roll_high = max(df.high[idx-n:idx])
-    roll_low  = min(df.low[idx-n:idx])
-    price_loc = (df.at[idx-1, 'close'] - roll_low)*2.0/(roll_high - roll_low) - 1
-    df.set_value(idx-1, 'FISHER_P', df.at[idx-2, 'FISHER_P'] * (1 - smooth_p) + smooth_p * price_loc)
-    fisher_ind = 0.5 * np.log((1 + df.at[idx-1, 'FISHER_P'])/(1 - df.at[idx-1, 'FISHER_P']))
-    df.set_value(idx-1, 'FISHER_I', df.at[idx-2, 'FISHER_I'] * (1 - smooth_i) + smooth_i * fisher_ind)
+def fisher(df, n, smooth_p = 0.7, smooth_i = 0.7):
+    roll_high = max(df['high'][-n:])
+    roll_low  = min(df['low'][-n:])
+    price_loc = (df['close'][-1] - roll_low)*2.0/(roll_high - roll_low) - 1
+    df['FISHER_P'][-1] = df['FISHER_P'][-2] * (1 - smooth_p) + smooth_p * price_loc
+    fisher_ind = 0.5 * np.log((1 + df['FISHER_P'][-1])/(1 - df['FISHER_P'][-1]))
+    df['FISHER_I'][-1] = df['FISHER_I'][-2] * (1 - smooth_i) + smooth_i * fisher_ind
 
 def PCT_CHANNEL(df, n = 20, pct = 50, field = 'close'):
     out = pd.Series(index=df.index, name = 'PCT%sCH%s' % (pct, n))
@@ -533,10 +521,9 @@ def PCT_CHANNEL(df, n = 20, pct = 50, field = 'close'):
             out[d] = np.percentile(df[field].iloc[max(idx-n,0):idx], pct)
     return out
 
-def pct_channel(df_tup, n = 20, pct = 50, field = 'close'):
+def pct_channel(df, n = 20, pct = 50, field = 'close'):
     key =  'PCT%sCH%s' % (pct, n)
-    df, idx = df_tup
-    df.set_value(idx-1, key, np.percentile(df[field].iloc[(idx-n):idx], pct))
+    df[key][-1] = np.percentile(df[field][-n:], pct)
 
 def COND_PCT_CHAN(df, n = 20, pct = 50, field = 'close', direction=1):
     out = pd.Series(index=df.index, name = 'C_CH%s_PCT%s' % (n, pct))
