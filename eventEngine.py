@@ -6,6 +6,7 @@ import threading
 
 # 自己开发的模块
 from eventType import *
+import event_priority 
 
 class RepeatTimer():
 
@@ -182,10 +183,14 @@ class PriEventEngine(EventEngine):
 class Event(object):
     """事件对象"""
     #----------------------------------------------------------------------
-    def __init__(self, type=None, priority = 100):
+    def __init__(self, type=None, priority = None, priority_map = event_priority.Event_Priority_Basic):
         """Constructor"""
         self.type = type      # 事件类型
-        self.priority = priority
+        if (priority == None) and (type!= None):
+            dict_key = type.split('.')[0] + '.'
+            self.priority = priority_map.get(dict_key, 100)
+        else:
+            self.priority = priority            
         self.dict = {}         # 字典用于保存具体的事件数据
 
 #----------------------------------------------------------------------
