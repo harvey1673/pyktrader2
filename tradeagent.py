@@ -19,7 +19,7 @@ import backtest
 from eventType import *
 from eventEngine import *
 
-min_data_list = ['datetime', 'date', 'min_id', 'tick_min', 'bar_id', 'open', 'high','low', 'close', 'volume', 'openInterest']
+min_data_list = ['datetime', 'date', 'min_id', 'bar_id', 'open', 'high','low', 'close', 'volume', 'openInterest', 'tick_min']
 day_data_list = ['date', 'open', 'high','low', 'close', 'volume', 'openInterest']
 dtype_map = {'date': 'datetime64[D]', 
              'datetime': 'datetime64[ms]',
@@ -45,8 +45,6 @@ class MktDataMixin(object):
     def __init__(self, config):
         self.tick_data  = {}
         self.day_data  = {}
-        self.min_store = {}
-        self.min_store_idx = {}
         self.min_data  = {}
         self.cur_min = {}
         self.cur_day = {}  		
@@ -62,9 +60,9 @@ class MktDataMixin(object):
     def add_instrument(self, name):
         self.tick_data[name] = []        
         dtypes = [(field, dtype(field)) for field in day_data_list]
-        self.day_data[name]  = data_handler.DynamicRecArray(dtypes)
+        self.day_data[name]  = data_handler.DynamicRecArray(dtype = dtypes)
         dtypes = [(field, dtype(field)) for field in min_data_list]
-        self.min_data[name]  = {1: self.min_store[name][1]}
+        self.min_data[name]  = {1: data_handler.DynamicRecArray(dtype = dtypes)}
         self.cur_day[name]   = dict([(item, 0) for item in day_data_list])
         self.cur_min[name]   = dict([(item, 0) for item in min_data_list])
         self.day_data_func[name] = []
@@ -155,7 +153,7 @@ class MktDataMixin(object):
         if self.cur_min[inst]['min_id'] == 0:
             return bar_id
         ra = self.min_data[inst][1]
-        ra.append(self.cur_min[inst])
+        ra.append_by_dict(self.cur_min[inst])
         for m in sorted(self.min_data_func[inst]):
             ra_m = self.min_data[inst][m]
             if ((int(bar_id/m)>int(prev_bar/m)) or forced):
@@ -172,9 +170,9 @@ class MktDataMixin(object):
                                 'low': min(ra.data['low'][-idx:]), 'close': ra.data['close'][-1],\
                                 'volume': sum(ra.data['volume'][-idx:]), 'openInterest':ra.data['openInterest'][-1],\
                                 'min_id': ra.data['min_id'][-idx], 'bar_id': ra.data['bar_id'][-idx], 'date':ra.data['date'][-idx]}
-                        ra_m.append(new_data)                        
+                        ra_m.append_by_dict(new_data)                        
                 for fobj in self.min_data_func[inst][m]:
-                    fobj.rfunc(self.min_data[inst][m])
+                    fobj.rfunc(self.min_data[inst][m].data)
         if self.save_flag:
             event1 = Event(type=EVENT_DB_WRITE, priority = 500)
             event1.dict['data'] = self.tick_data[inst]
@@ -208,23 +206,13 @@ class MktDataMixin(object):
                 new_day = { key: self.cur_day[inst][key] for key in day_data_list }
                 self.day_data[inst].append(new_day)
                 for fobj in self.day_data_func[inst]:
-                    fobj.rfunc(self.day_data[inst])
+                    fobj.rfunc(self.day_data[inst].data)
                 if self.save_flag:
                     event = Event(type=EVENT_DB_WRITE, priority = 500)
                     event.dict['data'] = self.cur_day[inst]
                     event.dict['type'] = EVENT_MKTDATA_EOD
                     event.dict['instID'] = inst
                     self.eventEngine.put(event)
-            #m_start = workdays.workday(self.scur_day, -(self.min_data_days+1), CHN_Holidays)
-            #num_min = 600 * (self.min_data_days + 50)
-            #for m in self.min_store[inst]:
-            #    if int(len(self.min_data[inst][m])*m/600) > self.min_data_days + 40:
-            #        mdf = self.min_data[inst][m]
-            #        mdf = mdf[(mdf['date'] >= m_start)]
-            #        idx = len(mdf)
-            #        self.min_store[inst][m] = pd.DataFrame(mdf, index = range(int(num_min/m)))
-            #        self.min_store_idx[inst][m] = idx
-            #        self.min_data[inst][m] = self.min_store[inst][m][:idx]
 
     def write_mkt_data(self, event):
         inst = event.dict['instID']
@@ -470,63 +458,57 @@ class Agent(MktDataMixin):
             self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             daily_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
             daily_end = self.scur_day
-            self.day_data[inst] = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)
-            df = self.day_data[inst]
+            ddf = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)            
             if len(df) > 0:
-                self.instruments[inst].price = df['close'].iloc[-1]
+                self.instruments[inst].price = ddf['close'].iloc[-1]
                 self.instruments[inst].last_update = 0
-                self.instruments[inst].prev_close = df['close'].iloc[-1]
+                self.instruments[inst].prev_close = ddf['close'].iloc[-1]
                 for fobj in self.day_data_func[inst]:
-                    ts = fobj.sfunc(df)
-                    df[ts.name]= ts
+                    ts = fobj.sfunc(ddf)
+                    ddf[ts.name]= ts
+            self.day_data[inst] = data_handler.DynamicRecArray(dtype = [], dataframe = ddf)
         if self.min_data_days > 0 or mid_day:
             self.logger.debug('Updating historical min data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             d_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
             d_end = self.scur_day
             min_start = int(self.instruments[inst].start_tick_id/1000)
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
-            mindata = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
-            mindata = backtest.cleanup_mindata(mindata, self.instruments[inst].product, index_col = None)
-            mindata['bar_id'] = self.conv_bar_id(mindata['min_id'], inst)
-            self.min_data[inst][1] = pd.DataFrame(mindata, index=range(600*(self.min_data_days+1)))
-            idx = len(mindata)
-            self.min_store_idx[inst][1] = idx
-            self.min_data[inst][1] = self.min_store[inst][1][:idx]
+            mdf = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
+            mdf = backtest.cleanup_mindata(mdf, self.instruments[inst].product, index_col = None)
+            mdf['bar_id'] = self.conv_bar_id(mdf['min_id'], inst)            
             if len(mindata)>0:
                 idx = mindata.index[-1]
-                min_date = mindata['date'][idx]
-                if (len(self.day_data[inst])==0) or (min_date > self.day_data[inst]['date'].iloc[-1]):
-                    ddf = data_handler.conv_ohlc_freq(mindata, 'd', index_col = None)
+                min_date = mdf['date'][-1]
+                if (len(self.day_data[inst])==0) or (min_date > self.day_data[inst]['date'][-1]):
+                    ddf = data_handler.conv_ohlc_freq(mdf, 'd', index_col = None)
                     self.cur_day[inst]['open'] = float(ddf.open[-1])
                     self.cur_day[inst]['close'] = float(ddf.close[-1])
                     self.cur_day[inst]['high'] = float(ddf.high[-1])
                     self.cur_day[inst]['low'] = float(ddf.low[-1])
                     self.cur_day[inst]['volume'] = int(ddf.volume[-1])
                     self.cur_day[inst]['openInterest'] = int(ddf.openInterest[-1])
-                    self.cur_min[inst]['datetime'] = pd.datetime(*mindata['datetime'][idx].timetuple()[0:-3])
-                    self.cur_min[inst]['date'] = mindata.at[idx,'date']
-                    self.cur_min[inst]['open'] = float(mindata.at[idx,'open'])
-                    self.cur_min[inst]['close'] = float(mindata.at[idx,'close'])
-                    self.cur_min[inst]['high'] = float(mindata.at[idx,'high'])
-                    self.cur_min[inst]['low'] = float(mindata.at[idx,'low'])
+                    self.cur_min[inst]['datetime'] = pd.datetime(*mdf['datetime'][-1].timetuple()[0:-3])
+                    self.cur_min[inst]['date'] = mdf['date'][-1]
+                    self.cur_min[inst]['open'] = float(midf['open'][-1])
+                    self.cur_min[inst]['close'] = float(mdf['close'][-1])
+                    self.cur_min[inst]['high'] = float(mdf['high'][-1])
+                    self.cur_min[inst]['low'] = float(mdf['low'][-1])
                     self.cur_min[inst]['volume'] = self.cur_day[inst]['volume']
                     self.cur_min[inst]['openInterest'] = self.cur_day[inst]['openInterest']
-                    self.cur_min[inst]['min_id'] = int(mindata.at[idx,'min_id'])
+                    self.cur_min[inst]['min_id'] = int(mdf['min_id'][-1])
                     self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
-                    self.instruments[inst].price = float(mindata.at[idx,'close'])
+                    self.instruments[inst].price = float(mdf['close'][-1])
                     self.instruments[inst].last_update = 0
                     self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
-                for m in sorted(self.min_data_func[inst]):
+                for m in sorted(self.min_data_func[inst]): 
+                    mdf_m = mdf
                     if m != 1:
                         bar_func = lambda ts: self.conv_bar_id(ts, inst)
-                        df = data_handler.conv_ohlc_freq(self.min_data[inst][1], str(m)+'min', index_col = None, bar_func = bar_func, extra_cols = ['bar_id'])
-                        self.min_store[inst][m] = pd.DataFrame(df, index = range(int(600*(self.min_data_days+50)/m)))
-                        self.min_store_idx[inst][m] = len(df.dropna())
-                    df = self.min_store[inst][m]
+                        mdf_m = data_handler.conv_ohlc_freq(mdf, str(m)+'min', index_col = None, bar_func = bar_func, extra_cols = ['bar_id'])
                     for fobj in self.min_data_func[inst][m]:
-                        ts = fobj.sfunc(df)
-                        df[ts.name]= ts
-                    self.min_data[inst][m] = self.min_store[inst][m][:self.min_store_idx[inst][m]]
+                        ts = fobj.sfunc(mdf_m)
+                        mdf_m[ts.name]= ts
+                    self.min_data[inst][m] = data_handler.DynamicRecArray(dtype = [], dataframe = mdf_m)
 
     def restart(self):
         self.logger.debug('Prepare trade environment for %s' % self.scur_day.strftime('%y%m%d'))
