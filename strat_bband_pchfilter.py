@@ -60,35 +60,30 @@ class BbandPChanTrader(Strategy):
 
     def update_mkt_state(self, idx):
         instID = self.underliers[idx][0]
-        xdf = self.agent.min_data[instID][self.freq[idx]]
-        midx = xdf.index[-1]
+        xdf = self.agent.min_data[instID][self.freq[idx]].data
         key = self.channel_keys[0] + str(self.channels[idx])
-        self.chan_high[idx] = xdf.at[midx, key]
+        self.chan_high[idx] = xdf[key][-1]
         key = self.channel_keys[1] + str(self.channels[idx])
-        self.chan_low[idx]  = xdf.at[midx, key]
+        self.chan_low[idx]  = xdf[key][-1]
         key = self.band_keys[0] + str(self.band_win[idx])
-        self.mid_band[idx] = xdf.at[midx, key]
+        self.mid_band[idx] = xdf[key][-1]
         key = self.band_keys[1] + str(self.band_win[idx])
-        stdev = xdf.at[midx, key]
+        stdev = xdf.at[key][-1]
         self.upper_band[idx] = self.mid_band[idx] + self.ratios[idx] * stdev
         self.lower_band[idx] = self.mid_band[idx] - self.ratios[idx] * stdev
 
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
         self.update_mkt_state(idx)
-        mslice = self.agent.min_data[inst][self.freq[idx]].iloc[-1]
+        #mdata = self.agent.min_data[inst][self.freq[idx]]
         if len(self.positions[idx]) > 0:
             self.positions[idx][0].set_exit(self.mid_band[idx])
-        self.check_trigger(idx, mslice)
+        self.check_trigger(idx)
 
     def on_tick(self, idx, ctick):
         pass
-        #if self.freq[idx] == 0:
-        #    curr_p = self.curr_prices[idx]
-        #    mslice = BaseObject(open = curr_p, high = curr_p, low = curr_p, close = curr_p)
-        #    self.check_trigger(idx, mslice)
 
-    def check_trigger(self, idx, mslice):
+    def check_trigger(self, idx):
         if len(self.submitted_trades[idx]) > 0:
             return
         inst = self.underliers[idx][0]
