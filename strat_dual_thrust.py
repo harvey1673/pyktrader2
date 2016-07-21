@@ -21,16 +21,16 @@ class DTTrader(Strategy):
         for idx, underlier in enumerate(self.underliers):
             inst = underlier[0]
             self.tick_base[idx] = self.agent.instruments[inst].tick_base
-            ddf = self.agent.day_data[inst]
+            ddf = self.agent.day_data[inst].data
             win = self.lookbacks[idx]
             if win > 0:
-                self.cur_rng[idx] = max(max(ddf.iloc[-win:]['high'])- min(ddf.iloc[-win:]['close']), max(ddf.iloc[-win:]['close']) - min(ddf.iloc[-win:]['low']))
+                self.cur_rng[idx] = max(max(ddf['high'][-win:])- min(ddf['close'][-win:]), max(ddf['close'][-win:]) - min(ddf['low'][-win:]))
             elif win == 0:
-                self.cur_rng[idx] = max(max(ddf.iloc[-2:]['high'])- min(ddf.iloc[-2:]['close']), max(ddf.iloc[-2:]['close']) - min(ddf.iloc[-2:]['low']))
-                self.cur_rng[idx] = max(self.cur_rng[idx] * 0.5, ddf.iloc[-1]['high']-ddf.iloc[-1]['close'],ddf.iloc[-1]['close']-ddf.iloc[-1]['low'])
+                self.cur_rng[idx] = max(max(ddf['high'][-2:])- min(ddf['close'][-2:]), max(ddf['close'][-2:]) - min(ddf['low'][-2:]))
+                self.cur_rng[idx] = max(self.cur_rng[idx] * 0.5, ddf['high'][-1]-ddf['close'][-1],ddf['close'][-1]-ddf['low'][-1])
             else:
-                self.cur_rng[idx] = max(ddf.iloc[-1]['high']- ddf.iloc[-1]['low'], abs(ddf.iloc[-1]['close'] - ddf.iloc[-2]['close']))
-            self.cur_ma[idx] = ddf.iloc[-self.ma_win[idx]:]['close'].mean()
+                self.cur_rng[idx] = max(ddf['high'][-1]- ddf['low'][-1], abs(ddf['close'][-1] - ddf['close'][-2]))
+            self.cur_ma[idx] = ddf['close'][-self.ma_win[idx]:].mean()
             min_id = self.agent.instruments[inst].last_tick_id/1000
             min_id = int(min_id/100)*60 + min_id % 100 - self.daily_close_buffer
             self.last_min_id[idx] = int(min_id/60)*100 + min_id % 60
@@ -59,8 +59,10 @@ class DTTrader(Strategy):
     def on_bar(self, idx, freq):
         if (self.freq[idx]>0) and (freq == self.freq[idx]):
             inst = self.underliers[idx][0]
-            mslice = self.agent.min_data[inst][freq].iloc[-1]
-            self.check_trigger(idx, mslice.high, mslice.low)
+            if self.agent.cur_min[inst]['min_id'] < 300:
+                return
+            min_data = self.agent.min_data[inst][freq]
+            self.check_trigger(idx, min_data['high'][-1], min_data['low'][-1])
             
     def on_tick(self, idx, ctick):
         if self.freq[idx] == 0:
@@ -121,4 +123,3 @@ class DTTrader(Strategy):
             self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
             self.status_notifier(msg)
             self.save_state()
-
