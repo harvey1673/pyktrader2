@@ -23,13 +23,13 @@ class RBreaker(Strategy):
         for idx, underlier in enumerate(self.underliers):
             inst = underlier[0]
             self.tick_base[idx] = self.agent.instruments[inst].tick_base
-            ddf = self.agent.day_data[inst]
+            ddf = self.agent.day_data[inst].data
             a = self.ratios[idx][0]
             b = self.ratios[idx][1]
             c = self.ratios[idx][2]
-            dhigh = ddf.iloc[-1]['high']
-            dlow = ddf.iloc[-1]['low']
-            dclose = ddf.iloc[-1]['close']
+            dhigh = ddf['high'][-1]
+            dlow = ddf['low'][-1]
+            dclose = ddf['close'][-1]
             if dhigh - dlow <= self.min_rng[idx] * dclose:
                 self.reverse_flag[idx] = False
             self.ssetup[idx] = dhigh + a*(dclose - dlow)
@@ -80,7 +80,7 @@ class RBreaker(Strategy):
         inst = self.underliers[idx][0]
         min_id = self.agent.cur_min[inst]['min_id']
         if (min_id < self.start_min_id[idx]):
-            self.logger.debug('inst=%s has not started in this strategy = %s' % (inst, self.name))
+            #self.logger.debug('inst=%s has not started in this strategy = %s' % (inst, self.name))
             return
         if (freq != self.freq[idx]) or (len(self.submitted_trades[idx]) > 0):
             if (min_id >= self.last_min_id[idx]):
@@ -92,9 +92,8 @@ class RBreaker(Strategy):
         tick_base = self.tick_base[idx]
         dhigh = self.agent.cur_day[inst]['high']
         dlow  = self.agent.cur_day[inst]['low']
-        midx = self.agent.min_data[inst][freq].index[-1]
-        mhigh = self.agent.min_data[inst][freq].at[midx, 'high']
-        mlow  = self.agent.min_data[inst][freq].at[midx, 'low']
+        mhigh = self.agent.min_data[inst][freq]['high'][-1]
+        mlow  = self.agent.min_data[inst][freq]['low'][-1]
         if num_pos > 1:
             self.logger.warning('something wrong with position management - submitted trade is empty but trade position is more than 1')
             return
