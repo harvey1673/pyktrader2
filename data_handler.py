@@ -47,7 +47,7 @@ class DynamicRecArray(object):
         s_idx = self.length
         e_idx = self.length + df_len
         for name in self.dtype.names:
-            if name in ddf.columns:
+            if name in df.columns:
                 self._data[name][s_idx:e_idx] = df[name].values
 
     def create_from_df(self, df, need_index = False):
@@ -87,6 +87,22 @@ def day_split(mdf, minlist = [1500], index_col = 'datetime'):
     if index_col != None:
         xdf = xdf.set_index('datetime')
     return xdf
+
+def array_split_by_bar(darr, split_list = [300, 1500, 2100], field = 'min_id'):
+    s_idx = 0
+    sparr = DynamicRecArray(dtype = darr.dtype)
+    ind = np.zeros(len(darr))
+    for i in range(1, len(split_list)-1):
+        ind[(darr[field]>=split_list[i]) & (darr[field]<split_list[i+1])] = i
+    for i in range(len(darr)):
+        if (i == len(darr)-1) or (darr['date'][s_idx] != darr['date'][i+1]) or (ind[s_idx] != ind[i+1]):
+            tmp = darr[s_idx:(i+1)]
+            data_dict = {'datetime': tmp['datetime'][0], 'date': tmp['date'][0], 'open': tmp['open'][0], \
+                         'high': tmp['high'].max(), 'low': tmp['low'].min(), 'close': tmp['close'][-1], \
+                         'volume': tmp['volume'].sum(), 'openInterest': tmp['openInterest'][-1], 'min_id': tmp['min_id'][0]}
+            sparr.append_by_dict(data_dict)
+            s_idx = i+1
+    return sparr.data
 
 def min2daily(df, extra_cols = []):
     ts = [df.index[0], df['min_id'][0], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]]

@@ -51,17 +51,16 @@ class DTSplitDChanFilter(Strategy):
             min_id = self.agent.instruments[inst].last_tick_id/1000
             min_id = int(min_id/100)*60 + min_id % 100 - self.daily_close_buffer
             self.last_min_id[idx] = int(min_id/60)*100 + min_id % 60
-            ddf = self.agent.day_data[inst]
-            mdf = self.agent.min_data[inst][1]
-            midx = mdf.index[-1]
+            ddf = self.agent.day_data[inst].data
+            mdf = self.agent.min_data[inst][1].data
             last_date = ddf['date'].iloc[-1]
             if self.use_chan:
                 key = self.channel_keys[0] + str(self.channels[idx])
-                self.chan_high[idx] = ddf.iloc[-1][key]
+                self.chan_high[idx] = ddf[key][-1]
                 key = self.channel_keys[1] + str(self.channels[idx])
-                self.chan_low[idx]  = ddf.iloc[-1][key]
-            if last_date < mdf.at[midx, 'date']:
-                last_min = mdf.at[midx, 'min_id']
+                self.chan_low[idx]  = ddf[key][-1]
+            if last_date < mdf['date'][-1]:
+                last_min = mdf['min_id'][-1]
                 pid = 0
                 for i in range(1, len(self.open_period)):
                     if self.open_period[i] > last_min:
@@ -121,7 +120,7 @@ class DTSplitDChanFilter(Strategy):
                 self.tday_open[idx] = self.agent.instruments[inst].price
                 self.open_idx[idx] += 1
                 self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
-        if (self.freq[idx]>0) and (freq == self.freq[idx]) and ((curr_min != 300) and (curr_min != 1500)):
+        if (self.freq[idx]>0) and (freq == self.freq[idx]) and ((curr_min <= 300) and (curr_min != 1500)):
             inst = self.underliers[idx][0]
             mslice = self.agent.min_data[inst][freq].iloc[-1]
             self.check_trigger(idx, mslice.high, mslice.low)
@@ -167,8 +166,8 @@ class DTSplitDChanFilter(Strategy):
         if ((buy_price >= buy_trig) and (buysell <=0)) or ((sell_price <= sell_trig) and (buysell >=0)):
             save_status = False
             if buysell!=0:
-                msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, curr_price= %s, direction=%s, volume=%s' \
-                                    % (inst, t_open, buy_trig, sell_trig, self.curr_prices[idx], buysell, self.trade_unit[idx])
+                msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
+                                    % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, self.trade_unit[idx])
                 self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
                 save_status = True
@@ -181,8 +180,8 @@ class DTSplitDChanFilter(Strategy):
             else:
                 buysell = -1
             if buy_price >= max(buy_trig, self.chan_high[idx]) or sell_price <= min(sell_trig, self.chan_low[idx]):
-                msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, curr_price= %s, direction=%s, volume=%s' \
-                                        % (inst, t_open, buy_trig, sell_trig, self.curr_prices[idx], buysell, self.trade_unit[idx])
+                msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
+                                        % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, self.trade_unit[idx])
                 self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
                 save_status = True
