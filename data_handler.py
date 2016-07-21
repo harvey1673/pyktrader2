@@ -1,15 +1,18 @@
 import datetime
-#import talib
+import talib
 import numpy as np
 import pandas as pd
-#import scipy.stats as stats
+import scipy.stats as stats
 
 class DynamicRecArray(object):
-    def __init__(self, dtype, default_size = 300):
-        self.dtype = np.dtype(dtype)
-        self.length = 0
-        self.size = default_size
-        self._data = np.empty(self.size, dtype=self.dtype)
+    def __init__(self, dtype = [], dataframe = None):
+        if isinstance(dataframe, pd.DataFrame) and (len(dataframe) > 0):
+            self.create_from_df(dataframe)
+        else:
+            self.dtype = np.dtype(dtype)
+            self.length = 0
+            self.size = 100
+            self._data = np.empty(self.size, dtype=self.dtype)
 
     def __len__(self):
         return self.length
@@ -17,14 +20,43 @@ class DynamicRecArray(object):
     def append(self, rec):
         if self.length == self.size:
             self.size = int(1.5*self.size)
-            self._data = np.resize(self._data, self.size)
+            self._data = np.resize(self._data, self.size)        
         self._data[self.length] = rec
         self.length += 1
 
+    def append_by_dict(self, data_dict):
+        if self.length == self.size:
+            self.size = int(1.5*self.size)
+            self._data = np.resize(self._data, self.size)        
+        for name in self.dtype.names:
+            try:
+                self._data[name][self.length] = data_dict[name]
+            except:            
+                continue
+        self.length += 1
+        
     def extend(self, recs):
         for rec in recs:
             self.append(rec)
+    
+    def extend_from_df(self, df):
+        df_len = len(df)
+        if (self.size - self.length) <= df_len * 1.5:
+            self.size = self.length + int(1.5 * df_len)
+            self._data = np.resize(self._data, self.size)
+        s_idx = self.length
+        e_idx = self.length + df_len
+        for name in self.dtype.names:
+            if name in ddf.columns:
+                self._data[name][s_idx:e_idx] = df[name].values
 
+    def create_from_df(self, df, need_index = False):
+        df_len = len(df)
+        self.size = int(1.5 * df_len)
+        self._data = np.resize(np.array(df.to_records(index = need_index)), self.size)
+        self.dtype = self._data.dtype
+        self.length = df_len
+        
     @property
     def data(self):
         return self._data[:self.length]
