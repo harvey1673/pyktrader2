@@ -21,17 +21,17 @@ class TurtleTrader(Strategy):
         for idx, under in enumerate(self.underliers):
             inst = under[0]
             self.tick_base[idx] = self.agent.instruments[inst].tick_base
-            df = self.agent.day_data[inst]		
+            df = self.agent.day_data[inst].data		
             atr_str = self.data_func[0][0] + str(self.channels[idx][1])
             bb_str = self.data_func[1][0] + str(self.channels[idx][1])
             sb_str = self.data_func[2][0] + str(self.channels[idx][1])
             bs_str = self.data_func[1][0] + str(self.channels[idx][0])
             ss_str = self.data_func[2][0] + str(self.channels[idx][0])
-            self.entry_high[idx] = df.iloc[-1][bb_str]
-            self.entry_low[idx]  = df.iloc[-1][sb_str]
-            self.exit_high[idx] = df.iloc[-1][bs_str]
-            self.exit_low[idx]  = df.iloc[-1][ss_str]
-            self.curr_atr[idx] = df.iloc[-1][atr_str]
+            self.entry_high[idx] = df[bb_str][-1]
+            self.entry_low[idx]  = df[sb_str][-1]
+            self.exit_high[idx] = df[bs_str][-1]
+            self.exit_low[idx]  = df[ss_str][-1]
+            self.curr_atr[idx] = df[atr_str][-1]
 
     def register_func_freq(self):
         for under, chan, dfreq in zip(self.underliers, self.channels, self.data_freq):
