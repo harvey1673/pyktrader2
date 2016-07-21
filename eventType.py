@@ -1,6 +1,4 @@
 #-*- coding:utf-8 -*-
-EVENT_PRIORITY_DICT = {}
-
 EVENT_TIMER = 'eTimer.'                  # 计时器事件，每隔1秒发送一次
 EVENT_LOG = 'eLog.'                      # 日志事件，通常使用某个监听函数直接显示
 
