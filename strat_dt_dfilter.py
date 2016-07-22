@@ -15,8 +15,9 @@ class DTSplitDChanFilter(Strategy):
         self.chan_high = [0.0] * numAssets
         self.chan_low  = [0.0] * numAssets
         self.tday_open = [0.0] * numAssets
-        self.open_idx = [0] * numAssets
         self.tick_base = [0.0] * numAssets
+        self.split_data = [None] * numAssets
+        self.open_idx = [0.0] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
 
@@ -53,48 +54,47 @@ class DTSplitDChanFilter(Strategy):
             self.last_min_id[idx] = int(min_id/60)*100 + min_id % 60
             ddf = self.agent.day_data[inst].data
             mdf = self.agent.min_data[inst][1].data
+            min_date = mdf['date'][-1]
             last_date = ddf['date'].iloc[-1]
             if self.use_chan:
                 key = self.channel_keys[0] + str(self.channels[idx])
                 self.chan_high[idx] = ddf[key][-1]
                 key = self.channel_keys[1] + str(self.channels[idx])
                 self.chan_low[idx]  = ddf[key][-1]
-            if last_date < mdf['date'][-1]:
+            if last_date < min_date:
                 last_min = mdf['min_id'][-1]
                 pid = 0
                 for i in range(1, len(self.open_period)):
                     if self.open_period[i] > last_min:
+                        pid = i - 1
                         break
-                    else:
-                        pid = i
-                df = mdf[(mdf['date'] <= last_date)|(mdf['min_id'] < self.open_period[pid])]
-                post_df = mdf[(mdf['date'] > last_date) & (mdf['min_id'] >= self.open_period[pid])]
                 self.open_idx[idx] = pid
-                self.tday_open[idx] = post_df['open'].iloc[0]
+                midx = len(mdf)-1
+                for i in range(len(mdf)-2, -1, -1):
+                    if (mdf['date'][i] < min_date) or (mdf['min_id'][i] < self.open_period[pid]):
+                        midx = i + 1
+                        break
+                self.tday_open[idx] = mdf['open'][midx]
+                df = mdf[:midx]
             else:
-                df = mdf
-                self.tday_open[idx] = mdf.at[midx, 'close']
+                self.tday_open[idx] = mdf['close'][-1]
                 self.open_idx[idx] = 0
-            self.recalc_rng(idx, df)
+                df = mdf
+            self.split_data[idx] = dh.array_split_by_bar(df, split_list = self.open_period, field = 'min_id')
+            self.recalc_rng(idx)
         self.update_trade_unit()
         self.save_state()
 
-    def recalc_rng(self, idx, df):
-        mdf = copy.copy(df)
-        mdf = mdf.set_index('datetime')
-        inst = self.underliers[idx][0]
-        mdf['min_idx'] = 0
-        for i in range(1, len(self.open_period)-1):
-            mdf.loc[(mdf['min_id']>= self.open_period[i]) & (mdf['min_id']<self.open_period[i+1]), 'min_idx'] = i
-        ddf = mdf.groupby([mdf['date'], mdf['min_idx']]).apply(dh.ohlcsum).reset_index()
+    def recalc_rng(self, idx):
         win = self.lookbacks[idx]
+        ddf = self.split_data[idx].data
         if win > 0:
-            self.cur_rng[idx] = max(max(ddf.iloc[-win:]['high'])- min(ddf.iloc[-win:]['close']), max(ddf.iloc[-win:]['close']) - min(ddf.iloc[-win:]['low']))
+            self.cur_rng[idx] = max(max(ddf['high'][-win:])- min(ddf['close'][-win:]), max(ddf['close'][-win:]) - min(ddf['low'][-win:]))
         elif win == 0:
-            self.cur_rng[idx] = max(max(ddf.iloc[-2:]['high'])- min(ddf.iloc[-2:]['close']), max(ddf.iloc[-2:]['close']) - min(ddf.iloc[-2:]['low']))
-            self.cur_rng[idx] = max(self.cur_rng[idx] * 0.5, ddf.iloc[-1]['high']-ddf.iloc[-1]['close'],ddf.iloc[-1]['close']-ddf.iloc[-1]['low'])
+            self.cur_rng[idx] = max(max(ddf['high'][-2:])- min(ddf['close'][-2:]), max(ddf['close'][-2:]) - min(ddf['low'][-2:]))
+            self.cur_rng[idx] = max(self.cur_rng[idx] * 0.5, ddf['high'][-1]-ddf['close'][-1], ddf['close'][-1]-ddf['low'][-1])
         else:
-            self.cur_rng[idx] = max(ddf.iloc[-1]['high']- ddf.iloc[-1]['low'], abs(ddf.iloc[-1]['close'] - ddf.iloc[-2]['close']))
+            self.cur_rng[idx] = max(ddf['high'][-1] - ddf['low'][-1], abs(ddf['close'][-1] - ddf['close'][-2]))
 
     def save_local_variables(self, file_writer):
         for idx, underlier in enumerate(self.underliers):
@@ -116,7 +116,7 @@ class DTSplitDChanFilter(Strategy):
         pid = self.open_idx[idx]
         if pid < len(self.open_period)-1:
             if (self.open_period[pid+1] > min_id) and (self.open_period[pid+1] <= curr_min):
-                self.recalc_rng(idx, self.agent.min_data[inst][1])
+                self.recalc_rng(idx)
                 self.tday_open[idx] = self.agent.instruments[inst].price
                 self.open_idx[idx] += 1
                 self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
@@ -187,4 +187,3 @@ class DTSplitDChanFilter(Strategy):
                 save_status = True
             if save_status:
                 self.save_state()
-
