@@ -61,7 +61,7 @@ class DTTrader(Strategy):
             inst = self.underliers[idx][0]
             if self.agent.cur_min[inst]['min_id'] < 300:
                 return
-            min_data = self.agent.min_data[inst][freq]
+            min_data = self.agent.min_data[inst][freq].data
             self.check_trigger(idx, min_data['high'][-1], min_data['low'][-1])
             
     def on_tick(self, idx, ctick):

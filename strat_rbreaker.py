@@ -90,10 +90,10 @@ class RBreaker(Strategy):
         num_pos = len(self.positions[idx])
         curr_pos = None
         tick_base = self.tick_base[idx]
-        dhigh = self.agent.cur_day[inst]['high']
-        dlow  = self.agent.cur_day[inst]['low']
-        mhigh = self.agent.min_data[inst][freq]['high'][-1]
-        mlow  = self.agent.min_data[inst][freq]['low'][-1]
+        dhigh = self.agent.cur_day[inst].data['high']
+        dlow  = self.agent.cur_day[inst].data['low']
+        mhigh = self.agent.min_data[inst][freq].data['high'][-1]
+        mlow  = self.agent.min_data[inst][freq].data['low'][-1]
         if num_pos > 1:
             self.logger.warning('something wrong with position management - submitted trade is empty but trade position is more than 1')
             return

@@ -68,7 +68,7 @@ class BbandPChanTrader(Strategy):
         key = self.band_keys[0] + str(self.band_win[idx])
         self.mid_band[idx] = xdf[key][-1]
         key = self.band_keys[1] + str(self.band_win[idx])
-        stdev = xdf.at[key][-1]
+        stdev = xdf[key][-1]
         self.upper_band[idx] = self.mid_band[idx] + self.ratios[idx] * stdev
         self.lower_band[idx] = self.mid_band[idx] - self.ratios[idx] * stdev
 

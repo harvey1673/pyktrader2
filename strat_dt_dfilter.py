@@ -16,8 +16,7 @@ class DTSplitDChanFilter(Strategy):
         self.chan_low  = [0.0] * numAssets
         self.tday_open = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
-        self.split_data = [None] * numAssets
-        self.open_idx = [0.0] * numAssets
+        self.open_idx = [0] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
 
@@ -55,7 +54,7 @@ class DTSplitDChanFilter(Strategy):
             ddf = self.agent.day_data[inst].data
             mdf = self.agent.min_data[inst][1].data
             min_date = mdf['date'][-1]
-            last_date = ddf['date'].iloc[-1]
+            last_date = ddf['date'][-1]
             if self.use_chan:
                 key = self.channel_keys[0] + str(self.channels[idx])
                 self.chan_high[idx] = ddf[key][-1]
@@ -80,14 +79,14 @@ class DTSplitDChanFilter(Strategy):
                 self.tday_open[idx] = mdf['close'][-1]
                 self.open_idx[idx] = 0
                 df = mdf
-            self.split_data[idx] = dh.array_split_by_bar(df, split_list = self.open_period, field = 'min_id')
-            self.recalc_rng(idx)
+            self.recalc_rng(idx, df)
         self.update_trade_unit()
         self.save_state()
 
-    def recalc_rng(self, idx):
-        win = self.lookbacks[idx]
-        ddf = self.split_data[idx].data
+    def recalc_rng(self, idx, df):
+        split_arr = dh.array_split_by_bar(df, split_list = self.open_period, field = 'min_id')
+        win = int(self.lookbacks[idx])
+        ddf = split_arr.data
         if win > 0:
             self.cur_rng[idx] = max(max(ddf['high'][-win:])- min(ddf['close'][-win:]), max(ddf['close'][-win:]) - min(ddf['low'][-win:]))
         elif win == 0:
@@ -113,17 +112,24 @@ class DTSplitDChanFilter(Strategy):
         inst = self.underliers[idx][0]
         min_id = self.agent.cur_min[inst]['min_id']
         curr_min = self.agent.cur_min[inst]['tick_min']
+        for i in range(self.open_idx[idx], len(self.open_period)-1):
+            if (self.open_period[i+1] > curr_min):
+                self.open_idx[idx] = i
+                break
         pid = self.open_idx[idx]
-        if pid < len(self.open_period)-1:
-            if (self.open_period[pid+1] > min_id) and (self.open_period[pid+1] <= curr_min):
-                self.recalc_rng(idx)
-                self.tday_open[idx] = self.agent.instruments[inst].price
-                self.open_idx[idx] += 1
-                self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
-        if (self.freq[idx]>0) and (freq == self.freq[idx]) and ((curr_min <= 300) and (curr_min != 1500)):
+        if (self.open_period[pid] > min_id) and (self.open_period[pid] <= curr_min):
+            self.tday_open[idx] = self.agent.instruments[inst].price
+            self.open_idx[idx] = pid
+            self.recalc_rng(idx, self.agent.min_data[1].data)
+            self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
+        if min_id < 300:
+            return
+        if (self.freq[idx]>0) and (freq == self.freq[idx]):
             inst = self.underliers[idx][0]
-            mslice = self.agent.min_data[inst][freq].iloc[-1]
-            self.check_trigger(idx, mslice.high, mslice.low)
+            min_data = self.agent.min_data[inst][freq].data
+            buy_p = min_data['high'][-1]
+            sell_p = min_data['low'][-1]
+            self.check_trigger(idx, buy_p, sell_p)
 
     def on_tick(self, idx, ctick):
         if self.freq[idx] == 0:
@@ -133,8 +139,6 @@ class DTSplitDChanFilter(Strategy):
         if len(self.submitted_trades[idx]) > 0:
             return
         inst = self.underliers[idx][0]
-        if self.open_idx[idx] == 0:
-            self.tday_open[idx] = self.agent.cur_day[inst]['open']
         if (self.tday_open[idx] <= 0.0) or (self.cur_rng[idx] <= 0) or (self.curr_prices[idx] <= 0.001):
             self.logger.warning("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name))
             return

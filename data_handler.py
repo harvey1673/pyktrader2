@@ -102,7 +102,7 @@ def array_split_by_bar(darr, split_list = [300, 1500, 2100], field = 'min_id'):
                          'volume': tmp['volume'].sum(), 'openInterest': tmp['openInterest'][-1], 'min_id': tmp['min_id'][0]}
             sparr.append_by_dict(data_dict)
             s_idx = i+1
-    return sparr.data
+    return sparr
 
 def min2daily(df, extra_cols = []):
     ts = [df.index[0], df['min_id'][0], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]]
