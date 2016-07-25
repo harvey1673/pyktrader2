@@ -120,7 +120,7 @@ class DTSplitDChanFilter(Strategy):
         if (self.open_period[pid] > min_id) and (self.open_period[pid] <= curr_min):
             self.tday_open[idx] = self.agent.instruments[inst].price
             self.open_idx[idx] = pid
-            self.recalc_rng(idx, self.agent.min_data[1].data)
+            self.recalc_rng(idx, self.agent.min_data[inst][1].data)
             self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
         if min_id < 300:
             return

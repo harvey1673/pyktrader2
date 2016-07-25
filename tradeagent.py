@@ -204,7 +204,7 @@ class MktDataMixin(object):
                 self.min_switch(inst, True)
             if (self.cur_day[inst]['close']>0):
                 new_day = { key: self.cur_day[inst][key] for key in day_data_list }
-                self.day_data[inst].append(new_day)
+                self.day_data[inst].append_by_dict(new_day)
                 for fobj in self.day_data_func[inst]:
                     fobj.rfunc(self.day_data[inst].data)
                 if self.save_flag:
