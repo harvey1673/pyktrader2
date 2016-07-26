@@ -293,19 +293,23 @@ def TRIX(df, n):
     return pd.Series(EX3/EX3.shift(1) - 1, name = 'Trix' + str(n))
 
 #Average Directional Movement Index
-def ADX(df, n, n_ADX):
-    UpMove = df['high'] - df['high'].shift(1)
-    DoMove = df['low'].shift(1) - df['low']
-    UpD = pd.Series(UpMove)
-    DoD = pd.Series(DoMove)
-    UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
-    DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
-    ATRs = ATR(df,span = n, min_periods = n)
-    PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1) / ATRs)
-    NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1) / ATRs)
-    ADX = pd.Series(pd.ewma(abs(PosDI - NegDI) / (PosDI + NegDI), span = n_ADX, min_periods = n_ADX - 1), name = 'ADX' + str(n) + '_' + str(n_ADX))
-    return ADX 
+def ADX(df, n):
+    return pd.Series(talib.ADX(df['high'], df['low'], df['close'], timeperiod = n), name = 'ADX_%s' % str(n))
+    # UpMove = df['high'] - df['high'].shift(1)
+    # DoMove = df['low'].shift(1) - df['low']
+    # UpD = pd.Series(UpMove)
+    # DoD = pd.Series(DoMove)
+    # UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
+    # DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
+    # ATRs = ATR(df,span = n, min_periods = n)
+    # PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1) / ATRs)
+    # NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1) / ATRs)
+    # ADX = pd.Series(pd.ewma(abs(PosDI - NegDI) / (PosDI + NegDI), span = n_ADX, min_periods = n_ADX - 1), name = 'ADX' + str(n) + '_' + str(n_ADX))
+    # return ADX 
 
+def ADXR(df, n):
+    return pd.Series(talib.ADXR(df['high'], df['low'], df['close'], timeperiod = n), name = 'ADXR_%s' % str(n))
+    
 #MACD, MACD Signal and MACD difference
 def MACD(df, n_fast, n_slow):
     EMAfast = pd.Series(pd.ewma(df['close'], span = n_fast, min_periods = n_slow - 1))
@@ -349,18 +353,23 @@ def KST(df, r1, r2, r3, r4, n1, n2, n3, n4):
     return KST
 
 #Relative Strength Index
-def RSI(df, n):
-    UpMove = df['high'] - df['high'].shift(1)
-    DoMove = df['low'].shift(1) - df['low']
-    UpD = pd.Series(UpMove)
-    DoD = pd.Series(DoMove)
-    UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
-    DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
-    PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1))
-    NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1))
-    RSI = pd.Series(PosDI / (PosDI + NegDI), name = 'RSI' + str(n))
-    return RSI
+def RSI(df, n, field='close'):
+    return pd.Series(talib.RSI(df[field].values, n), name='RSI_%s' % str(n))
+    #UpMove = df[field] - df[field].shift(1)
+    #DoMove = df[field].shift(1) - df[field]
+    #UpD = pd.Series(UpMove)
+    #DoD = pd.Series(DoMove)
+    #UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
+    #DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
+    #PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1))
+    #NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1))
+    #RSI = pd.Series(PosDI / (PosDI + NegDI) * 100, name = 'RSI' + str(n))
+    #return RSI
 
+def rsi(df, n, field = 'close'):
+    RSI_key = 'RSI_%s' % str(n)
+    df[RSI_key][-1] = talib.RSI(df[field][(-n-1):], n)[-1]
+    
 #True Strength Index
 def TSI(df, r, s):
     M = pd.Series(df['close'].diff(1))
@@ -706,3 +715,26 @@ def PSAR(df, iaf = 0.02, maxaf = 0.2, incr = 0):
         else:
             direction[idx] = -1
     return pd.concat([psar, direction], join='outer', axis=1)
+
+def SPBFILTER(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
+    if n3 == 0:
+        n3 = int((n1 + n2)/2)
+    a1 = 5.0/n1
+    a2 = 5.0/n2
+    B = [a1-a2, a2-a1]
+    A = [1, (1-a1)+(1-a2), -(1-a1)*(1-a2)]
+    PB = pd.Series(scipy.signal.lfilter(B, A, df[field]), name = 'SPB_%s_%s' % (n1, n2))
+    RMS = pd.Series(pd.rolling_mean(PB*PB, n3)**0.5, name = 'SPBRMS__%s_%s' % (n1, n2))
+    return pd.concat([PB, RMS], join='outer', axis=1)
+
+def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, feild = 'close'):
+    if n3 == 0:
+        n3 = int((n1 + n2)/2)
+    a1 = 5.0/n1
+    a2 = 5.0/n2
+    SPB_key = 'SPB_%s_%s' % (n1, n2)
+    RMS_key = 'SPBRMS_%s_%s' % (n1, n2)
+    df[SPB_key][-1] = df[field][-1]*(a1-a2) + df[field][-2]*(a2-a1) \
+                    + df[SPB_key][-2]*(2-a1-a2) - df[SPB_key][-2]*(1-a1)*(1-a2)
+    df[RMS_key][-1] = np.sqrt((df[SPB_key][(-n3):]**2).mean())
+    
