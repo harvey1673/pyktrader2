@@ -3,6 +3,7 @@ import talib
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+import scipy.signal as signal
 
 class DynamicRecArray(object):
     def __init__(self, dtype = [], dataframe = None):
@@ -723,11 +724,11 @@ def SPBFILTER(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     a2 = 5.0/n2
     B = [a1-a2, a2-a1]
     A = [1, (1-a1)+(1-a2), -(1-a1)*(1-a2)]
-    PB = pd.Series(scipy.signal.lfilter(B, A, df[field]), name = 'SPB_%s_%s' % (n1, n2))
+    PB = pd.Series(signal.lfilter(B, A, df[field]), name = 'SPB_%s_%s' % (n1, n2))
     RMS = pd.Series(pd.rolling_mean(PB*PB, n3)**0.5, name = 'SPBRMS__%s_%s' % (n1, n2))
     return pd.concat([PB, RMS], join='outer', axis=1)
 
-def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, feild = 'close'):
+def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     if n3 == 0:
         n3 = int((n1 + n2)/2)
     a1 = 5.0/n1
