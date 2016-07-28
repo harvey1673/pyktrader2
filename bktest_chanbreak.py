@@ -17,7 +17,6 @@ def chanbreak_sim( mdf, config):
     start_equity = config['capital']
     tcost = config['trans_cost']
     unit = config['unit']
-    #k = config['scaler']
     marginrate = config['marginrate']
     offset = config['offset']
     win = config['win']
@@ -98,48 +97,51 @@ def chanbreak_sim( mdf, config):
                     mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
             mdf.ix[dd, 'pos'] = pos
     return (mdf, closed_trades)
-    
-def run_sim(start_date, end_date):
-    #sim_list = [ 'm', 'y', 'l', 'p', 'rb', 'TA', 'SR', 'RM', 'cu', 'i', 'a', 'ag']
-    sim_list = [ 'rb', 'p', 'IF' ]
-    test_folder = backtest.get_bktest_folder()
-    file_prefix = test_folder + 'ChanBreaktest_'
-    config = {'capital': 10000,
-              'offset': 0,
-              'trans_cost': 0.0, 
-              'unit': 1,
-              'scaler': (0.5),
-              'channel_func': [dh.DONCH_H, dh.DONCH_L],
-              'pos_class': strat.ParSARTradePos,
-              'pos_args': {'af': 0.02, 'incr': 0.02, 'cap': 0.2},
-              'file_prefix': file_prefix}        
-    freqs = [3, 5, 15]
-    windows = [[20,10], [20,5], [40,20], [40,10], [60,30], [60, 15]]
-    for asset in sim_list:
-        sdate =  backtest.sim_start_dict[asset]
-        config['marginrate'] = ( backtest.sim_margin_dict[asset], backtest.sim_margin_dict[asset])
-        config['rollrule'] = '-50b' 
-        config['nearby'] = 1 
-        config['start_min'] = 1600
-        config['exit_min'] = 2044
-        if asset in ['cu', 'al', 'zn']:
-            config['nearby'] = 3
-            config['rollrule'] = '-1b'
-        elif asset in ['IF']:
-            config['start_min'] = 1520
-            config['exit_min'] = 2059
-            config['rollrule'] = '-1b'    
-        chanbreak( asset, max(start_date, sdate), end_date, freqs, windows, config)
 
+def gen_config_file(filename):
+    sim_config = {}
+    sim_config['sim_func']  = 'bktest_chanbreak.chanbreak_sim'
+    sim_config['scen_keys'] = ['freq', 'win']
+    sim_config['sim_name']   = 'chanbreak_'
+    sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
+    sim_config['start_date'] = '20150102'
+    sim_config['end_date']   = '20160708'
+    sim_config['need_daily'] = False
+    sim_config['freq'] = ['5min', '15min', '30min', '60min']
+    sim_config['win'] = [ [5,  10, 20], [5, 10, 40], [5, 20, 40], [5, 20, 80], \
+                             [10, 20, 40], [10, 20, 80],[10, 30, 60],[10, 30, 120],\
+                             [10, 40, 80], [10, 40, 120],\
+                             [5, 10], [5, 20], [5, 40], \
+                             [10, 20], [10, 30], [10, 40] ]
+    sim_config['pos_class'] = 'strat.TradePos'
+    #sim_config['pos_class'] = 'strat.ParSARTradePos'
+    #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+    #                            {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+    #                            {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
+    sim_config['offset']    = 1
+    config = {'capital': 10000,
+              'trans_cost': 0.0,
+              'unit': 1,
+              'stoploss': 0.0,
+              'close_daily': False,
+              'pos_update': False,
+              'channel_func': [dh.DONCH_H, dh.DONCH_L],
+              'MA_func': dh.MA,
+              'exit_min': 2055,
+              'pos_args': {},
+              }
+    sim_config['config'] = config
+    with open(filename, 'w') as outfile:
+        json.dump(sim_config, outfile)
+    return sim_config
+    
 if __name__=="__main__":
     args = sys.argv[1:]
-    if len(args) < 2:
-        end_d = datetime.date(2015,1,23)
-    else:
-        end_d = datetime.datetime.strptime(args[1], '%Y%m%d').date()
     if len(args) < 1:
-        start_d = datetime.date(2013,1,2)
+        print "need to input a file name for config file"
     else:
-        start_d = datetime.datetime.strptime(args[0], '%Y%m%d').date()
-    run_sim(start_d, end_d)
+        gen_config_file(args[0])
     pass
