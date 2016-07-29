@@ -10,6 +10,7 @@ import sys
 
 def MA_sim( mdf, config):
     offset = config['offset']
+    use_chan = config['use_chan']
     pos_class = config['pos_class']
     pos_args  = config['pos_args']
     pos_update = config.get('pos_update', False)
@@ -20,9 +21,17 @@ def MA_sim( mdf, config):
     tcost = config['trans_cost']
     unit = config['unit']
     freq = config['freq']
+    chan_ratio = config['channel_ratio']
+    channel = int(chan_ratio * win_list[-1])
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols=['contract'])
     for idx, win in enumerate(win_list):
         xdf['MA'+str(idx)] = MA_func(xdf, win).shift(1)
+    if use_chan:
+        xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(1)
+        xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(1)
+    else:
+        xdf['chan_high'] = pd.Series(1000000, index = xdf['close'].index)
+        xdf['chan_low'] = pd.Series(0, index = xdf['close'].index)
     tot_MA = len(win_list)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
@@ -59,7 +68,7 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
-            if ((ma_short >= ma_last) and (pos<0)) or ((ma_short <= ma_last) and (pos>0)):
+            if (((ma_short >= ma_last) or (mslice.open >= mslice.chan_high)) and (pos<0)) or (((ma_short <= ma_last) or (mslice.open <=mslice.chan_low)) and (pos>0)):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -68,8 +77,8 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
-            if ((ma_short >= max(ma_list)) or (ma_short <= min(ma_list))) and (pos==0):
-                target_pos = (ma_short >= max(ma_list)) * unit - (ma_short <= min(ma_list)) * unit
+            if (((ma_short >= max(ma_list)) and (mslice.open>=mslice.chan_high)) or ((ma_short <= min(ma_list)) and (mslice.open<=mslice.chan_low))) and (pos==0):
+                target_pos = ((ma_short >= max(ma_list)) and (mslice.open>=mslice.chan_high)) * unit - ((ma_short <= min(ma_list)) and (mslice.open<=mslice.chan_low)) * unit
                 new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
@@ -108,10 +117,14 @@ def gen_config_file(filename):
     config = {'capital': 10000,
               'trans_cost': 0.0,
               'unit': 1,
+              'use_chan': True, 
               'stoploss': 0.0,
               'close_daily': False,
               'pos_update': False,
               'MA_func': 'dh.EMA',
+              'channel_func': [dh.DONCH_H, dh.DONCH_L],
+              'channel_args': [{}, {}],
+              'channel_ratio': 0.5,
               'exit_min': 2055,
               'pos_args': {},
               }
