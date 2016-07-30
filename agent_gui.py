@@ -293,7 +293,30 @@ class BBandPChanStratGui(StratGui):
                             'PosScaler': 'float',
                             'Freq': 'int',
                             }
-                            
+
+class MASystemStratGui(StratGui):
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaPrices', 'Channels', 'ChanHigh', 'ChanLow']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'Ratios': 'float',
+                            'CloseTday': 'bool',
+                            'CurrPrices': 'float',
+                            'MaWin': 'intlist',
+                            'MaPrices': 'floatlist',
+                            'ChanHigh': 'float',
+                            'ChanLow': 'float',
+                            'NumTick': 'int',
+                            'Channels': 'int',
+                            'OrderType': 'str',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
+
 class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
@@ -633,7 +656,9 @@ class Gui(tk.Tk):
             elif strat.__class__.__name__ in ['DTSplitDChanFilter']:
                 self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['BbandPChanTrader']:
-                self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)            
+                self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)
+            elif strat.__class__.__name__ in ['MASystemTrader']:
+                self.strat_gui[strat_name] = MASystemStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'RBreaker':
                 self.strat_gui[strat_name] = RBStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'TurtleTrader':

@@ -6,12 +6,12 @@ import copy
 from strategy import *
  
 class MASystemTrader(Strategy):
-    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'MA_key': ['MA_C'], \
+    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'ma_key': 'MA_C', \
                                                       'price_limit_buffer': 5, 'pos_exec_flag': STRAT_POS_MUST_EXEC, \
                                                       'data_func': [['MA_C', 'dh.MA', 'dh.ma'], \
                                                                     ["DONCH_HC", "dh.DONCH_H", "dh.donch_h", {'field':'close'}], \
                                                                     ["DONCH_LC", "dh.DONCH_L", "dh.donch_l", {'field':'close'}]]})
-    asset_params = dict({'ma_win': [10, 20, 40] 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'ma_win': [10, 20, 40], 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -35,10 +35,10 @@ class MASystemTrader(Strategy):
                 freq_str = str(self.freq[idx]) + 'm'
                 if idy == 0:
                     for win in self.ma_win[idx]:
-                        fobj = BaseObject(name = name + str(win), sfunc = fcustom(sfunc, n = win, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
+                        fobj = BaseObject(name = name + str(win), sfunc = fcustom(sfunc, n = win, **fargs), rfunc = fcustom(rfunc, n = win, **fargs))
                         self.agent.register_data_func(under[0], freq_str, fobj)
                 else:
-                    chan = self.channnels[idx]
+                    chan = self.channels[idx]
                     fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
                     self.agent.register_data_func(under[0], freq_str, fobj)
 
@@ -62,18 +62,15 @@ class MASystemTrader(Strategy):
     def update_mkt_state(self, idx):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]].data
-        self.ma_prices = [ xdf[self.ma_key + str(win)][-1] for win in self.ma_win[idx]]
+        self.ma_prices[idx] = [ xdf[self.ma_key + str(win)][-1] for win in self.ma_win[idx]]
         key = self.channel_keys[0] + str(self.channels[idx])
         self.chan_high[idx] = xdf[key][-1]
         key = self.channel_keys[1] + str(self.channels[idx])
-        self.chan_low[idx]  = xdf[key][-1]
+        self.chan_low[idx] = xdf[key][-1]
 
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
         self.update_mkt_state(idx)
-        #mdata = self.agent.min_data[inst][self.freq[idx]]
-        #if len(self.positions[idx]) > 0:
-        #    self.positions[idx][0].set_exit(self.ma_prices[idx])
         self.check_trigger(idx)
 
     def on_tick(self, idx, ctick):
