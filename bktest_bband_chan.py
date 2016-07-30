@@ -17,7 +17,7 @@ def bband_chan_sim( mdf, config):
     pos_update = config.get('pos_update', False)
     stoploss = config.get('stoploss', 0.0)
     param = config['param']
-    bar_func = config['bar_conv_func']
+    bar_func = eval(config['bar_conv_func'])
     std_func = eval(config['std_func'])
     #tick_base = config['tick_base']
     close_daily = config['close_daily']
