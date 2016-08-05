@@ -55,6 +55,7 @@ class Instrument(object):
         self.broker_fee = 0.0
         self.marginrate = (0,0) 
         self.multiple = 0
+        self.pos = 1
         self.tick_base = 0  
         self.start_tick_id = 0
         self.last_tick_id = 0
