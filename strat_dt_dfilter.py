@@ -96,17 +96,19 @@ class DTSplitDChanFilter(Strategy):
             self.cur_rng[idx] = max(ddf['high'][-1] - ddf['low'][-1], abs(ddf['close'][-1] - ddf['close'][-2]))
 
     def save_local_variables(self, file_writer):
-        for idx, underlier in enumerate(self.underliers):
-            inst = underlier[0]
-            row = ['CurrRange', str(inst), self.cur_rng[idx]]
-            file_writer.writerow(row)
+        pass
+        #for idx, underlier in enumerate(self.underliers):
+        #    inst = underlier[0]
+        #    row = ['CurrRange', str(inst), self.cur_rng[idx]]
+        #    file_writer.writerow(row)
     
     def load_local_variables(self, row):
-        if row[0] == 'CurrRange':
-            inst = str(row[1])
-            idx = self.under2idx[inst]
-            if idx >= 0:
-                self.cur_rng[idx] = float(row[2])
+        pass
+        #if row[0] == 'CurrRange':
+        #    inst = str(row[1])
+        #    idx = self.under2idx[inst]
+        #    if idx >= 0:
+        #        self.cur_rng[idx] = float(row[2])
 
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
