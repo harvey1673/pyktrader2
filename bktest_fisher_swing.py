@@ -17,25 +17,31 @@ def fisher_swing_sim( mdf, config):
     tcost = config['trans_cost']
     unit = config['unit']
     freq = config['freq']
-    win = config['param']
+    param = config['param']
+    fisher_n = param[0]
+    bband_n = param[1]
+    bband_std = param[2]
+    heiken_n = param[3]
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols=['contract'])
     fisher = dh.FISHER(xdf, win[0])
     xdf['FISHER_I'] = fisher['FISHER_I'].shift(1)
-    xdf = xdf.join(dh.BBANDS_STOP(xdf, win[1], 1.0).shift(1))
+    bbands_stop = dh.BBANDS_STOP(xdf, win[1], 1.0)
+    xdf['BBSTOP_upper'] = bbands_stop['BBSTOP_upper'].shift(1)
+    xdf['BBSTOP_lower'] = bbands_stop['BBSTOP_lower'].shift(1)
+    xdf['BBSTOP_trend'] = bbands_stop['BBSTOP_trend'].shift(1)
     ha_df = dh.HEIKEN_ASHI(xdf, win[2]).shift(1)
-    xdf['HAopen'] = ha_df['HAopen']
-    xdf['HAclose'] = ha_df['HAclose']
+    xdf['HAopen'] = ha_df['HAopen'].shift(1)
+    xdf['HAclose'] = ha_df['HAclose'].shift(1)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end        
-    ll = xdf.shape[0]
-    xdf['pos'] = pd.Series([0]*ll, index = df.index)
-    xdf['cost'] = pd.Series([0]*ll, index = df.index)
+    xdf['pos'] = 0
+    xdf['cost'] = 0
+    xdf['traded_price'] = xdf.open
     curr_pos = []
     closed_trades = []
-    end_d = df.index[-1].date()
     tradeid = 0
     for idx, dd in enumerate(xdf.index):
         mslice = xdf.loc[dd]
@@ -45,32 +51,43 @@ def fisher_swing_sim( mdf, config):
             pos = 0
         else:
             pos = curr_pos[0].pos
-        df.ix[dd, 'pos'] = pos
+        xdf.set_value(dd, 'pos', pos)
         if np.isnan(mslice.BBSTOP_lower) or np.isnan(mslice.FISHER_I) or np.isnan(mslice.HAclose):
             continue
-        end_trading = (min_id >=config['exit_min']) and (d == end_d)
-        stop_loss = (pos > 0) and ((mslice.close < mslice.BBSTOP_lower) or (mslice.FISHER_I<0))
-        stop_loss = stop_loss or ((pos < 0) and ((mslice.close > mslice.BBSTOP_upper) or (mslice.FISHER_I>0)))
+        stop_loss = (pos > 0) and ((mslice.open < mslice.BBSTOP_lower) or (mslice.FISHER_I<0))
+        stop_loss = stop_loss or ((pos < 0) and ((mslice.open > mslice.BBSTOP_upper) or (mslice.FISHER_I>0)))
         start_long = (mslice.FISHER_I>0) and (mslice.HAclose > mslice.HAopen ) and (mslice.BBSTOP_trend > 0)
-        start_short = (mslice.FISHER_I<0) and (mslice.HAclose < mslice.HAopen ) and (mslice.BBSTOP_trend < 0)
-        if pos != 0:
-            if stop_loss or end_trading:
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
+        start_short = (mslice.FISHER_I<0) and (mslice.HAclose < mslice.HAopen ) and (mslice.BBSTOP_trend < 0)        
+        if mslice.close_ind:
+            if pos != 0:
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset , dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
-                df.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)    
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)  
                 pos = 0
+        else:
+            if stop_loss:
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset , dd)
+                tradeid += 1
+                curr_pos[0].exit_tradeid = tradeid
+                closed_trades.append(curr_pos[0])
+                curr_pos = []
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)  
+                pos = 0                
             pos = (start_long == True) * unit - (start_short == True) * unit
             if abs(pos)>0:
                 #target = (start_long == True) * mslice.close +(start_short == True) * mslice.close
-                new_pos = strat.TradePos([mslice.contract], [1], pos, mslice.close, mslice.close)
+                new_pos = pos_class([mslice.contract], [1], pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.close + misc.sign(pos)*offset, dd)
+                new_pos.open(mslice.open + misc.sign(pos)*offset, dd)
                 curr_pos.append(new_pos)
-                xdf.set_value(dd, 'cost', abs(pos) * (offset + mslice.close*tcost))
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(pos)*offset)                
         xdf.ix[dd, 'pos'] = pos
     return (xdf, closed_trades)
     
@@ -84,11 +101,7 @@ def gen_config_file(filename):
     sim_config['end_date']   = '20160708'
     sim_config['need_daily'] = False
     sim_config['freq'] = ['3min', '5min', '15min', '30min', '60min']
-    sim_config['param'] = [ [5,  10, 20], [5, 10, 40], [5, 20, 40], [5, 20, 80], \
-                             [10, 20, 40], [10, 20, 80],[10, 30, 60],[10, 30, 120],\
-                             [10, 40, 80], [10, 40, 120],\
-                             [5, 10], [5, 20], [5, 40], \
-                             [10, 20], [10, 30], [10, 40] ]
+    sim_config['param'] = [ [10,  10, 1.0, 10], [5,  5, 1.0, 5], [20,  20, 1.0, 20]]
     sim_config['pos_class'] = 'strat.TradePos'
     #sim_config['pos_class'] = 'strat.ParSARTradePos'
     #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
