@@ -21,8 +21,7 @@ def dual_thrust_sim( mdf, config):
     pos_args  = config['pos_args']
     proc_func = config['proc_func']
     proc_args = config['proc_args']
-    rev_buffer = config['rev_buffer']
-    start_equity = config['capital']
+    rev_buffer = config.get('rev_buffer', 0)
     chan_func = config['chan_func']
     chan_high = eval(chan_func['high']['func'])
     chan_low  = eval(chan_func['low']['func'])

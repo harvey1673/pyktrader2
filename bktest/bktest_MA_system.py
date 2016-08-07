@@ -22,7 +22,7 @@ def MA_sim( mdf, config):
     unit = config['unit']
     freq = config['freq']
     chan_ratio = config['channel_ratio']
-    channel = int(chan_ratio * win_list[0])
+    channel = int(chan_ratio * win_list[-1])
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols=['contract'])
     for idx, win in enumerate(win_list):
         xdf['MA'+str(idx)] = MA_func(xdf, win).shift(1)
