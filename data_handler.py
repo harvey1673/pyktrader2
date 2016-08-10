@@ -738,4 +738,20 @@ def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     df[SPB_key][-1] = df[field][-1]*(a1-a2) + df[field][-2]*(a2-a1) \
                     + df[SPB_key][-2]*(2-a1-a2) - df[SPB_key][-2]*(1-a1)*(1-a2)
     df[RMS_key][-1] = np.sqrt((df[SPB_key][(-n3):]**2).mean())
-    
+
+def WPR(df, n):
+    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n)), name = "WPR_%s" % str(n))
+    return res
+
+def ASCTREND(df, risk = 3, atr_period = 10):
+    wpr_period = 3 + risk * 2
+    atr_period = wpr_period + 1
+    if standard > 0 :
+        rng = ATR(df, atr_period)
+    else:
+        rng = pd.rolling_mean(df['high'] - df['low'], atr_period)
+    hh = pd.rolling_max(df['high'], wpr_period)
+    ll = pd.rolling_min(df['low'], wpr_period)
+    bsmax = pd.Series(hh-(hh - ll)*(33.0-risk)/100.0, name = "ASC%s_UP" % str(risk))
+    bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "ASC%s_DN" % str(risk))
+    return pd.concat([bsmax, bsmin], join='outer', axis=1)
