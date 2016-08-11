@@ -276,17 +276,25 @@ def PPSR(df):
     PSR = pd.DataFrame(psr)
     return PSR
 
-#Stochastic oscillator %K
-def STOK(df):
-    return pd.Series((df['close'] - df['low']) / (df['high'] - df['low']), name = 'SOk')
+#Stochastic oscillator %K    
+def STOCH(df, fastk_period = 14, slowk_period = 3, slowd_period = 3)
+    slowk, slowd = talib.STOCH(df['high'].values, df['low'].values, df['close'].values, fastk_period = fastk_period, slowk_period=slowk_period, slowd_period=slowd_period)
+    sk = pd.Series(slowk, index = df.index, name = "STOCHSK_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
+    sd = pd.Series(slowd, index = df.index, name = "STOCHSD_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
+    return pd.concat([sk,sd], join='outer', axis=1)
 
-#Stochastic oscillator %D
-def STO(df, n):
-    SOk = STOK(df)
-    SOd = pd.Series(pd.ewma(SOk, span = n, min_periods = n - 1, adjust = False), name = 'SOd' + str(n))
-    return SOd
+def STOCHF(df, fastk_period = 14, fastd_period = 3):
+    fd = pd.Series(talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period=fastk_period, fastd_period=fastd_period), \
+                   index = df.index, name = "STOCHFD_%s_%s" % (fastk_period, fastd_period))
+    return fd
 
-#Trix
+def STOCHRSI(df, n=14, fastk_period=5, fastd_period=3):
+    fastk, fastd = STOCHRSI(df['close'].valkues, timeperiod = n, fastk_period= fastk_period, fastd_period=fastd_period)
+    fk = pd.Series(fastk, index = df.index, name = "STOCRSI_FK_%s" % (str(n)))
+    fd = pd.Series(fastd, index = df.index, name = "STOCRSI_FD_%s" % (str(n)))   
+    return pd.concat([fk,fd], join='outer', axis=1)
+    
+    #Trix
 def TRIX(df, n):
     EX1 = pd.ewma(df['close'], span = n, min_periods = n - 1, adjust = False)
     EX2 = pd.ewma(EX1, span = n, min_periods = n - 1, adjust = False)
@@ -295,7 +303,7 @@ def TRIX(df, n):
 
 #Average Directional Movement Index
 def ADX(df, n):
-    return pd.Series(talib.ADX(df['high'], df['low'], df['close'], timeperiod = n), name = 'ADX_%s' % str(n))
+    return pd.Series(talib.ADX(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), name = 'ADX_%s' % str(n))
     # UpMove = df['high'] - df['high'].shift(1)
     # DoMove = df['low'].shift(1) - df['low']
     # UpD = pd.Series(UpMove)
@@ -309,15 +317,22 @@ def ADX(df, n):
     # return ADX 
 
 def ADXR(df, n):
-    return pd.Series(talib.ADXR(df['high'], df['low'], df['close'], timeperiod = n), name = 'ADXR_%s' % str(n))
+    return pd.Series(talib.ADXR(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), name = 'ADXR_%s' % str(n))
     
 #MACD, MACD Signal and MACD difference
-def MACD(df, n_fast, n_slow):
+def MACD(df, n_fast, n_slow, n_signal):
     EMAfast = pd.Series(pd.ewma(df['close'], span = n_fast, min_periods = n_slow - 1))
     EMAslow = pd.Series(pd.ewma(df['close'], span = n_slow, min_periods = n_slow - 1))
-    MACD = pd.Series(EMAfast - EMAslow, name = 'MACD' + str(n_fast) + '_' + str(n_slow))
-    MACDsign = pd.Series(pd.ewma(MACD, span = 9, min_periods = 8), name = 'MACDsign' + str(n_fast) + '_' + str(n_slow))
-    MACDdiff = pd.Series(MACD - MACDsign, name = 'MACDdiff' + str(n_fast) + '_' + str(n_slow))
+    MACD = pd.Series(EMAfast - EMAslow, name = 'MACD' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDsign = pd.Series(pd.ewma(MACD, span = n_signal, min_periods = n_signal - 1), name = 'MACDsign' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDdiff = pd.Series(MACD - MACDsign, name = 'MACDdiff' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    return pd.concat([MACD, MACDsign, MACDdiff], join='outer', axis=1)
+
+def MACDEXT(df, n_fast, n_slow, n_signal, matype = 0):
+    macd, macdsignal, macdhist = talib.MACDEXT(df['close'].values, fastperiod=n_fast, fastmatype=matype, slowperiod=n_slow, slowmatype=matype, signalperiod=n_signal, signalmatype=matype)
+    MACD = pd.Series(macd, index = df.index, name = 'MACD' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDsign = pd.Series(macdsignal, index = df.index, name = 'MACDsign' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDdiff = pd.Series(macdhist, index = df.index, name = 'MACDdiff' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
     return pd.concat([MACD, MACDsign, MACDdiff], join='outer', axis=1)
 
 #Mass Index
@@ -743,15 +758,33 @@ def WPR(df, n):
     res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n)), name = "WPR_%s" % str(n))
     return res
 
-def ASCTREND(df, risk = 3, atr_period = 10):
-    wpr_period = 3 + risk * 2
-    atr_period = wpr_period + 1
-    if standard > 0 :
-        rng = ATR(df, atr_period)
-    else:
-        rng = pd.rolling_mean(df['high'] - df['low'], atr_period)
+def PRICE_CHANNEL(df, n, risk = 0.3):
     hh = pd.rolling_max(df['high'], wpr_period)
     ll = pd.rolling_min(df['low'], wpr_period)
-    bsmax = pd.Series(hh-(hh - ll)*(33.0-risk)/100.0, name = "ASC%s_UP" % str(risk))
-    bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "ASC%s_DN" % str(risk))
+    bsmax = pd.Series(hh-(hh - ll)*(33.0-risk)/100.0, name = "PCHUP_%s" % str(risk))
+    bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "PCHDN_%s" % str(risk))    
     return pd.concat([bsmax, bsmin], join='outer', axis=1)
+
+def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):    
+    if period == 0: 
+        period = 3 + risk * 2
+    wpr = WPR(df, period)
+    uplevel = 67 + risk
+    dnlevel = 33 - risk
+    signal = pd.Series(0, index = df.index, name = "ASCSIG_%s" % str(n))
+    trend = pd.Series(index = df.index, name = "ASCTRD_%s" % str(n))
+    stop = pd.Series(index = df.index, name = "ASCSTOP_%s" % str(n))
+    ind = (wpr >= uplevel) & (wpr.shift(1) < uplevel)
+    signal[ind] = 1
+    trend[ind] = 1
+    ind = (wpr <= dnlevel) & (wpr.shift(1) > dnlevel)
+    signal[ind] = -1
+    trendd[ind] = -1
+    trend = trend.fillna(method='ffill')
+    if atr_mode == 0:
+        atr = ATR(df, period + 1)
+    else:
+        atr = pd.rolling_mean(df['high'] - df['low'], period + 1)
+    stop[trend > 0] = df['low'] - stop_ratio * atr
+    stop[trend < 0] = df['high'] + stop_ratio * atr
+    return pd.concat([signal, trend, stop], join='outer', axis=1)
