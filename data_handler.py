@@ -189,6 +189,12 @@ def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
             res = res.reset_index()
     return res
 
+def crossover(ts, value = 0):
+    return (ts[-1] > value) and (ts[-2] <= value)
+
+def crossover2(ts1, ts2, value = 0):
+    return (ts1[-1] - ts2[-1] > value) and (ts1[-2] - ts2[-2] <= value)
+
 def TR(df):
     tr_df = pd.concat([df['high'] - df['close'], abs(df['high'] - df['close'].shift(1)), abs(df['low'] - df['close'].shift(1))], join='outer', axis=1)
     ts_tr = pd.Series(tr_df.max(1), name='TR')
@@ -447,9 +453,13 @@ def EOM(df, n):
 #Commodity Channel Index
 def CCI(df, n):
     PP = (df['high'] + df['low'] + df['close']) / 3
-    CCI = pd.Series((PP - pd.rolling_mean(PP, n)) / pd.rolling_std(PP, n), name = 'CCI' + str(n))
+    CCI = pd.Series((PP - pd.rolling_mean(PP, n)) / pd.rolling_std(PP, n) / 0.015, name = 'CCI' + str(n))
     return CCI
 
+def cci(df, n):
+    real = talib.CCI(df['high'][(-n-1):], df['low'][(-n-1):], df['close'][(-n-1):], timeperiod=n)
+    df['CCI' + str(n)][-1] = real[-1]
+    
 #Coppock Curve
 def COPP(df, n):
     M = df['close'].diff(int(n * 11 / 10) - 1)
@@ -788,3 +798,4 @@ def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):
     stop[trend > 0] = df['low'] - stop_ratio * atr
     stop[trend < 0] = df['high'] + stop_ratio * atr
     return pd.concat([signal, trend, stop], join='outer', axis=1)
+        
