@@ -30,8 +30,8 @@ def MA_sim( mdf, config):
         xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(1)
         xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(1)
     else:
-        xdf['chan_high'] = pd.Series(1000000, index = xdf['close'].index)
-        xdf['chan_low'] = pd.Series(0, index = xdf['close'].index)
+        xdf['chan_high'] = pd.Series(0, index = xdf['close'].index)
+        xdf['chan_low'] = pd.Series(1000000, index = xdf['close'].index)
     tot_MA = len(win_list)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))

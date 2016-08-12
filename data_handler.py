@@ -277,7 +277,7 @@ def PPSR(df):
     return PSR
 
 #Stochastic oscillator %K    
-def STOCH(df, fastk_period = 14, slowk_period = 3, slowd_period = 3)
+def STOCH(df, fastk_period = 14, slowk_period = 3, slowd_period = 3):
     slowk, slowd = talib.STOCH(df['high'].values, df['low'].values, df['close'].values, fastk_period = fastk_period, slowk_period=slowk_period, slowd_period=slowd_period)
     sk = pd.Series(slowk, index = df.index, name = "STOCHSK_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
     sd = pd.Series(slowd, index = df.index, name = "STOCHSD_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
@@ -759,8 +759,8 @@ def WPR(df, n):
     return res
 
 def PRICE_CHANNEL(df, n, risk = 0.3):
-    hh = pd.rolling_max(df['high'], wpr_period)
-    ll = pd.rolling_min(df['low'], wpr_period)
+    hh = pd.rolling_max(df['high'], n)
+    ll = pd.rolling_min(df['low'], n)
     bsmax = pd.Series(hh-(hh - ll)*(33.0-risk)/100.0, name = "PCHUP_%s" % str(risk))
     bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "PCHDN_%s" % str(risk))    
     return pd.concat([bsmax, bsmin], join='outer', axis=1)
@@ -779,7 +779,7 @@ def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):
     trend[ind] = 1
     ind = (wpr <= dnlevel) & (wpr.shift(1) > dnlevel)
     signal[ind] = -1
-    trendd[ind] = -1
+    trend[ind] = -1
     trend = trend.fillna(method='ffill')
     if atr_mode == 0:
         atr = ATR(df, period + 1)
