@@ -1,22 +1,21 @@
 import sys
 import misc
-import agent
 import data_handler as dh
 import pandas as pd
 import numpy as np
+import json
 import strategy as strat
-import datetime
-import backtest
 
-def psar_test_sim( mdf, config):
+def psar_chan_sim( mdf, config):
     marginrate = config['marginrate']
     offset = config['offset']
     tcost = config['trans_cost']
     unit = config['unit']
     stoploss = config['stoploss']
-    bar_func = config.get('bar_conv_func', 'dh.bar_conv_func1')    
+    bar_func = config.get('bar_conv_func', 'dh.bar_conv_func2')
     param = config['param']
     freq = config['freq']
+    use_HL = config.get('use_HL',False)
     use_chan = config['use_chan']    
     chan_func = config['chan_func']
     chan_args = config['chan_args']
@@ -32,11 +31,13 @@ def psar_test_sim( mdf, config):
         xdf['chanH'] = eval(chan_func[0])(xdf, chan, **chan_args[0]).shift(1)
         xdf['chanL'] = eval(chan_func[1])(xdf, chan, **chan_args[1]).shift(1)
     else:
-        xdf['chan_h'] = 0
-        xdf['chan_l'] = 10000000
-    psar_data = dh.PSAR(xdf, **config['sar_params'])
+        xdf['chanH'] = 0
+        xdf['chanL'] = 10000000
+    psar_data = dh.PSAR(xdf, **sar_param)
     xdf['psar_dir'] = psar_data['PSAR_DIR'].shift(1)
     xdf['psar_val'] = psar_data['PSAR_VAL'].shift(1)
+    xdf['prev_high'] = xdf['high'].shift(1)
+    xdf['prev_low'] = xdf['low'].shift(1)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
@@ -55,15 +56,21 @@ def psar_test_sim( mdf, config):
         else:
             pos = curr_pos[0].pos
         xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.ChanH) or np.isnan(mslice.ChanL):
+        if np.isnan(mslice.chanH) or np.isnan(mslice.chanL):
             continue
-		buy_trig  = (mslice.high >= mslice.chanH) and (mslice.psar_dir > 0)
-		sell_trig = (mslice.low <= mslice.chanL) and (mslice.psar_dir < 0)
-		long_close  = (mslice.low <= mslice.chanL) or (mslice.psar_dir < 0)
-		short_close = (mslice.high >= mslice.chanH) or (mslice.psar_dir > 0)
+        if use_HL:
+            buy_trig  = (mslice.prev_high >= mslice.chanH) and (mslice.psar_dir > 0)
+            sell_trig = (mslice.prev_low <= mslice.chanL) and (mslice.psar_dir < 0)
+            long_close  = (mslice.prev_low <= mslice.chanL) or (mslice.psar_dir < 0)
+            short_close = (mslice.prev_high >= mslice.chanH) or (mslice.psar_dir > 0)
+        else:
+            buy_trig  = (mslice.open >= mslice.chanH) and (mslice.psar_dir > 0)
+            sell_trig = (mslice.open <= mslice.chanL) and (mslice.psar_dir < 0)
+            long_close  = (mslice.open <= mslice.chanL) or (mslice.psar_dir < 0)
+            short_close = (mslice.open >= mslice.chanH) or (mslice.psar_dir > 0)
         if mslice.close_ind:
             if (pos != 0):
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset , dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
@@ -108,31 +115,36 @@ def psar_test_sim( mdf, config):
     
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest_psar_test.psar_test_sim'
-    sim_config['scen_keys'] = ['freq']
-    sim_config['sim_name']   = 'psar_test'
+    sim_config['sim_func']  = 'bktest_psar_chan.psar_chan_sim'
+    sim_config['scen_keys'] = ['freq', 'param']
+    sim_config['sim_name']   = 'psar_chan'
     sim_config['products']   = [ 'm', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j', 'jm', 'ag', 'cu', 'au', 'al', 'zn' ]
-    sim_config['start_date'] = '20141101'
-    sim_config['end_date']   = '20151118'
-    sim_config['freq']  =  [ '15m', '60m' ]
+    sim_config['start_date'] = '20150102'
+    sim_config['end_date']   = '20160722'
+    sim_config['freq']  =  ['5Min', '15Min', '30Min', '60Min']
+    sim_config['param']= [[3, {'iaf': 0.02, 'maxaf': 0.2, 'incr': 0.02}], \
+                           [5, {'iaf': 0.02, 'maxaf': 0.2, 'incr': 0.02}], \
+                           [10, {'iaf': 0.02, 'maxaf': 0.2, 'incr': 0.02}], \
+                           [20, {'iaf': 0.02, 'maxaf': 0.2, 'incr': 0.02}], \
+                           [3, {'iaf': 0.01, 'maxaf': 0.2, 'incr': 0.01}], \
+                           [5, {'iaf': 0.01, 'maxaf': 0.2, 'incr': 0.01}], \
+                           [10, {'iaf': 0.01, 'maxaf': 0.2, 'incr': 0.01}], \
+                           [20, {'iaf': 0.01, 'maxaf': 0.2, 'incr': 0.01}], \
+                           ]
     sim_config['pos_class'] = 'strat.TradePos'
-    sim_config['proc_func'] = 'min_freq_group'
-    #chan_func = {'high': {'func': 'pd.rolling_max', 'args':{}},
-    #             'low':  {'func': 'pd.rolling_min', 'args':{}},
-    #             }
+    chan_func = ['dh.DONCH_H', 'dh.DONCH_L']
     config = {'capital': 10000,
               'offset': 0,
-              'chan': 20,
               'use_chan': True,
-              'sar_params': {'iaf': 0.02, 'maxaf': 0.2, 'incr': 0},
+              'use_HL': False,
               'trans_cost': 0.0,
               'close_daily': False,
               'unit': 1,
               'stoploss': 0.0,
-              #'proc_args': {'minlist':[1500]},
-              'proc_args': {'freq':15},
               'pos_update': False,
-              #'chan_func': chan_func,
+              'pos_args': {},
+              'chan_func': chan_func,
+              'chan_args': [{}, {}]
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:

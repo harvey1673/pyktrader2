@@ -30,8 +30,8 @@ def MA_sim( mdf, config):
         xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(1)
         xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(1)
     else:
-        xdf['chan_high'] = pd.Series(0, index = xdf['close'].index)
-        xdf['chan_low'] = pd.Series(1000000, index = xdf['close'].index)
+        xdf['chan_high'] = pd.Series(index = xdf.index)
+        xdf['chan_low'] = pd.Series(index = xdf.index)
     tot_MA = len(win_list)
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
@@ -77,8 +77,10 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
-            if (((ma_short >= max(ma_list)) and (mslice.open>=mslice.chan_high)) or ((ma_short <= min(ma_list)) and (mslice.open<=mslice.chan_low))) and (pos==0):
-                target_pos = ((ma_short >= max(ma_list)) and (mslice.open>=mslice.chan_high)) * unit - ((ma_short <= min(ma_list)) and (mslice.open<=mslice.chan_low)) * unit
+            if (((ma_short >= max(ma_list)) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) or \
+                        ((ma_short <= min(ma_list)) and ((use_chan == False) or (mslice.open<=mslice.chan_low)))) and (pos==0):
+                target_pos = ((ma_short >= max(ma_list)) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) * unit \
+                             - ((ma_short <= min(ma_list)) and ((use_chan == False) or (mslice.open<=mslice.chan_low))) * unit
                 new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
@@ -122,7 +124,7 @@ def gen_config_file(filename):
               'close_daily': False,
               'pos_update': False,
               'MA_func': 'dh.EMA',
-              'channel_func': [dh.DONCH_H, dh.DONCH_L],
+              'channel_func': ['dh.DONCH_H', 'dh.DONCH_L'],
               'channel_args': [{}, {}],
               'channel_ratio': 0.5,
               'exit_min': 2055,

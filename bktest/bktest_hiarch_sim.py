@@ -1,6 +1,7 @@
 import misc
 import data_handler as dh
 import pandas as pd
+import json
 import numpy as np
 import strategy as strat
 import datetime
@@ -21,7 +22,7 @@ def hiarch_sim( mdf, config):
     signal_level = config['signal_level']
     for idx, f, sfunc, sargs, slvl  in enumerate(zip(freq, signal_func, signal_args, signal_level)):
         df = dh.conv_ohlc_freq(mdf, f, extra_cols=['contract'])
-        df['signal'+'_'+ f] = eval(sfunc)(df, sparam[0], sparam[1], sparam[2])
+        df['signal'+'_'+ f] = eval(sfunc)(df, **sargs)
         xdf.append(df)
 
     xdata = pd.concat([xdf['H1'], xdf['L1'], xdf['H2'], xdf['L2'], xdf['ATR'], xdf['high'], xdf['low']], \
@@ -93,13 +94,15 @@ def hiarch_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_hiarch_sim.hiarch_sim'
-    sim_config['scen_keys'] = ['freq', 'param']
+    sim_config['scen_keys'] = ['freq', 'signal_args']
     sim_config['sim_name']   = 'chanbreak_'
     sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160708'
     sim_config['need_daily'] = False
-    sim_config['param'] = [[[13, 7, 7], [13, 7, 7]], [[20, 7, 7], [20, 7, 7]]]
+    sim_config['signal_args'] = [[{'n_fast': 13, 'n_slow': 5, 'n_signal': 5 }, {'n_fast': 13, 'n_slow': 5, 'n_signal': 5 }], \
+                        [{'n_fast': 13, 'n_slow': 7, 'n_signal': 7}, {'n_fast': 13, 'n_slow': 7, 'n_signal': 7}], \
+                        [{'n_fast': 20, 'n_slow': 7, 'n_signal': 7}, {'n_fast': 20, 'n_slow': 7, 'n_signal': 7}]]
     sim_config['freq'] = [['15min', '60min'], ['15min', '90min'], ['5min', '30min'], ['5min', '60min']]
     sim_config['pos_class'] = 'strat.TradePos'
     #sim_config['pos_class'] = 'strat.ParSARTradePos'
@@ -117,7 +120,6 @@ def gen_config_file(filename):
               'close_daily': False,
               'pos_update': False,
               'signal_func': ['dh.MACD', 'dh.MACD'],
-              'signal_args': [{}, {}],
               'signal_level': [[0, 0], [0, 0]],
               'exit_min': 2055,
               'pos_args': {},

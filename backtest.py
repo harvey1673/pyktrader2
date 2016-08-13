@@ -143,19 +143,19 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + start_capital, name = 'cum_pnl')
     available = cum_pnl - daily_margin
     res = {}
-    res['avg_pnl'] = daily_pnl.mean()
-    res['std_pnl'] = daily_pnl.std()
-    res['tot_pnl'] = daily_pnl.sum()
-    res['tot_cost'] = daily_cost.sum()
+    res['avg_pnl'] = float(daily_pnl.mean())
+    res['std_pnl'] = float(daily_pnl.std())
+    res['tot_pnl'] = float(daily_pnl.sum())
+    res['tot_cost'] = float(daily_cost.sum())
     res['num_days'] = len(daily_pnl)
-    res['sharp_ratio'] = res['avg_pnl']/res['std_pnl']*np.sqrt(252.0)
+    res['sharp_ratio'] = float(res['avg_pnl']/res['std_pnl']*np.sqrt(252.0))
     max_dd, max_dur = max_drawdown(cum_pnl)
-    res['max_margin'] = daily_margin.max()
-    res['min_avail'] = available.min() 
-    res['max_drawdown'] =  max_dd
-    res['max_dd_period'] =  max_dur
+    res['max_margin'] = float(daily_margin.max())
+    res['min_avail'] = float(available.min())
+    res['max_drawdown'] =  float(max_dd)
+    res['max_dd_period'] =  int(max_dur)
     if abs(max_dd) > 0:
-        res['profit_dd_ratio'] = res['tot_pnl']/abs(max_dd)
+        res['profit_dd_ratio'] = float(res['tot_pnl']/abs(max_dd))
     else:
         res['profit_dd_ratio'] = 0
     ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
@@ -164,32 +164,32 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
 def get_trade_stats(trade_list):
     res = {}
     res['n_trades'] = len(trade_list)
-    res['all_profit'] = sum([trade.profit for trade in trade_list])
-    res['win_profit'] = sum([trade.profit for trade in trade_list if trade.profit>0])
-    res['loss_profit'] = sum([trade.profit for trade in trade_list if trade.profit<0])
+    res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
+    res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit>0]))
+    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit<0]))
     sorted_profit = sorted([trade.profit for trade in trade_list])
     if len(sorted_profit)>5:
-        res['largest_profit'] = sorted_profit[-1]
+        res['largest_profit'] = float(sorted_profit[-1])
     else:
         res['largest_profit'] = 0
     if len(sorted_profit)>4:
-        res['second largest'] = sorted_profit[-2]
+        res['second largest'] = float(sorted_profit[-2])
     else:
         res['second largest'] = 0
     if len(sorted_profit) > 3:
-        res['third_profit'] = sorted_profit[-3]
+        res['third_profit'] = float(sorted_profit[-3])
     else:
         res['third_profit'] = 0
     if len(sorted_profit) > 0:
-        res['largest_loss'] = sorted_profit[0]
+        res['largest_loss'] = float(sorted_profit[0])
     else:
         res['largest_loss'] = 0
     if len(sorted_profit) > 1:
-        res['second_loss'] = sorted_profit[1]
+        res['second_loss'] = float(sorted_profit[1])
     else:
         res['second_loss'] = 0
     if len(sorted_profit) > 2:
-        res['third_loss'] = sorted_profit[2]
+        res['third_loss'] = float(sorted_profit[2])
     else:
         res['third_loss'] = 0
     res['num_win'] = len([trade.profit for trade in trade_list if trade.profit>0])
@@ -199,10 +199,10 @@ def get_trade_stats(trade_list):
         res['win_ratio'] = float(res['num_win'])/float(res['n_trades'])
     res['profit_per_win'] = 0
     if res['num_win'] > 0:
-        res['profit_per_win'] = res['win_profit']/float(res['num_win'])
+        res['profit_per_win'] = float(res['win_profit']/float(res['num_win']))
     res['profit_per_loss'] = 0
     if res['num_loss'] > 0:    
-        res['profit_per_loss'] = res['loss_profit']/float(res['num_loss'])
+        res['profit_per_loss'] = float(res['loss_profit']/float(res['num_loss']))
     return res
 
 def create_drawdowns(ts):
@@ -345,11 +345,8 @@ def simnearby_min(config_file):
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
                 fname = file_prefix + 'stats.json'
-                try:
-                    with open(fname, 'w') as ofile:
-                        json.dump(output, ofile)
-                except:
-                    continue
+                with open(fname, 'w') as ofile:
+                    json.dump(output, ofile)
         res = pd.DataFrame.from_dict(output, orient = 'index')
         res.index.name = 'scenario'
         res = res.sort_values(by = ['sharp_ratio'], ascending=False)
