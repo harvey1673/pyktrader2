@@ -9,8 +9,8 @@ class MASystemTrader(Strategy):
     common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'ma_key': 'MA_C', \
                                                       'price_limit_buffer': 5, 'pos_exec_flag': STRAT_POS_MUST_EXEC, \
                                                       'data_func': [['MA_C', 'dh.MA', 'dh.ma'], \
-                                                                    ["DONCH_HC", "dh.DONCH_H", "dh.donch_h", {'field':'close'}], \
-                                                                    ["DONCH_LC", "dh.DONCH_L", "dh.donch_l", {'field':'close'}]]})
+                                                                    ["DONCH_HH", "dh.DONCH_H", "dh.donch_h", {'field':'high'}], \
+                                                                    ["DONCH_LL", "dh.DONCH_L", "dh.donch_l", {'field':'low'}]]})
     asset_params = dict({'ma_win': [10, 20, 40], 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
