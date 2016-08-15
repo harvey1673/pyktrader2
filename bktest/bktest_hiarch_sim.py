@@ -15,81 +15,78 @@ def hiarch_sim( mdf, config):
     pos_class = config['pos_class']
     pos_args  = config['pos_args']    
     freq = config['freq']
-    xdf = []
     param = config['param']
     signal_func = config['signal_func']
     signal_args = config['signal_args']
     signal_level = config['signal_level']
-    for idx, f, sfunc, sargs, slvl  in enumerate(zip(freq, signal_func, signal_args, signal_level)):
+    close_daily = config['close_daily']
+    for idx, (f, sfunc, sargs, slvl)  in enumerate(zip(freq, signal_func, signal_args, signal_level)):
         df = dh.conv_ohlc_freq(mdf, f, extra_cols=['contract'])
-        df['signal'+'_'+ f] = eval(sfunc)(df, **sargs)
-        xdf.append(df)
-
-    xdata = pd.concat([xdf['H1'], xdf['L1'], xdf['H2'], xdf['L2'], xdf['ATR'], xdf['high'], xdf['low']], \
-                      axis=1, keys=['H1', 'L1', 'H2', 'L2', 'ATR', 'xhigh', 'xlow']).shift(1)
-    ll = mdf.shape[0]
-    mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
-    mdf['pos'] = pd.Series([0]*ll, index = mdf.index)
-    mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
+        if idx == 0:
+            xdf = df
+        signal = eval(sfunc)(df, **sargs)
+        long_lvl  = slvl[0] + slvl[1]
+        short_lvl = slvl[0] - slvl[1]
+        long_ind = (signal > long_lvl)
+        short_ind = (signal < short_lvl)
+        xdata = pd.concat([signal, long_ind, short_ind], axis = 1, keys = ['signal'+str(idx), 'long_ind'+str(idx), 'short_ind'+str(idx)]).shift(1)
+        xdf = xdf.join(xdata, how = 'left').fillna(method='ffill')
+    xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
+    if close_daily:
+        daily_end = (xdf['date']!=xdf['date'].shift(-1))
+        xdf['close_ind'] = xdf['close_ind'] | daily_end        
+    xdf['pos'] = 0
+    xdf['cost'] = 0
+    xdf['traded_price'] = xdf.open
     curr_pos = []
     closed_trades = []
-    end_d = mdf.index[-1].date()
     tradeid = 0
-    x_idx = 0
-    max_idx = len(xdf.index)
-    for idx, dd in enumerate(mdf.index):
-        mslice = mdf.ix[dd]
+    for idx, dd in enumerate(xdf.index):
+        mslice = xdf.ix[dd]
         min_id = mslice.min_id
-        cnt_id = count_min_id(dd)
         if len(curr_pos) == 0:
             pos = 0
         else:
             pos = curr_pos[0].pos
-        mdf.ix[dd, 'pos'] = pos
-        #if np.isnan(mslice.ATR):
-        #    continue
-        if (min_id >=config['exit_min']):
-            if (pos!=0) and (dd.date() == end_d):
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
+        xdf.set_value(dd, 'pos', pos)
+        if mslice.close_ind:
+            if pos!=0:
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
                 closed_trades.append(curr_pos[0])
                 curr_pos = []
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
-                mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost) 
-            continue
         else:
             if (pos !=0):
-                if (cnt_id % freq) == 0:
-                    curr_pos[0].update_bar(mslice)
-                check_price = (pos>0) * mslice.low + (pos<0) * mslice.high
-                if curr_pos[0].check_exit(check_price, 0):
-                    curr_pos[0].close(mslice.close - misc.sign(pos) * offset, dd)
+                direction = 0
+                long_ind = True in [mslice.getattr('long_ind'+str(idx) for idx in range(len(freq))]
+                short_ind = True in [mslice.getattr('short_ind'+str(idx) for idx in range(len(freq))]
+                if ((pos < 0) and long_ind) or ((pos > 0) and short_ind):
+                    curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                     tradeid += 1
                     curr_pos[0].exit_tradeid = tradeid
                     closed_trades.append(curr_pos[0])
-                    pos = 0
-                    curr_pos = []                    
-            if ((mslice.high >= mslice.H2) and (pos<0)) or ((mslice.low <= mslice.L2) and (pos>0)):
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset, dd)
+                    curr_pos = []
+                    xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
+                    xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
+                    pos = 0                
+            long_ind = False not in [mslice.getattr('long_ind'+str(idx) for idx in range(len(freq))]
+            short_ind = False not in [mslice.getattr('short_ind'+str(idx) for idx in range(len(freq))]            
+            if (long_ind or short_ind) and (pos == 0):
+                target_pos = long_ind * unit - short_ind * unit
+                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                mdf.ix[dd, 'cost'] -= abs(pos) * (offset + mslice.close*tcost)
-                pos = 0
-            if ((mslice.high >= mslice.H1) and (pos<=0)) or ((mslice.low <= mslice.L1) and (pos>=0)):
-                if (pos ==0 ):
-                    pos = (mslice.high >= mslice.H1) * unit -(mslice.low <= mslice.L1) * unit
-                    exit_target = (mslice.high >= mslice.H1) * mslice.L2 + (mslice.low <= mslice.L1) * mslice.H2
-                    new_pos = pos_class([mslice.contract], [1], pos, mslice.close, exit_target, 1, **pos_args)
-                    tradeid += 1
-                    new_pos.entry_tradeid = tradeid
-                    new_pos.open(mslice.close + misc.sign(pos)*offset, dd)
-                    curr_pos.append(new_pos)
-                    mdf.ix[dd, 'cost'] -=  abs(pos) * (offset + mslice.close*tcost)
-            mdf.ix[dd, 'pos'] = pos
-    return (mdf, closed_trades)
+                new_pos.entry_tradeid = tradeid
+                new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
+                curr_pos.append(new_pos)
+                pos = target_pos
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)            
+        xdf.set_value(dd, 'pos', pos)
+    return (xdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
