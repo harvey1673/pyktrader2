@@ -224,6 +224,15 @@ def atr(df, n = 20):
     
 def tsMA(ts, n):
     return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
+
+# talib matype: 0=SMA, 1=EMA, 2=WMA, 3=DEMA, 4=TEMA, 5=TRIMA, 6=KAMA, 7=MAMA, 8=T3
+def MAEXT(df, n, field = 'close', ma_type = 0):
+    return pd.Series(talib.MA(df[field].values, timeperiod = n, matype = ma_type), index = df.index, name = 'MA_' + field[0].upper() + str(n))
+
+def maext(df, n, field = 'close', ma_type = 0):
+    key = 'MA_' + field[0].upper() + str(n)
+    ma_ts = talib.MA(df[field][-(n+1):].values, timeperiod = n, matype = ma_type)
+    df[key][-1] = float(ma_ts[-1])
     
 def MA(df, n, field = 'close'):
     return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n), index = df.index)
@@ -798,4 +807,30 @@ def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):
     stop[trend > 0] = df['low'] - stop_ratio * atr
     stop[trend < 0] = df['high'] + stop_ratio * atr
     return pd.concat([signal, trend, stop], join='outer', axis=1)
-        
+    
+def MA_RIBBON(df, ma_series, ma_type = 0):
+    ma_array = np.zeros([len(df), len(ma_series)])
+    for idx, ma_len in enumerate(ma_series):
+        ma_array[:, idx] = MAEXT(df, ma_len, field = 'close', ma_type = ma_type)
+    corr = np.zeros([len(df)])
+    pval = np.zeros([len(df)])
+    dist = np.zeros([len(df)])
+    for idy in range(len(df)):
+        corr[idy], pval[idy] = stats.spearmanr(ma_array[idy,:], range(1, len(ma_series)+1))
+        dist = max(ma_array[idy,:]) - min(ma_array[idy,:])
+    corr_ts = pd.Series(corr, index = df.index, name = "MARIBBON_CORR")
+    pval_ts = pd.Series(pval, index = df.index, name = "MARIBBON_PVAL")
+    dist_ts = pd.Series(pval, index = df.index, name = "MARIBBON_DIST")
+    return pd.concat([corr_ts, pval_ts], join='outer', axis=1)
+    
+de ma_ribbon(df, ma_series, ma_type = 0):
+    ma_array = np.zeros([len(df)])
+    for idx, ma_len in enumerate(ma_series):
+        ma_ts = talib.MA(df[field][-(ma_len+1):].values, timeperiod = ma_len, matype = ma_type)
+        ma_array[idx] = ma_ts[-1]
+    corr, pval = stats.spearmanr(ma_array, range(1, len(ma_series)+1))
+    dist = max(ma_array) - min(ma_array)
+    df["MARIBBON_CORR"][-1] = corr
+    df["MARIBBON_PVAL"][-1] = pval
+    df["MARIBBON_DIST"] = dist
+    
