@@ -823,14 +823,13 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
     dist_ts = pd.Series(pval, index = df.index, name = "MARIBBON_DIST")
     return pd.concat([corr_ts, pval_ts], join='outer', axis=1)
     
-de ma_ribbon(df, ma_series, ma_type = 0):
+def ma_ribbon(df, ma_series, ma_type = 0):
     ma_array = np.zeros([len(df)])
     for idx, ma_len in enumerate(ma_series):
-        ma_ts = talib.MA(df[field][-(ma_len+1):].values, timeperiod = ma_len, matype = ma_type)
+        ma_ts = talib.MA(df['close'][-(ma_len+1):].values, timeperiod = ma_len, matype = ma_type)
         ma_array[idx] = ma_ts[-1]
     corr, pval = stats.spearmanr(ma_array, range(1, len(ma_series)+1))
     dist = max(ma_array) - min(ma_array)
     df["MARIBBON_CORR"][-1] = corr
     df["MARIBBON_PVAL"][-1] = pval
     df["MARIBBON_DIST"] = dist
-    
