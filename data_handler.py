@@ -339,16 +339,16 @@ def MACD(df, n_fast, n_slow, n_signal):
     EMAfast = pd.Series(pd.ewma(df['close'], span = n_fast, min_periods = n_slow - 1))
     EMAslow = pd.Series(pd.ewma(df['close'], span = n_slow, min_periods = n_slow - 1))
     MACD = pd.Series(EMAfast - EMAslow, name = 'MACD' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    MACDsign = pd.Series(pd.ewma(MACD, span = n_signal, min_periods = n_signal - 1), name = 'MACDsign' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    MACDdiff = pd.Series(MACD - MACDsign, name = 'MACDdiff' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    return pd.concat([MACD, MACDsign, MACDdiff], join='outer', axis=1)
+    MACDsig = pd.Series(pd.ewma(MACD, span = n_signal, min_periods = n_signal - 1), name = 'MACDsig' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDhist = pd.Series(MACD - MACDsig, name = 'MACDhist' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    return pd.concat([MACD, MACDsig, MACDhist], join='outer', axis=1)
 
 def MACDEXT(df, n_fast, n_slow, n_signal, matype = 0):
     macd, macdsignal, macdhist = talib.MACDEXT(df['close'].values, fastperiod=n_fast, fastmatype=matype, slowperiod=n_slow, slowmatype=matype, signalperiod=n_signal, signalmatype=matype)
     MACD = pd.Series(macd, index = df.index, name = 'MACD' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    MACDsign = pd.Series(macdsignal, index = df.index, name = 'MACDsign' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    MACDdiff = pd.Series(macdhist, index = df.index, name = 'MACDdiff' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    return pd.concat([MACD, MACDsign, MACDdiff], join='outer', axis=1)
+    MACDsig = pd.Series(macdsignal, index = df.index, name = 'MACDsig' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDhist = pd.Series(macdhist, index = df.index, name = 'MACDhist' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    return pd.concat([MACD, MACDsig, MACDhist], join='outer', axis=1)
 
 #Mass Index
 def MassI(df):
