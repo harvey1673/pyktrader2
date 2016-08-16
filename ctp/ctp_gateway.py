@@ -240,8 +240,8 @@ class CtpGateway(Gateway):
         self.eventEngine.register(EVENT_QRYORDER+self.gatewayName, self.rsp_qry_order)
         self.eventEngine.register(EVENT_QRYINVESTOR+self.gatewayName, self.rsp_qry_investor)
         self.eventEngine.register(EVENT_QRYINSTRUMENT+self.gatewayName, self.rsp_qry_instrument)
-        self.eventEngine.register(EVENT_ERRORDERCANCEL+self.gatewayName, self.err_order_insert)
-        self.eventEngine.register(EVENT_ERRORDERINSERT+self.gatewayName, self.err_order_action)
+        self.eventEngine.register(EVENT_ERRORDERINSERT+self.gatewayName, self.err_order_insert)
+        self.eventEngine.register(EVENT_ERRORDERCANCEL+self.gatewayName, self.err_order_action)
         self.eventEngine.register(EVENT_RTNTRADE+self.gatewayName, self.rtn_trade)
         self.eventEngine.register(EVENT_RTNORDER+self.gatewayName, self.rtn_order)
         self.eventEngine.register(EVENT_TIMER, self.query)
@@ -593,4 +593,3 @@ class CtpGateway(Gateway):
 
 if __name__ == '__main__':
     pass
-    
