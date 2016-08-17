@@ -494,19 +494,22 @@ def simcontract_min(config_file):
                         mdf = pd.concat(all_data, axis = 1, join = 'inner')
                         mdf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
                         mdf = mdf[ mdf.date0 < edate]
-                    else:                        
+                    else:
+                        #print all_data[0], all_data[1]
                         for i, (coeff, tmpdf) in enumerate(zip(calc_coeffs, all_data)):
                             if i == 0:
-                                open = tmpdf['open'] * coeff
-                                close = tmpdf['close'] * coeff
+                                xopen = tmpdf['open'] * coeff
+                                xclose = tmpdf['close'] * coeff
                             else:
-                                open = open + tmpdf['open'] * coeff
-                                close = close + tmpdf['close'] * coeff
-                        high = pd.concat([open, close], axis = 1).max(axis = 1)
-                        low = pd.concat([open, close], axis = 1).min(axis = 1)
+                                xopen = xopen + tmpdf['open'] * coeff
+                                xclose = xclose + tmpdf['close'] * coeff
+                        xhigh = pd.concat([xopen, xclose], axis = 1).max(axis = 1)
+                        xlow = pd.concat([xopen, xclose], axis = 1).min(axis = 1)
                         col_list = ['date', 'min_id', 'volume', 'openInterest']                        
-                        mdf = pd.concat([ open, high, low, close] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
+                        mdf = pd.concat([ xopen, xhigh, xlow, xclose] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
                         mdf.columns = ['open', 'high', 'low', 'close'] + col_list
+                        mdf['contract'] = cont
+                        #print mdf
                     if need_daily:
                         if smode == 'TS':
                             all_data = [day_data[assets[0]][contlist[assets[0]][idx+i]] for i in cont_map]
@@ -519,16 +522,17 @@ def simcontract_min(config_file):
                         else:
                             for i, (coeff, tmpdf) in enumerate(zip(calc_coeffs, all_data)):
                                 if i == 0:
-                                    open = tmpdf['open'] * coeff
-                                    close = tmpdf['close'] * coeff
+                                    xopen = tmpdf['open'] * coeff
+                                    xclose = tmpdf['close'] * coeff
                                 else:
-                                    open = open + tmpdf['open'] * coeff
-                                    close = close + tmpdf['close'] * coeff
-                            high = pd.concat([open, close], axis = 1).max(axis = 1)
-                            low = pd.concat([open, close], axis = 1).min(axis = 1)
+                                    xopen = xopen + tmpdf['open'] * coeff
+                                    xclose = xclose + tmpdf['close'] * coeff
+                            xhigh = pd.concat([xopen, xclose], axis = 1).max(axis = 1)
+                            xlow = pd.concat([xopen, xclose], axis = 1).min(axis = 1)
                             col_list = ['volume', 'openInterest']
-                            ddf = pd.concat([ open, high, low, close] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
+                            ddf = pd.concat([ xopen, xhigh, xlow, xclose] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
                             ddf.columns = ['open', 'high', 'low', 'close'] + col_list
+                            ddf['contract'] = cont
                             config['ddf'] = ddf[ddf.index <= edate]
                         if len(config['ddf']) < 10:
                             continue

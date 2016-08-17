@@ -189,11 +189,11 @@ def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
             res = res.reset_index()
     return res
 
-def crossover(ts, value = 0):
-    return (ts[-1] > value) and (ts[-2] <= value)
+def crossover(ts, value = 0, direction = 1):
+    return ((ts[-1] - value)*direction>0) and ((ts[-2] - value)*direction<0)
 
-def crossover2(ts1, ts2, value = 0):
-    return (ts1[-1] - ts2[-1] > value) and (ts1[-2] - ts2[-2] <= value)
+def crossover2(ts1, ts2, value = 0, direction = 1):
+    return ((ts1[-1] - ts2[-1] - value)*direction>0) and ((ts1[-2] - ts2[-2] - value)*direction<0)
 
 def TR(df):
     tr_df = pd.concat([df['high'] - df['close'], abs(df['high'] - df['close'].shift(1)), abs(df['low'] - df['close'].shift(1))], join='outer', axis=1)
