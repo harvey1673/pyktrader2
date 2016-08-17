@@ -377,6 +377,7 @@ def simcontract_min(config_file):
     if type(sim_list[0]).__name__ != 'list':
         sim_list = [[str(asset)] for asset in sim_list]
     sim_mode = sim_config.get('sim_mode', 'OR')
+    calc_coeffs = sim_config.get('calc_coeffs', [1, -1])
     cont_maplist = sim_config.get('cont_maplist', [])
     sim_period = sim_config.get('sim_period', '-6m')
     need_daily = sim_config.get('need_daily', False)
@@ -481,21 +482,54 @@ def simcontract_min(config_file):
                         if len(config['ddf']) < 10:
                             continue
                 else:
-                    if sim_mode == 'TS':
+                    mode_keylist = sim_mode.split('-')
+                    smode = mode_keylist[0]
+                    cmode = mode_keylist[1]
+                    all_data = []
+                    if smode == 'TS':
                         all_data = [min_data[assets[0]][contlist[assets[0]][idx+i]] for i in cont_map]
                     else:
                         all_data = [min_data[asset][contlist[asset][idx+i]] for asset, i in zip(assets, cont_map)]
-                    mdf = pd.concat(all_data, axis = 1, join = 'inner')
-                    mdf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
-                    mdf = mdf[ mdf.date0 < edate]
+                    if cmode == 'Full':
+                        mdf = pd.concat(all_data, axis = 1, join = 'inner')
+                        mdf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
+                        mdf = mdf[ mdf.date0 < edate]
+                    else:                        
+                        for i, (coeff, tmpdf) in enumerate(zip(calc_coeffs, all_data)):
+                            if i == 0:
+                                open = tmpdf['open'] * coeff
+                                close = tmpdf['close'] * coeff
+                            else:
+                                open = open + tmpdf['open'] * coeff
+                                close = close + tmpdf['close'] * coeff
+                        high = pd.concat([open, close], axis = 1).max(axis = 1)
+                        low = pd.concat([open, close], axis = 1).min(axis = 1)
+                        col_list = ['date', 'min_id', 'volume', 'openInterest']                        
+                        mdf = pd.concat([ open, high, low, close] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
+                        mdf.columns = ['open', 'high', 'low', 'close'] + col_list
                     if need_daily:
-                        if sim_mode == 'TS':
+                        if smode == 'TS':
                             all_data = [day_data[assets[0]][contlist[assets[0]][idx+i]] for i in cont_map]
                         else:
                             all_data = [day_data[asset][contlist[asset]][idx+i] for asset, i in zip(assets, cont_map)]
-                        ddf = pd.concat(all_data, axis = 1, join = 'inner')
-                        ddf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
-                        config['ddf'] = ddf[ddf.index <= edate]
+                        if cmode == 'Full':
+                            ddf = pd.concat(all_data, axis = 1, join = 'inner')
+                            ddf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
+                            config['ddf'] = ddf[ddf.index <= edate]
+                        else:
+                            for i, (coeff, tmpdf) in enumerate(zip(calc_coeffs, all_data)):
+                                if i == 0:
+                                    open = tmpdf['open'] * coeff
+                                    close = tmpdf['close'] * coeff
+                                else:
+                                    open = open + tmpdf['open'] * coeff
+                                    close = close + tmpdf['close'] * coeff
+                            high = pd.concat([open, close], axis = 1).max(axis = 1)
+                            low = pd.concat([open, close], axis = 1).min(axis = 1)
+                            col_list = ['volume', 'openInterest']
+                            ddf = pd.concat([ open, high, low, close] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
+                            ddf.columns = ['open', 'high', 'low', 'close'] + col_list
+                            config['ddf'] = ddf[ddf.index <= edate]
                         if len(config['ddf']) < 10:
                             continue
                 df = mdf.copy(deep = True)
