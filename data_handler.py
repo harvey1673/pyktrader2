@@ -832,4 +832,16 @@ def ma_ribbon(df, ma_series, ma_type = 0):
     dist = max(ma_array) - min(ma_array)
     df["MARIBBON_CORR"][-1] = corr
     df["MARIBBON_PVAL"][-1] = pval
-    df["MARIBBON_DIST"] = dist
+    df["MARIBBON_DIST"][-1] = dist
+    
+ def AROON(df, n):
+    aroondown, aroonup = AROON(df['high'].values, df['low'].values, timeperiod= n)
+    aroon_dn = pd.Series(arrondown, index = df.index, name = "AROONDN_%s" % str(n))
+    aroon_up = pd.Series(arronup, index = df.index, name = "AROONUP_%s" % str(n))
+    return pd.concat([aroon_up, aroon_dn], join='outer', axis=1)
+    
+def aroon(df, n):
+    aroondown, aroonup = AROON(df['high'][-(n+1):], df['low'][-(n+1):], timeperiod= n)
+    df["AROOONDN_%s" % str(n)] = aroondown[-1]
+    df["AROOONUP_%s" % str(n)] = aroonup[-1]
+    
