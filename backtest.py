@@ -379,7 +379,7 @@ def simcontract_min(config_file):
     sim_mode = sim_config.get('sim_mode', 'OR')
     calc_coeffs = sim_config.get('calc_coeffs', [1, -1])
     cont_maplist = sim_config.get('cont_maplist', [])
-    sim_period = sim_config.get('sim_period', '-6m')
+    sim_period = sim_config.get('sim_period', '-12m')
     need_daily = sim_config.get('need_daily', False)
     if len(cont_maplist) == 0:
         cont_maplist = [[0]] * len(sim_list)
@@ -421,24 +421,23 @@ def simcontract_min(config_file):
         day_data = {}
         config['tick_base'] = 0
         config['marginrate'] = (0, 0)
-        rollrule = config.get('rollrule', '-50b')
+        roll_rule = '-50b'
         config['exit_min'] = config.get('exit_min', 2057)
         config['no_trade_set'] = config.get('no_trade_set', [])
         if assets[0] in ['cu', 'al', 'zn']:
             rollrule = '-1b'
         elif assets[0] in ['IF', 'IH', 'IC']:
             rollrule = '-2b'
-            #config['no_trade_set'] = range(1500, 1514) + range(2100, 2115)
         elif assets[0] in ['au', 'ag']:
             rollrule = '-25b'
         elif assets[0] in ['TF', 'T']:
             rollrule = '-20b'
-            #config['no_trade_set'] = range(1500, 1514) + range(2110, 2115)
+        rollrule = config.get('rollrule', rollrule)
         contlist = {}
         exp_dates = {}
         for i, prod in enumerate(assets):
             cont_mth, exch = mysqlaccess.prod_main_cont_exch(prod)
-            contlist[prod] = misc.contract_range(prod, exch, cont_mth, start_date,end_date)
+            contlist[prod] = misc.contract_range(prod, exch, cont_mth, start_date, end_date)
             exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
             edates = [ misc.day_shift(d, rollrule) for d in exp_dates[prod] ]
             sdates = [ misc.day_shift(d, sim_period) for d in exp_dates[prod] ]
@@ -503,6 +502,8 @@ def simcontract_min(config_file):
                             else:
                                 xopen = xopen + tmpdf['open'] * coeff
                                 xclose = xclose + tmpdf['close'] * coeff
+                        xopen = xopen.dropna()
+                        xclose = xclose.dropna()
                         xhigh = pd.concat([xopen, xclose], axis = 1).max(axis = 1)
                         xlow = pd.concat([xopen, xclose], axis = 1).min(axis = 1)
                         col_list = ['date', 'min_id', 'volume', 'openInterest']                        
