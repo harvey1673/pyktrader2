@@ -63,8 +63,8 @@ def asctrend_sim( mdf, config):
             continue
         buy_trig  = (mslice.asc_signal > 0) and (mslice.rsi_signal > 0) and (mslice.sar_signal > 0)
         sell_trig = (mslice.asc_signal < 0) and (mslice.rsi_signal < 0) and (mslice.sar_signal < 0)
-        long_close  = (mslice.open <= mslice.chanL) or (mslice.psar_dir < 0)
-        short_close = (mslice.open >= mslice.chanH) or (mslice.psar_dir > 0)
+        buy_close  = (mslice.asc_signal < 0) or (mslice.rsi_signal < 0)
+        sell_close = (mslice.asc_signal > 0) or (mslice.rsi_signal > 0)
         if mslice.close_ind:
             if (pos != 0):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset , dd)
@@ -76,7 +76,7 @@ def asctrend_sim( mdf, config):
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
-            if (short_close and (pos > 0)) or (long_close and (pos < 0)):
+            if (buy_close and (pos > 0)) or (sell_close and (pos < 0)):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -95,18 +95,18 @@ def asctrend_sim( mdf, config):
                 pos = target_pos
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        #if pos_update and pos != 0:
-        #    if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
-        #        curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-        #        tradeid += 1
-        #        curr_pos[0].exit_tradeid = tradeid
-        #        closed_trades.append(curr_pos[0])
-        #        curr_pos = []
-        #        xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-        #        xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-        #        pos = 0
-        #    else:
-        #        curr_pos[0].update_bar(mslice)                
+        if pos_update and pos != 0:
+            if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
+                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
+                tradeid += 1
+                curr_pos[0].exit_tradeid = tradeid
+                closed_trades.append(curr_pos[0])
+                curr_pos = []
+                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
+                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
+                pos = 0
+            else:
+                curr_pos[0].update_bar(mslice)                
         xdf.set_value(dd, 'pos', pos)
     return (xdf, closed_trades)
     
