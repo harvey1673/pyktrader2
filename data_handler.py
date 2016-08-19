@@ -703,7 +703,7 @@ def DVO(df, w = [0.5, 0.5, 0, 0], N = 2, s = [0.5, 0.5], M = 252):
 def PSAR(df, iaf = 0.02, maxaf = 0.2, incr = 0):
     if incr == 0:
         incr = iaf
-    psar = pd.Series(df.close, name='PSAR_VAL')
+    psar = pd.Series(index = df.index, name='PSAR_VAL')
     direction = pd.Series(index = df.index, name='PSAR_DIR')
     bull = True
     ep = df.low[0]
@@ -751,6 +751,14 @@ def PSAR(df, iaf = 0.02, maxaf = 0.2, incr = 0):
             direction[idx] = -1
     return pd.concat([psar, direction], join='outer', axis=1)
 
+def SAR(df, incr = 0.005, maxaf = 0.02):                                           
+    sar = talib.SAR(df['high'].values, df['low'].values, acceleration=incr, maximum=maxaf)
+    return pd.Series(sar, index = df.index, name = "SAR")
+
+def sar(df, incr = 0.005, maxaf = 0.02, lookback = 100):                          
+    sar = talib.SAR(df['high'][-lookback:].values, df['low'][-lookback:].values, acceleration=incr, maximum=maxaf)
+    df['SAR'][-1] = sar[-1]
+    
 def SPBFILTER(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     if n3 == 0:
         n3 = int((n1 + n2)/2)
@@ -784,10 +792,9 @@ def PRICE_CHANNEL(df, n, risk = 0.3):
     bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "PCHDN_%s" % str(risk))    
     return pd.concat([bsmax, bsmin], join='outer', axis=1)
 
-def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):    
-    if period == 0: 
-        period = 3 + risk * 2
-    wpr = WPR(df, period)
+def ASCTREND(df, n, risk = 3, stop_ratio = 0.5, atr_mode = 0):    
+
+    wpr = WPR(df, n)
     uplevel = 67 + risk
     dnlevel = 33 - risk
     signal = pd.Series(0, index = df.index, name = "ASCSIG_%s" % str(n))
@@ -801,9 +808,9 @@ def ASCTREND(df, n, risk = 3, period = 0, stop_ratio = 0.5, atr_mode = 0):
     trend[ind] = -1
     trend = trend.fillna(method='ffill')
     if atr_mode == 0:
-        atr = ATR(df, period + 1)
+        atr = ATR(df, n + 1)
     else:
-        atr = pd.rolling_mean(df['high'] - df['low'], period + 1)
+        atr = pd.rolling_mean(df['high'] - df['low'], n + 1)
     stop[trend > 0] = df['low'] - stop_ratio * atr
     stop[trend < 0] = df['high'] + stop_ratio * atr
     return pd.concat([signal, trend, stop], join='outer', axis=1)
