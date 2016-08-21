@@ -385,7 +385,7 @@ def KST(df, r1, r2, r3, r4, n1, n2, n3, n4):
 
 #Relative Strength Index
 def RSI(df, n, field='close'):
-    return pd.Series(talib.RSI(df[field].values, n), name='RSI_%s' % str(n))
+    return pd.Series(talib.RSI(df[field].values, n), index = df.index, name='RSI_%s' % str(n))
     #UpMove = df[field] - df[field].shift(1)
     #DoMove = df[field].shift(1) - df[field]
     #UpD = pd.Series(UpMove)
@@ -782,7 +782,7 @@ def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     df[RMS_key][-1] = np.sqrt((df[SPB_key][(-n3):]**2).mean())
 
 def WPR(df, n):
-    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n)), name = "WPR_%s" % str(n))
+    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name = "WPR_%s" % str(n))
     return res
 
 def PRICE_CHANNEL(df, n, risk = 0.3):
@@ -792,8 +792,7 @@ def PRICE_CHANNEL(df, n, risk = 0.3):
     bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "PCHDN_%s" % str(risk))    
     return pd.concat([bsmax, bsmin], join='outer', axis=1)
 
-def ASCTREND(df, n, risk = 3, stop_ratio = 0.5, atr_mode = 0):    
-
+def ASCTREND(df, n, risk = 3, stop_ratio = 0.5, atr_mode = 0):
     wpr = WPR(df, n)
     uplevel = 67 + risk
     dnlevel = 33 - risk
@@ -827,8 +826,8 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
         dist = max(ma_array[idy,:]) - min(ma_array[idy,:])
     corr_ts = pd.Series(corr, index = df.index, name = "MARIBBON_CORR")
     pval_ts = pd.Series(pval, index = df.index, name = "MARIBBON_PVAL")
-    dist_ts = pd.Series(pval, index = df.index, name = "MARIBBON_DIST")
-    return pd.concat([corr_ts, pval_ts], join='outer', axis=1)
+    dist_ts = pd.Series(dist, index = df.index, name = "MARIBBON_DIST")
+    return pd.concat([corr_ts, pval_ts, dist_ts], join='outer', axis=1)
     
 def ma_ribbon(df, ma_series, ma_type = 0):
     ma_array = np.zeros([len(df)])
@@ -841,14 +840,13 @@ def ma_ribbon(df, ma_series, ma_type = 0):
     df["MARIBBON_PVAL"][-1] = pval
     df["MARIBBON_DIST"][-1] = dist
     
- def AROON(df, n):
-    aroondown, aroonup = AROON(df['high'].values, df['low'].values, timeperiod= n)
-    aroon_dn = pd.Series(arrondown, index = df.index, name = "AROONDN_%s" % str(n))
-    aroon_up = pd.Series(arronup, index = df.index, name = "AROONUP_%s" % str(n))
+def AROON(df, n):
+    aroondown, aroonup = talib.AROON(df['high'].values, df['low'].values, timeperiod= n)
+    aroon_dn = pd.Series(aroondown, index = df.index, name = "AROONDN_%s" % str(n))
+    aroon_up = pd.Series(aroonup, index = df.index, name = "AROONUP_%s" % str(n))
     return pd.concat([aroon_up, aroon_dn], join='outer', axis=1)
     
 def aroon(df, n):
     aroondown, aroonup = AROON(df['high'][-(n+1):], df['low'][-(n+1):], timeperiod= n)
     df["AROOONDN_%s" % str(n)] = aroondown[-1]
     df["AROOONUP_%s" % str(n)] = aroonup[-1]
-    

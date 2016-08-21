@@ -28,17 +28,23 @@ def asctrend_sim( mdf, config):
     rsi_offset = param[3]
     rsi_buy = 50 + rsi_offset 
     rsi_sell = 50 - rsi_offset
-    rsi  = dh.RSI(df, n = rsi_period) 
+    rsi  = dh.RSI(xdf, n = rsi_period)
     rsi_signal = pd.Series(0, index = rsi.index)
-    rsi_signal[(rsi > rsi_buy) & (rsi.shift(1) <= rsi_buy)] = 1
-    rsi_signal[(rsi < rsi_sell) & (rsi.shift(1) >= rsi_sell)] = -1
+    rsi_signal[(rsi > rsi_buy)] = 1
+    #rsi_signal[(rsi > rsi_buy) & (rsi.shift(1) <= rsi_buy)] = 1
+    rsi_signal[(rsi < rsi_sell)] = -1
+    #rsi_signal[(rsi < rsi_sell) & (rsi.shift(1) >= rsi_sell)] = -1
     xdf['rsi_signal'] = rsi_signal
-    sar_step = 0.005
-    sar_max = 0.02
+    if len(param) > 4:
+        sar_step = param[4]
+        sar_max = param[5]
+    else:
+        sar_step = 0.005
+        sar_max = 0.02
     sar = dh.SAR(xdf, incr = sar_step, maxaf = sar_max)
     sar_signal = pd.Series(0, index = sar.index)
-    sar_signal[(sar >= sar.shift(1)) & (sar > df['close'])] = 1 
-    sar_signal[(sar <= sar.shift(1)) & (sar < df['close'])] = -1
+    sar_signal[(sar >= sar.shift(1))] = 1
+    sar_signal[(sar <= sar.shift(1))] = -1
     xdf['sar_signal'] = sar_signal
     xdf['sar_stop'] = sar
     xdf['prev_close'] = xdf['close'].shift(1)
@@ -59,7 +65,7 @@ def asctrend_sim( mdf, config):
         else:
             pos = curr_pos[0].pos
         xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.chanH) or np.isnan(mslice.chanL):
+        if np.isnan(mslice.sar_stop) or np.isnan(mslice.asc_stop):
             continue
         buy_trig  = (mslice.asc_signal > 0) and (mslice.rsi_signal > 0) and (mslice.sar_signal > 0)
         sell_trig = (mslice.asc_signal < 0) and (mslice.rsi_signal < 0) and (mslice.sar_signal < 0)
@@ -95,18 +101,18 @@ def asctrend_sim( mdf, config):
                 pos = target_pos
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        if pos_update and pos != 0:
-            if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-            else:
-                curr_pos[0].update_bar(mslice)                
+        # if pos_update and pos != 0:
+        #     if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
+        #         curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
+        #         tradeid += 1
+        #         curr_pos[0].exit_tradeid = tradeid
+        #         closed_trades.append(curr_pos[0])
+        #         curr_pos = []
+        #         xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
+        #         xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
+        #         pos = 0
+        #     else:
+        #         curr_pos[0].update_bar(mslice)
         xdf.set_value(dd, 'pos', pos)
     return (xdf, closed_trades)
     
@@ -114,13 +120,12 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_asctrend.asctrend_sim'
     sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'psar_chan'
+    sim_config['sim_name']   = 'asctrend_sim'
     sim_config['products']   = [ 'm', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j', 'jm', 'ag', 'cu', 'au', 'al', 'zn' ]
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160722'
+    sim_config['end_date']   = '20160819'
     sim_config['freq']  =  ['5Min', '15Min', '30Min', '60Min']
-    sim_config['param'] = [[20, 80],   
-
+    sim_config['param'] = [[9, 3, 14, 10, 0.005, 0.02], [9, 3, 21, 10, 0.005, 0.02]]
     sim_config['pos_class'] = 'strat.TradePos'
     config = {'capital': 10000,
               'offset': 0,
@@ -130,7 +135,6 @@ def gen_config_file(filename):
               'stoploss': 0.0,
               'pos_update': False,
               'pos_args': {},
-              'chan_args': [{}, {}]
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:

@@ -77,10 +77,10 @@ def MA_sim( mdf, config):
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
-            if (((ma_short >= max(ma_list)) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) or \
-                        ((ma_short <= min(ma_list)) and ((use_chan == False) or (mslice.open<=mslice.chan_low)))) and (pos==0):
-                target_pos = ((ma_short >= max(ma_list)) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) * unit \
-                             - ((ma_short <= min(ma_list)) and ((use_chan == False) or (mslice.open<=mslice.chan_low))) * unit
+            if (((ma_short >= ma_list[1]) and (ma_short >= ma_last) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) or \
+                        ((ma_short <= ma_list[1]) and (ma_short <= ma_last) and ((use_chan == False) or (mslice.open<=mslice.chan_low)))) and (pos==0):
+                target_pos = ((ma_short >= ma_list[1]) and (ma_short >= ma_last) and ((use_chan == False) or (mslice.open>=mslice.chan_high))) * unit \
+                             - ((ma_short <= ma_list[1]) and (ma_short <= ma_last) and ((use_chan == False) or (mslice.open<=mslice.chan_low))) * unit
                 new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
