@@ -15,8 +15,8 @@ class MASystemTrader(Strategy):
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
-        self.chan_high = [0.0] * numAssets
-        self.chan_low  = [0.0] * numAssets
+        self.chan_high = [True] * numAssets
+        self.chan_low  = [True] * numAssets
         self.ma_prices = [[]] * numAssets
         self.tick_base = [0.0] * numAssets
         self.daily_close_buffer = 3
@@ -63,10 +63,13 @@ class MASystemTrader(Strategy):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]].data
         self.ma_prices[idx] = [ xdf[self.ma_key + str(win)][-1] for win in self.ma_win[idx]]
-        key = self.channel_keys[0] + str(self.channels[idx])
-        self.chan_high[idx] = xdf[key][-1]
-        key = self.channel_keys[1] + str(self.channels[idx])
-        self.chan_low[idx] = xdf[key][-1]
+        self.chan_high[idx] = True
+        self.chan_low[idx] = True
+        if self.channels[idx] > 0:
+            key = self.channel_keys[0] + str(self.channels[idx])
+            self.chan_high[idx] = (self.curr_prices[idx] >= xdf[key][-2])
+            key = self.channel_keys[1] + str(self.channels[idx])
+            self.chan_low[idx] = (self.curr_prices[idx] <= xdf[key][-2])
 
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
@@ -80,7 +83,6 @@ class MASystemTrader(Strategy):
         if len(self.submitted_trades[idx]) > 0:
             return
         inst = self.underliers[idx][0]
-        curr_p = self.curr_prices[idx]
         min_id = self.agent.cur_min[inst]['tick_min']
         num_pos = len(self.positions[idx])
         buysell = 0
@@ -106,9 +108,9 @@ class MASystemTrader(Strategy):
             save_status = True
             buysell = 0
         if (self.trade_unit[idx] > 0) and (buysell == 0):
-            if (ma_fast >= max(self.ma_prices[idx])) and (curr_p >= self.chan_high[idx]):
+            if (ma_fast >= self.ma_prices[idx][1]) and (ma_fast >= self.ma_prices[idx][-1]) and self.chan_high[idx]:
                 buysell = 1
-            elif (ma_fast <= min(self.ma_prices[idx])) and (curr_p <= self.chan_low[idx]):
+            elif (ma_fast <= self.ma_prices[idx][1]) and (ma_fast <= self.ma_prices[idx][-1]) and self.chan_low[idx]:
                 buysell = -1
             if buysell != 0:
                 msg = 'MA_%s to open position for inst = %s, chan_high=%s, chan_low=%s, MA=%s, curr_price= %s, direction=%s, volume=%s' \
