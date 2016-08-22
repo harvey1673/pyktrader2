@@ -27,8 +27,8 @@ def MA_sim( mdf, config):
     for idx, win in enumerate(win_list):
         xdf['MA'+str(idx)] = MA_func(xdf, win).shift(1)
     if use_chan:
-        xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(1)
-        xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(1)
+        xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(2)
+        xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(2)
     else:
         xdf['chan_high'] = pd.Series(index = xdf.index)
         xdf['chan_low'] = pd.Series(index = xdf.index)

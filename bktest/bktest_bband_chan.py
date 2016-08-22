@@ -39,8 +39,8 @@ def bband_chan_sim( mdf, config):
     xdf['up_exit'] = xdf['boll_ma'] + xdf['boll_std'] * k_e
     xdf['dn_exit'] = xdf['boll_ma'] - xdf['boll_std'] * k_e
     if chan > 0:
-        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
-        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
+        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(2)
+        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(2)
     else:
         xdf['chan_h'] = 0
         xdf['chan_l'] = 10000000

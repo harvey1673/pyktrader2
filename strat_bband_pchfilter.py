@@ -62,9 +62,9 @@ class BbandPChanTrader(Strategy):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]].data
         key = self.channel_keys[0] + str(self.channels[idx])
-        self.chan_high[idx] = xdf[key][-1]
+        self.chan_high[idx] = xdf[key][-2]
         key = self.channel_keys[1] + str(self.channels[idx])
-        self.chan_low[idx]  = xdf[key][-1]
+        self.chan_low[idx]  = xdf[key][-2]
         key = self.band_keys[0] + str(self.band_win[idx])
         self.mid_band[idx] = xdf[key][-1]
         key = self.band_keys[1] + str(self.band_win[idx])
