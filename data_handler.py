@@ -318,7 +318,7 @@ def TRIX(df, n):
 
 #Average Directional Movement Index
 def ADX(df, n):
-    return pd.Series(talib.ADX(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), name = 'ADX_%s' % str(n))
+    return pd.Series(talib.ADX(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), index = df.index, name = 'ADX_%s' % str(n))
     # UpMove = df['high'] - df['high'].shift(1)
     # DoMove = df['low'].shift(1) - df['low']
     # UpD = pd.Series(UpMove)
@@ -332,7 +332,7 @@ def ADX(df, n):
     # return ADX 
 
 def ADXR(df, n):
-    return pd.Series(talib.ADXR(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), name = 'ADXR_%s' % str(n))
+    return pd.Series(talib.ADXR(df['high'].values, df['low'].values, df['close'].values, timeperiod = n), index = df.index, name = 'ADXR_%s' % str(n))
     
 #MACD, MACD Signal and MACD difference
 def MACD(df, n_fast, n_slow, n_signal):
