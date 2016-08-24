@@ -31,9 +31,9 @@ def asctrend_sim( mdf, config):
     rsi  = dh.RSI(xdf, n = rsi_period)
     rsi_signal = pd.Series(0, index = rsi.index)
     #rsi_signal[(rsi > rsi_buy)] = 1
-    rsi_signal[(rsi > rsi_buy) & (rsi.shift(1) <= rsi_buy)] = 1
+    rsi_signal[(rsi >= rsi_buy) & (rsi.shift(1) < rsi_buy)] = 1
     #rsi_signal[(rsi < rsi_sell)] = -1
-    rsi_signal[(rsi < rsi_sell) & (rsi.shift(1) >= rsi_sell)] = -1
+    rsi_signal[(rsi <= rsi_sell) & (rsi.shift(1) > rsi_sell)] = -1
     xdf['rsi_signal'] = rsi_signal.shift(1)
     if len(param) > 4:
         sar_step = param[4]
@@ -46,8 +46,7 @@ def asctrend_sim( mdf, config):
     sar_signal[(sar < xdf['close']) & (sar >= sar.shift(1)] = 1
     sar_signal[(sar > xdf['close']) & (sar <= sar.shift(1))] = -1
     xdf['sar_signal'] = sar_signal.shift(1)
-    xdf['sar_stop'] = sar
-    xdf['prev_close'] = xdf['close'].shift(1)
+    xdf['sar_stop'] = sar.shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
     if close_daily:
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
@@ -82,7 +81,9 @@ def asctrend_sim( mdf, config):
                 xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
                 pos = 0
         else:
-            if (buy_close and (pos > 0)) or (sell_close and (pos < 0)):
+            if pos_update and pos != 0:
+                curr_pos[0].update_price(mslice.asc_stop)
+            if ((buy_close or curr_pos[0].check_exit(mslice.open, 0)) and (pos > 0)) or ((sell_close or curr_pos[0].check_exit(mslice.open, 0)) and (pos < 0)):
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
@@ -93,7 +94,7 @@ def asctrend_sim( mdf, config):
                 pos = 0       
             if (buy_trig or sell_trig) and (pos==0):
                 target_pos = buy_trig * unit - sell_trig * unit
-                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
+                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.asc_stop, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
                 new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
@@ -101,18 +102,6 @@ def asctrend_sim( mdf, config):
                 pos = target_pos
                 xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
                 xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        # if pos_update and pos != 0:
-        #     if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
-        #         curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-        #         tradeid += 1
-        #         curr_pos[0].exit_tradeid = tradeid
-        #         closed_trades.append(curr_pos[0])
-        #         curr_pos = []
-        #         xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-        #         xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-        #         pos = 0
-        #     else:
-        #         curr_pos[0].update_bar(mslice)
         xdf.set_value(dd, 'pos', pos)
     return (xdf, closed_trades)
     
