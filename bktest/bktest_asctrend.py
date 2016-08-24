@@ -83,7 +83,10 @@ def asctrend_sim( mdf, config):
         else:
             if pos_update and pos != 0:
                 curr_pos[0].update_price(mslice.asc_stop)
-            if ((buy_close or curr_pos[0].check_exit(mslice.open, 0)) and (pos > 0)) or ((sell_close or curr_pos[0].check_exit(mslice.open, 0)) and (pos < 0)):
+                pos_close = curr_pos[0].check_exit(mslice.open, 0)
+            else:
+                pos_close = False
+            if (buy_close and (pos > 0)) or (sell_close and (pos < 0)) or pos_close:
                 curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
                 tradeid += 1
                 curr_pos[0].exit_tradeid = tradeid
