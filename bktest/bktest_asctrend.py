@@ -34,7 +34,7 @@ def asctrend_sim( mdf, config):
     rsi_signal[(rsi > rsi_buy) & (rsi.shift(1) <= rsi_buy)] = 1
     #rsi_signal[(rsi < rsi_sell)] = -1
     rsi_signal[(rsi < rsi_sell) & (rsi.shift(1) >= rsi_sell)] = -1
-    xdf['rsi_signal'] = rsi_signal
+    xdf['rsi_signal'] = rsi_signal.shift(1)
     if len(param) > 4:
         sar_step = param[4]
         sar_max = param[5]
@@ -43,9 +43,9 @@ def asctrend_sim( mdf, config):
         sar_max = 0.02
     sar = dh.SAR(xdf, incr = sar_step, maxaf = sar_max)
     sar_signal = pd.Series(0, index = sar.index)
-    sar_signal[(sar >= sar.shift(1))] = 1
-    sar_signal[(sar <= sar.shift(1))] = -1
-    xdf['sar_signal'] = sar_signal
+    sar_signal[(sar < xdf['close']) & (sar >= sar.shift(1)] = 1
+    sar_signal[(sar > xdf['close']) & (sar <= sar.shift(1))] = -1
+    xdf['sar_signal'] = sar_signal.shift(1)
     xdf['sar_stop'] = sar
     xdf['prev_close'] = xdf['close'].shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
