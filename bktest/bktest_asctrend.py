@@ -30,9 +30,9 @@ def asctrend_sim( mdf, config):
     rsi_sell = 50 - rsi_offset
     rsi  = dh.RSI(xdf, n = rsi_period)
     rsi_signal = pd.Series(0, index = rsi.index)
-    #rsi_signal[(rsi > rsi_buy)] = 1
+    #rsi_signal[(rsi >= rsi_buy)] = 1
     rsi_signal[(rsi >= rsi_buy) & (rsi.shift(1) < rsi_buy)] = 1
-    #rsi_signal[(rsi < rsi_sell)] = -1
+    #rsi_signal[(rsi <= rsi_sell)] = -1
     rsi_signal[(rsi <= rsi_sell) & (rsi.shift(1) > rsi_sell)] = -1
     xdf['rsi_signal'] = rsi_signal.shift(1)
     if len(param) > 4:
@@ -43,8 +43,8 @@ def asctrend_sim( mdf, config):
         sar_max = 0.02
     sar = dh.SAR(xdf, incr = sar_step, maxaf = sar_max)
     sar_signal = pd.Series(0, index = sar.index)
-    sar_signal[(sar < xdf['close']) & (sar >= sar.shift(1)] = 1
-    sar_signal[(sar > xdf['close']) & (sar <= sar.shift(1))] = -1
+    sar_signal[(sar < xdf['close'])] = 1
+    sar_signal[(sar > xdf['close'])] = -1
     xdf['sar_signal'] = sar_signal.shift(1)
     xdf['sar_stop'] = sar.shift(1)
     xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
@@ -113,7 +113,9 @@ def gen_config_file(filename):
     sim_config['sim_func']  = 'bktest_asctrend.asctrend_sim'
     sim_config['scen_keys'] = ['freq', 'param']
     sim_config['sim_name']   = 'asctrend_sim'
-    sim_config['products']   = [ 'm', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j', 'jm', 'ag', 'cu', 'au', 'al', 'zn' ]
+    sim_config['products']   = [ 'rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', \
+                                 'm', 'RM', 'y', 'p', 'a', 'jd', 'cs', 'SR', 'c', 'OI', \
+                                 'pp', 'l', 'TA', 'v', 'MA', 'bu', 'ag', 'cu', 'au', 'al', 'zn', 'CF']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160819'
     sim_config['freq']  =  ['5Min', '15Min', '30Min', '60Min']

@@ -148,15 +148,21 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     res['tot_pnl'] = float(daily_pnl.sum())
     res['tot_cost'] = float(daily_cost.sum())
     res['num_days'] = len(daily_pnl)
-    res['sharp_ratio'] = float(res['avg_pnl']/res['std_pnl']*np.sqrt(252.0))
-    max_dd, max_dur = max_drawdown(cum_pnl)
     res['max_margin'] = float(daily_margin.max())
     res['min_avail'] = float(available.min())
-    res['max_drawdown'] =  float(max_dd)
-    res['max_dd_period'] =  int(max_dur)
-    if abs(max_dd) > 0:
-        res['profit_dd_ratio'] = float(res['tot_pnl']/abs(max_dd))
+    if res['std_pnl'] > 0:
+        res['sharp_ratio'] = float(res['avg_pnl']/res['std_pnl']*np.sqrt(252.0))
+        max_dd, max_dur = max_drawdown(cum_pnl)
+        res['max_drawdown'] =  float(max_dd)
+        res['max_dd_period'] =  int(max_dur)
+        if abs(max_dd) > 0:
+            res['profit_dd_ratio'] = float(res['tot_pnl']/abs(max_dd))
+        else:
+            res['profit_dd_ratio'] = 0
     else:
+        res['sharp_ratio'] = 0
+        res['max_drawdown'] = 0
+        res['max_dd_period'] = 0
         res['profit_dd_ratio'] = 0
     ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
     return res, ts
@@ -421,7 +427,7 @@ def simcontract_min(config_file):
         day_data = {}
         config['tick_base'] = 0
         config['marginrate'] = (0, 0)
-        roll_rule = '-50b'
+        rollrule = '-50b'
         config['exit_min'] = config.get('exit_min', 2057)
         config['no_trade_set'] = config.get('no_trade_set', [])
         if assets[0] in ['cu', 'al', 'zn']:
