@@ -465,7 +465,15 @@ class Agent(MktDataMixin):
                 self.instruments[inst].prev_close = ddf['close'].iloc[-1]
                 for fobj in self.day_data_func[inst]:
                     ts = fobj.sfunc(ddf)
-                    ddf[ts.name]= ts
+                    if type(ts).__name__ == 'Series':
+                        if ts.name in ddf.columns:
+                            self.logger.warning('TimeSeries name %s is already in the columns for inst = %s' % (ts.name, inst))                    
+                        ddf[ts.name]= ts
+                    elif type(ts).__name__ == 'DataFrame':
+                        for col_name in ts.columns:
+                            if col_name in ddf.columns:
+                                self.logger.warning('TimeSeries name %s is already in the columns for inst = %s' % (col_name, inst))                            
+                            ddf[col_name] = ts[col_name]
             self.day_data[inst] = data_handler.DynamicRecArray(dataframe = ddf)
         if self.min_data_days > 0 or mid_day:
             self.logger.debug('Updating historical min data for %s' % self.scur_day.strftime('%Y-%m-%d'))
@@ -509,7 +517,15 @@ class Agent(MktDataMixin):
                         mdf_m = mdf
                     for fobj in self.min_data_func[inst][m]:
                         ts = fobj.sfunc(mdf_m)
-                        mdf_m[ts.name]= ts
+                        if type(ts).__name__ == 'Series':
+                            if ts.name in mdf_m.columns:
+                                self.logger.warning('TimeSeries name %s is already in the columns for inst = %s' % (ts.name, inst))                        
+                            mdf_m[ts.name]= ts
+                        elif type(ts).__name__ == 'DataFrame':
+                            for col_name in ts.columns:
+                                if col_name in mdf_m.columns:
+                                    self.logger.warning('TimeSeries name %s is already in the columns for inst = %s' % (col_name, inst))
+                                mdf_m[col_name] = ts[col_name]                        
                     self.min_data[inst][m] = data_handler.DynamicRecArray(dataframe = mdf_m)
 
     def restart(self):
