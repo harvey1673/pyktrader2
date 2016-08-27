@@ -7,6 +7,7 @@ import pyktlib
 import instrument
 import math
 import json
+import pandas as pd
 import tradeagent as agent
 
 vtype_func_map = {'int':int, 'float':float, 'str': str, 'bool':bool }
@@ -108,6 +109,8 @@ class StratGui(object):
                 for idx, underlier in enumerate(self.underliers):
                     under_key = ','.join(underlier)
                     value = params[field][idx]
+                    if type(value).__name__ in ['float', 'float64']:
+                        value = round(value, 2)
                     vtype = self.field_types[field]
                     value = type2str(value, vtype)
                     if field in self.entry_fields:
@@ -298,7 +301,7 @@ class MASystemStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
-        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaPrices', 'Channels', 'ChanHigh', 'ChanLow']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaFast', 'MaMedm', 'MaSlow', 'Channels', 'ChanHigh', 'ChanLow']
         self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
@@ -306,9 +309,11 @@ class MASystemStratGui(StratGui):
                             'CloseTday': 'bool',
                             'CurrPrices': 'float',
                             'MaWin': 'intlist',
-                            'MaPrices': 'floatlist',
-                            'ChanHigh': 'bool',
-                            'ChanLow': 'bool',
+                            'MaFast': 'float',
+                            'MaMedm': 'float',
+                            'MaSlow': 'float',
+                            'ChanHigh': 'float',
+                            'ChanLow': 'float',
                             'NumTick': 'int',
                             'Channels': 'int',
                             'OrderType': 'str',
@@ -776,6 +781,36 @@ class Gui(tk.Tk):
             v = self.stringvars['Insts.'+field]
             v.set(params['Insts'][inst][field])
 
+    def qry_agent_histdata(self):
+        instfield = 'QryInst'
+        ent = self.entries[instfield]
+        inst = ent.get()
+        freqfield = 'HistFreq'
+        fent = self.entries[freqfield]
+        freq = fent.get()
+        data = self.app.get_hist_data(inst, freq, nlen = 20)
+        if len(data) == 0:
+            return
+        pos_win = tk.Toplevel(self)
+        pos_frame = tk.Frame(pos_win)
+        fields = data.dtype.names
+        for idx, field in enumerate(fields):
+            row_idx = 0
+            tk.Label(pos_frame, text=field).grid(row=row_idx, column=idx)
+            for i in range(len(data)):
+                row_idx += 1
+                txt = data[field][i]
+                if type(txt).__name__ == "datetime64":
+                    if field == "date":
+                        txt = pd.to_datetime(str(txt)).strftime("%Y-%m-%d")
+                    else:
+                        txt = pd.to_datetime(str(txt)).strftime("%Y-%m-%d %H%M%S")
+                elif type(txt).__name__ in ['float', 'float64']:
+                    txt = round(txt, 2)
+                tk.Label(pos_frame, text=txt).grid(row=row_idx, column=idx)
+        pos_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+        return
+
     def get_agent_account(self):        
         gway_keys = [ 'Account.' + gway for gway in self.gateways]
         params = self.app.get_agent_params(gway_keys)
@@ -836,15 +871,17 @@ class Gui(tk.Tk):
         agent_fields = entry_fields + label_fields
         setup_qrybtn = ttk.Button(lbl_frame, text='QueryInst', command= self.qry_agent_inst)
         setup_qrybtn.grid(column=0, row=row_idx, sticky="ew")
+        setup_histbtn = ttk.Button(lbl_frame, text='QryHist', command= self.qry_agent_histdata)
+        setup_histbtn.grid(column=1, row=row_idx, sticky="ew")
         setup_loadbtn = ttk.Button(lbl_frame, text='RunEOD', command= self.run_eod)
-        setup_loadbtn.grid(column=1, row=row_idx, sticky="ew")
+        setup_loadbtn.grid(column=2, row=row_idx, sticky="ew")
         setup_setbtn = ttk.Button(lbl_frame, text='SetParam', command= lambda: self.set_agent_params(entry_fields))
-        setup_setbtn.grid(column=2, row=row_idx, sticky="ew")
+        setup_setbtn.grid(column=3, row=row_idx, sticky="ew")
         setup_loadbtn = ttk.Button(lbl_frame, text='LoadParam', command= lambda: self.get_agent_params(agent_fields))
-        setup_loadbtn.grid(column=3, row=row_idx, sticky="ew")
-        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAccount', command= self.get_agent_account)
         setup_loadbtn.grid(column=4, row=row_idx, sticky="ew")
-        col_idx = 5
+        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAccount', command= self.get_agent_account)
+        setup_loadbtn.grid(column=5, row=row_idx, sticky="ew")
+        col_idx = 6
         for gway in self.gateways:
             setup_loadbtn = ttk.Button(lbl_frame, text='ReCalc_'+gway, command= lambda: self.recalc_margin(gway))
             setup_loadbtn.grid(column=col_idx, row=row_idx, sticky="ew")
@@ -856,14 +893,20 @@ class Gui(tk.Tk):
         ent = ttk.Entry(lbl_frame, width=4)
         ent.grid(column=0, row=row_idx+1, sticky="ew")
         self.entries[field] = ent
+        field = 'HistFreq'
+        lab = ttk.Label(lbl_frame, text= field, anchor='w')
+        lab.grid(column=1, row=row_idx, sticky="ew")
+        freqent = ttk.Entry(lbl_frame, width=4)
+        freqent.grid(column=1, row=row_idx+1, sticky="ew")
+        self.entries[field] = freqent
         inst_fields = ['Price', 'PrevClose', 'Volume', 'OI', 'AskPrice', 'AskVol', 'BidPrice', 'BidVol', 'UpLimit', 'DownLimit']        
         for idx, field in enumerate(inst_fields):
             lab1 = ttk.Label(lbl_frame, text=field, anchor='w')
-            lab1.grid(column=idx+1, row=row_idx, sticky="ew")
+            lab1.grid(column=idx+2, row=row_idx, sticky="ew")
             v = tk.DoubleVar()
             lab2 = ttk.Label(lbl_frame, textvariable = v, anchor='w')
             self.stringvars['Insts.' + field] = v
-            lab2.grid(column=idx+1, row=row_idx+1, sticky="ew")            
+            lab2.grid(column=idx+2, row=row_idx+1, sticky="ew")
         lbl_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)        
         self.get_agent_params(agent_fields)
         self.get_agent_account()
@@ -1060,6 +1103,17 @@ class MainApp(object):
     def run_gateway_func(self, gway, func_name, params):
         gateway = self.agent.gateways[gway]
         getattr(gateway, func_name)(*params)
+
+    def get_hist_data(self, inst, freq, nlen = 20):
+        data = []
+        if freq in ['D', 'd']:
+            if inst in self.agent.day_data:
+                data = self.agent.day_data[inst].data[-nlen:]
+        elif ('m' in freq) or ('M' in freq):
+            f = int(freq[:-1])
+            if (inst in self.agent.min_data) and (f in self.agent.min_data[inst]):
+                data = self.agent.min_data[inst][f].data[-nlen:]
+        return data
 
     def exit_agent(self):
         if self.agent != None:

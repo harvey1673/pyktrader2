@@ -30,8 +30,12 @@ def layer_sim( mdf, config):
         signal = sigout[sig_field]
         long_lvl  = slvl[0] + slvl[1]
         short_lvl = slvl[0] - slvl[1]
-        long_ind = (signal > long_lvl)
-        short_ind = (signal < short_lvl)
+        if idx > 0:
+            long_ind = (signal > long_lvl)
+            short_ind = (signal < short_lvl)
+        else:
+            long_ind = (signal > long_lvl) & (signal.shift(1) <= long_lvl)
+            short_ind = (signal < short_lvl) & (signal.shift(1) >= short_lvl)
         xdata = pd.concat([signal, long_ind, short_ind], axis = 1, keys = ['signal'+str(idx), 'long_ind'+str(idx), 'short_ind'+str(idx)]).shift(1)
         #print xdata
         xdf = xdf.join(xdata, how = 'left').fillna(method='ffill')
@@ -103,7 +107,7 @@ def gen_config_file(filename):
     sim_config['sim_name']   = 'layeredMACD_'
     sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160722'
+    sim_config['end_date']   = '20160819'
     sim_config['need_daily'] = False
     sim_config['signal_args'] = [[[12, 26, 9], [12, 26, 9]], [[7, 13, 5], [7, 13, 5]], [[5, 10, 3], [5, 10, 3]]]
     sim_config['freq'] = [['15min', '60min'], ['15min', '90min'], ['5min', '30min'], ['5min', '60min']]

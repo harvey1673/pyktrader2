@@ -404,8 +404,8 @@ class GrossPosition(Position):
         
         self.can_open.long  = max(self.instrument.max_holding[0] - self.locked_pos.long,0)
         self.can_open.short = max(self.instrument.max_holding[1] - self.locked_pos.short,0)
-        logging.debug(u'P_RC_1:%s 重算头寸，当前已开数 long=%s,short=%s 当前锁定数 long=%s,short=%s, 昨日仓位long=%s,short=%s' \
-                    % (str(self), self.curr_pos.long,self.curr_pos.short,self.locked_pos.long,self.locked_pos.short, self.pos_yday.long, self.pos_yday.short))
+        #logging.debug(u'P_RC_1:%s 重算头寸，当前已开数 long=%s,short=%s 当前锁定数 long=%s,short=%s, 昨日仓位long=%s,short=%s' \
+        #            % (str(self), self.curr_pos.long,self.curr_pos.short,self.locked_pos.long,self.locked_pos.short, self.pos_yday.long, self.pos_yday.short))
     
     def get_open_volume(self):
         return (self.can_open.long, self.can_open.short)

@@ -455,7 +455,7 @@ class Agent(MktDataMixin):
         if  self.instruments[inst].ptype == instrument.ProductType.Option:
             return
         if self.daily_data_days > 0 or mid_day:
-            self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
+            #self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             daily_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
             daily_end = self.scur_day
             ddf = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)            
@@ -476,7 +476,7 @@ class Agent(MktDataMixin):
                             ddf[col_name] = ts[col_name]
             self.day_data[inst] = data_handler.DynamicRecArray(dataframe = ddf)
         if self.min_data_days > 0 or mid_day:
-            self.logger.debug('Updating historical min data for %s' % self.scur_day.strftime('%Y-%m-%d'))
+            #self.logger.debug('Updating historical min data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             d_start = workdays.workday(self.scur_day, -self.min_data_days, CHN_Holidays)
             d_end = self.scur_day
             min_start = int(self.instruments[inst].start_tick_id/1000)
@@ -506,7 +506,7 @@ class Agent(MktDataMixin):
                     self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
                     self.instruments[inst].price = float(mdf['close'].iloc[-1])
                     self.instruments[inst].last_update = 0
-                    self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
+                    #self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
                 if 1 not in self.min_data_func[inst]:
                     self.min_data[inst][1] = data_handler.DynamicRecArray(dataframe = mdf)
                 for m in sorted(self.min_data_func[inst]):
@@ -527,6 +527,7 @@ class Agent(MktDataMixin):
                                     self.logger.warning('TimeSeries name %s is already in the columns for inst = %s' % (col_name, inst))
                                 mdf_m[col_name] = ts[col_name]                        
                     self.min_data[inst][m] = data_handler.DynamicRecArray(dataframe = mdf_m)
+                    #print inst, self.min_data[inst][m].data['date'][-1] < self.cur_min[inst]['date']
 
     def restart(self):
         self.logger.debug('Prepare trade environment for %s' % self.scur_day.strftime('%y%m%d'))
