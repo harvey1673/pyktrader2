@@ -35,7 +35,10 @@ class DynamicRecArray(object):
             except:            
                 continue
         self.length += 1
-        
+
+    def remove_lastn(self, n):
+        self.length -= n
+
     def extend(self, recs):
         for rec in recs:
             self.append(rec)
@@ -100,16 +103,16 @@ def array_split_by_bar(darr, split_list = [300, 1500, 2100], field = 'min_id'):
             tmp = darr[s_idx:(i+1)]
             data_dict = {'datetime': tmp['datetime'][0], 'date': tmp['date'][0], 'open': tmp['open'][0], \
                          'high': tmp['high'].max(), 'low': tmp['low'].min(), 'close': tmp['close'][-1], \
-                         'volume': tmp['volume'].sum(), 'openInterest': tmp['openInterest'][-1], 'min_id': tmp['min_id'][0]}
+                         'volume': tmp['volume'].sum(), 'openInterest': tmp['openInterest'][-1], 'min_id': tmp['min_id'][-1]}
             sparr.append_by_dict(data_dict)
             s_idx = i+1
     return sparr
 
 def min2daily(df, extra_cols = []):
-    ts = [df.index[0], df['min_id'][0], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]]
+    ts = [df.index[0], df['min_id'][-1], df['open'][0], df['high'].max(), df['low'].min(), df['close'][-1], df['volume'].sum(), df['openInterest'][-1]]
     col_idx = ['datetime', 'min_id', 'open','high','low','close','volume', 'openInterest']
     for col in extra_cols:
-        ts.append(df[col][0])
+        ts.append(df[col][-1])
         col_idx.append(col)
     return pd.Series(ts, index = col_idx)
 
@@ -173,7 +176,7 @@ def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
             allcol.append(datecol)
             sort_cols.append('date')
         if 'min_id' in df.columns:
-            mincol  = pd.DataFrame(df['min_id']).resample(freq, how ='first').dropna()
+            mincol  = pd.DataFrame(df['min_id']).resample(freq, how ='last').dropna()
             allcol.append(mincol)
             sort_cols.append('min_id')
         if 'openInterest' in df.columns:

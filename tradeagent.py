@@ -158,18 +158,20 @@ class MktDataMixin(object):
             ra_m = self.min_data[inst][m]
             if ((int(bar_id/m)>int(prev_bar/m)) or forced):
                 if m > 1:
+                    if (int(prev_bar/m) <= int(ra_m.data['bar_id'][-1]/m)):
+                        ra_m.remove_lastn(1)
                     last_bar = ra_m.data['bar_id'][-1]
                     rlen = len(ra)
                     idx = 0
                     for i in range(rlen):
-                        if (ra.data['date'][rlen-i-1] < self.cur_min[inst]['date']) or (ra.data['bar_id'][rlen-i-1] < last_bar + m):
+                        if (ra.data['date'][rlen-i-1] < self.cur_min[inst]['date']) or (ra.data['bar_id'][rlen-i-1] <= last_bar):
                            idx = i
                            break
                     if idx > 0:
                         new_data = {'datetime':ra.data['datetime'][-idx], 'open':ra.data['open'][-idx], 'high':max(ra.data['high'][-idx:]), \
                                 'low': min(ra.data['low'][-idx:]), 'close': ra.data['close'][-1],\
                                 'volume': sum(ra.data['volume'][-idx:]), 'openInterest':ra.data['openInterest'][-1],\
-                                'min_id': ra.data['min_id'][-idx], 'bar_id': ra.data['bar_id'][-idx], 'date':ra.data['date'][-idx]}
+                                'min_id': ra.data['min_id'][-1], 'bar_id': ra.data['bar_id'][-1], 'date':ra.data['date'][-1]}
                         ra_m.append_by_dict(new_data)                        
                 for fobj in self.min_data_func[inst][m]:
                     fobj.rfunc(self.min_data[inst][m].data)
