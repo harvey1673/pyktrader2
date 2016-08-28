@@ -693,7 +693,7 @@ class Gui(tk.Tk):
             self.volgrid_gui[prod].set_frame(self.volgrid_frame[prod])
             self.notebook.add(self.volgrid_frame[prod], text = 'VG_' + prod)
                     
-        for strat_name in self.app.agent.strategies:
+        for strat_name in self.app.agent.strat_list:
             self.strat_frame[strat_name] = ttk.Frame(self)
             self.strat_gui[strat_name].set_frame(self.strat_frame[strat_name])
             self.notebook.add(self.strat_frame[strat_name], text = strat_name)
