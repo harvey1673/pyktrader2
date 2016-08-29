@@ -224,9 +224,6 @@ def atr(df, n = 20):
     new_tr = max(df['high'][-1]-df['low'][-1], abs(df['high'][-1] - df['close'][-2]), abs(df['low'][-1] - df['close'][-2]))
     alpha = 2.0/(n+1)
     df['ATR'+str(n)][-1] = df['ATR'+str(n)][-2] * (1-alpha) + alpha * new_tr
-    
-def tsMA(ts, n):
-    return pd.Series(pd.rolling_mean(ts, n), name = 'MA' + str(n))
 
 # talib matype: 0=SMA, 1=EMA, 2=WMA, 3=DEMA, 4=TEMA, 5=TRIMA, 6=KAMA, 7=MAMA, 8=T3
 def MAEXT(df, n, field = 'close', ma_type = 0):
@@ -295,17 +292,37 @@ def PPSR(df):
     return PSR
 
 #Stochastic oscillator %K    
-def STOCH(df, fastk_period = 14, slowk_period = 3, slowd_period = 3):
-    slowk, slowd = talib.STOCH(df['high'].values, df['low'].values, df['close'].values, fastk_period = fastk_period, slowk_period=slowk_period, slowd_period=slowd_period)
-    sk = pd.Series(slowk, index = df.index, name = "STOCHSK_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
-    sd = pd.Series(slowd, index = df.index, name = "STOCHSD_%s_%s_%s" % (str(fastk_period), str(slowk_period), str(slowd_period)))
-    return pd.concat([sk,sd], join='outer', axis=1)
+def STOCH(df, n = 14, slowk_period = 3, slowd_period = 3):
+    fastk, fastd = talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period = n, fastd_period=slowk_period)
+    slowk, slowd = talib.STOCH(df['high'].values, df['low'].values, df['close'].values, fastk_period = n, slowk_period=slowk_period, slowd_period=slowd_period)
+    fk = pd.Series(fastk, index = df.index, name = "STOCHFK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period)))
+    sk = pd.Series(slowk, index = df.index, name = "STOCHSK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period)))
+    sd = pd.Series(slowd, index = df.index, name = "STOCHSD_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period)))
+    return pd.concat([fk, sk, sd], join='outer', axis=1)
+    
+def STOCHF(df, n = 14, fastd_period = 3):
+    fastk, fastd = talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period = n, fastd_period=fastd_period)
+    fk = pd.Series(fastk, index = df.index, name = "STOCFK_%s_%s" % (str(n), str(fastd_period)))
+    sk = pd.Series(fastd, index = df.index, name = "STOCSK_%s_%s" % (str(n), str(slowk_period)))
+    return pd.concat([fk, sk], join='outer', axis=1)
+    
+def stoch(df, n = 14, slowk_period = 3, slowd_period = 3):    
+    key1 = "STOCHFK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
+    df[key1][-1] = (df['close'][-1] - min(df['low'][-n:]))/(max(df['high'][-n:]) - min(df['low'][-n:]))*100
+    alpha = 2.0/(slowk_period+1)
+    key2 = "STOCHSK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
+    df[key2][-1] = df[key2][-2] * (1- alpha) + df[key1][-1] * alpha
+    alpha = 2.0/(slowd_period+1)
+    key3 = "STOCHSD_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))    
+    df[key3][-1] = df[key3][-2] * (1-alpha) + df[key2][-1] * alpha
 
-def STOCHF(df, fastk_period = 14, fastd_period = 3):
-    fd = pd.Series(talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period=fastk_period, fastd_period=fastd_period), \
-                   index = df.index, name = "STOCHFD_%s_%s" % (fastk_period, fastd_period))
-    return fd
-
+def stochf(df, n = 14, fastd_period = 3):    
+    key1 = "STOCHFK_%s_%s" % (str(n), str(fastd_period))
+    df[key1][-1] = (df['close'][-1] - min(df['low'][-n:]))/(max(df['high'][-n:]) - min(df['low'][-n:]))*100
+    alpha = 2.0/(fastd_period+1)
+    key2 = "STOCHSK_%s_%s" % (str(n), str(fastd_period))
+    df[key2][-1] = df[key2][-2] * (1- alpha) + df[key1][-1] * alpha
+    
 def STOCHRSI(df, n=14, fastk_period=5, fastd_period=3):
     fastk, fastd = STOCHRSI(df['close'].valkues, timeperiod = n, fastk_period= fastk_period, fastd_period=fastd_period)
     fk = pd.Series(fastk, index = df.index, name = "STOCRSI_FK_%s" % (str(n)))
