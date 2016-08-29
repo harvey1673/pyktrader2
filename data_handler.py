@@ -303,7 +303,7 @@ def STOCH(df, n = 14, slowk_period = 3, slowd_period = 3):
 def STOCHF(df, n = 14, fastd_period = 3):
     fastk, fastd = talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period = n, fastd_period=fastd_period)
     fk = pd.Series(fastk, index = df.index, name = "STOCFK_%s_%s" % (str(n), str(fastd_period)))
-    sk = pd.Series(fastd, index = df.index, name = "STOCSK_%s_%s" % (str(n), str(slowk_period)))
+    sk = pd.Series(fastd, index = df.index, name = "STOCSK_%s_%s" % (str(n), str(fastd_period)))
     return pd.concat([fk, sk], join='outer', axis=1)
     
 def stoch(df, n = 14, slowk_period = 3, slowd_period = 3):    
@@ -681,7 +681,7 @@ def SVAPO(df, period = 8, cutoff = 1, stdev_h = 1.5, stdev_l = 1.3, stdev_period
     HA = HEIKEN_ASHI(df, 1)
     haCl = (HA.HAopen + HA.HAclose + HA.HAhigh + HA.HAlow)/4.0
     haC = TEMA( haCl, 0.625 * period )
-    vave = tsMA(df['volume'], 5 * period).shift(1)
+    vave = MA(df, 5 * period, field = 'volume').shift(1)
     vc = pd.concat([df['volume'], vave*2], axis=1).min(axis=1)
     vtrend = TEMA(LINEAR_REG_SLOPE(df.volume, period), period)
     UpD = pd.Series(vc)
