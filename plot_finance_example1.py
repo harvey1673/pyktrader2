@@ -32,7 +32,7 @@ def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule
 def plot_series(df, ind_fields, ind_levels):
     ra = dh.DynamicRecArray(dataframe = df)    
     xdf = ra.data
-    indx = df.index.values
+    indx = np.array(range(len(df)))
     plt.rc('axes', grid=True)
     plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
     textsize = 9
@@ -51,22 +51,22 @@ def plot_series(df, ind_fields, ind_levels):
 
     fillcolor = 'darkgoldenrod'
     ax1.plot(indx, xdf[ind_fields[0]], color=fillcolor)
-    ax1.axhline(70, color=fillcolor)
-    ax1.axhline(30, color=fillcolor)
-    ax1.fill_between(indx, xdf[ind_fields[0]], ind_levels[0][0], where=(xdf[ind_fields[0]] >= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
-    ax1.fill_between(indx, xdf[ind_fields[0]], ind_levels[0][1], where=(xdf[ind_fields[0]] <= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
-    ax1.text(0.6, 0.9, 'buy', va='top', transform=ax1.transAxes, fontsize=textsize)
-    ax1.text(0.6, 0.1, 'sell', transform=ax1.transAxes, fontsize=textsize)
-    ax1.set_ylim(0, 100)
-    ax1.set_yticks([30, 70])
-    ax1.text(0.025, 0.95, ind_fields[0], va='top', transform=ax1.transAxes, fontsize=textsize)
-    ax1.set_title('%s' % ind_fields[0])
+    #ax1.axhline(ind_levels[0][0], color=fillcolor)
+    #ax1.axhline(ind_levels[0][1], color=fillcolor)
+    #ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][0], where=(xdf[ind_fields[0][0]] >= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
+    #ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][1], where=(xdf[ind_fields[0][0]] <= ind_levels[0][1]), facecolor=fillcolor, edgecolor=fillcolor)
+    #ax1.text(0.6, 0.9, 'buy', va='top', transform=ax1.transAxes, fontsize=textsize)
+    #ax1.text(0.6, 0.1, 'sell', transform=ax1.transAxes, fontsize=textsize)
+    #ax1.set_ylim(0, 100)
+    #ax1.set_yticks([ind_levels[0][1], ind_levels[0][0]])
+    #ax1.text(0.025, 0.95, ind_fields[0][0], va='top', transform=ax1.transAxes, fontsize=textsize)
+    ax1.set_title('%s' % ind_fields[0][0])
 
-    deltas = np.zeros_like(ra['close'])
-    deltas[1:] = np.diff(ra['close'])
+    deltas = np.zeros_like(xdf['close'])
+    deltas[1:] = np.diff(xdf['close'])
     up = deltas > 0
-    ax2.vlines(indx[up], ra['low'][up], ra['high'][up], color='black', label='_nolegend_')
-    ax2.vlines(indx[~up], ra['low'][~up], ra['high'][~up], color='black', label='_nolegend_')
+    ax2.vlines(indx[up], xdf['low'][up], xdf['high'][up], color='black', label='_nolegend_')
+    ax2.vlines(indx[~up], xdf['low'][~up], xdf['high'][~up], color='black', label='_nolegend_')
     lines = []
     for field in ind_fields[1]:
         indline, = ax2.plot(indx, xdf[field], color='blue', lw=2, label=field)
