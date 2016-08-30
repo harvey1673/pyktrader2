@@ -158,12 +158,10 @@ class MktDataMixin(object):
             ra_m = self.min_data[inst][m]
             if ((int(bar_id/m)>int(prev_bar/m)) or forced):
                 if m > 1:
-                    last_bar = ra_m.data['bar_id'][-1]
-                    last_date = ra_m.data['date'][-1]
-                    if type(last_date).__name__ == 'datetime64':
-                        last_date = pd.to_datetime(str(last_date)).date()
-                    if (last_date == ra.data['date'][-1]) and (int(prev_bar/m) <= int(last_bar/m)):
+                    if (int(prev_bar/m) == int(ra_m.data['bar_id'][-1]/m)) and (ra.data['date'][-1] == data_handler.conv_date(ra_m.data['date'][-1])):
                         ra_m.remove_lastn(1)
+                    last_bar = ra_m.data['bar_id'][-1]
+                    last_date = data_handler.conv_date(ra_m.data['date'][-1])
                     rlen = len(ra)
                     idx = 0
                     for i in range(rlen):

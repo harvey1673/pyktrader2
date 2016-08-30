@@ -5,6 +5,11 @@ import pandas as pd
 import scipy.stats as stats
 import scipy.signal as signal
 
+def conv_date(d):
+    if type(d).__name__ == 'datetime64':
+        d = pd.to_datetime(str(d)).date()
+    return d
+
 class DynamicRecArray(object):
     def __init__(self, dtype = [], dataframe = None):
         if isinstance(dataframe, pd.DataFrame) and (len(dataframe) > 0):
