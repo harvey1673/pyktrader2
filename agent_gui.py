@@ -322,6 +322,30 @@ class MASystemStratGui(StratGui):
                             'Freq': 'int',
                             }
 
+class AsctrendStratGui(StratGui):
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiWin', 'RsiLevel', 'WprWin', 'WprLevel', \
+                              'SarParam', ]
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'Ratios': 'float',
+                            'CloseTday': 'bool',
+                            'CurrPrices': 'float',
+                            'RsiWin': 'int',
+                            'RsiLevel': 'intlist',
+                            'WprWin': 'int',
+                            'WprLevel': 'intlist',
+                            'SarParam': 'floatlist',
+                            'NumTick': 'int',
+                            'OrderType': 'str',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
+
 class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
@@ -664,6 +688,8 @@ class Gui(tk.Tk):
                 self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['MASystemTrader']:
                 self.strat_gui[strat_name] = MASystemStratGui(strat, app, self)
+            elif strat.__class__.__name__ in ['AsctrendTrader']:
+                self.strat_gui[strat_name] = AsctrendStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'RBreaker':
                 self.strat_gui[strat_name] = RBStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'TurtleTrader':

@@ -9,8 +9,8 @@ class AsctrendTrader(Strategy):
     common_params =  dict( Strategy.common_params, **{'price_limit_buffer': 5, 'pos_exec_flag': STRAT_POS_MUST_EXEC, \
                                                       'data_func': [["WPR", "dh.WPR", "dh.wpr"], \
                                                                     ["RSI", "dh.RSI", "dh.rsi"], \
-                                                                    ['SAR', 'dh.SAR', 'dh.sar'], ]})
-    asset_params = dict({'freq': 30, 'wpr_win': 9, 'wpr_level': [70, 30], 'stop_ratio': 0.5, \
+                                                                    ["SAR", "dh.SAR", "dh.sar"], ]})
+    asset_params = dict({'freq': 30, 'wpr_win': 9, 'wpr_level': [70, 30], \
                         'sar_param': [0.005, 0.02], 'rsi_win': 14, 'rsi_level': [60, 40], 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
@@ -30,14 +30,14 @@ class AsctrendTrader(Strategy):
                 rfunc = eval(infunc[2])
                 freq_str = str(self.freq[idx]) + 'm'
                 if name == 'SAR':                                   
-                    fargs = self.sar_param[idx]
+                    fargs = {'incr': self.sar_param[idx][0], 'maxaf': self.sar_param[idx][1]}
                     fobj = BaseObject(name = name, sfunc = fcustom(sfunc, **fargs), rfunc = fcustom(rfunc, **fargs))
                 else:
                     if name == 'WPR':
-                        chan = wpr_win
+                        chan = self.wpr_win[idx]
                         fargs = {}
                     elif name == "RSI":
-                        chan = rsi_win
+                        chan = self.rsi_win[idx]
                         fargs = {}
                     fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
                 self.agent.register_data_func(under[0], freq_str, fobj)
@@ -70,16 +70,16 @@ class AsctrendTrader(Strategy):
         else:
             self.wpr_signal[idx] = 0
         key = 'SAR'
-        if (xdf[key] > 0):
+        if (xdf[key][-1] > 0):
             self.sar_signal[idx] = 1
-        elif (xdf[key] < 0):
+        elif (xdf[key][-1] < 0):
             self.sar_signal[idx] = -1
         else:
             self.sar_signal[idx] = 0
         key = 'RSI_%s' % str(self.rsi_win[idx])
-        if (xdf[key] >= self.rsi_level[idx][0]):
+        if (xdf[key][-1] >= self.rsi_level[idx][0]):
             self.sar_signal[idx] = 1
-        elif (xdf[key] <= self.rsi_level[idx][1]):
+        elif (xdf[key][-1] <= self.rsi_level[idx][1]):
             self.sar_signal[idx] = -1
         else:
             self.sar_signal[idx] = 0            

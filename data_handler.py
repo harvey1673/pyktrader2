@@ -10,6 +10,14 @@ def conv_date(d):
         d = pd.to_datetime(str(d)).date()
     return d
 
+def date_datetime64(d):
+    if type(d).__name__ == 'datetime64':
+        return d
+    dt = d
+    if type(d).__name__ == 'date':
+        dt = datetime.datetime.combine(d, datetime.time(0,0,0))
+    return np.datetime64(dt)
+
 class DynamicRecArray(object):
     def __init__(self, dtype = [], dataframe = None):
         if isinstance(dataframe, pd.DataFrame) and (len(dataframe) > 0):
@@ -36,8 +44,11 @@ class DynamicRecArray(object):
             self._data = np.resize(self._data, self.size)        
         for name in self.dtype.names:
             try:
+                #data = data_dict[name]
+                #if ('datetime64' in self.dtype[name].name) and type(data_dict[name]).__name__ in ['date', 'datetime']:
+                #    data = date_datetime64(data)
                 self._data[name][self.length] = data_dict[name]
-            except:            
+            except:
                 continue
         self.length += 1
 
@@ -859,7 +870,7 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
         if idy >= max_n - 1:
             corr[idy], pval[idy] = stats.spearmanr(ma_array[idy,:], range(len(ma_series), 0, -1))
             dist[idy] = max(ma_array[idy,:]) - min(ma_array[idy,:])
-    corr_ts = pd.Series(corr, index = df.index, name = "MARIBBON_CORR")
+    corr_ts = pd.Series(corr, indefax = df.index, name = "MARIBBON_CORR")
     pval_ts = pd.Series(pval, index = df.index, name = "MARIBBON_PVAL")
     dist_ts = pd.Series(dist, index = df.index, name = "MARIBBON_DIST")
     return pd.concat([corr_ts, pval_ts, dist_ts], join='outer', axis=1)
