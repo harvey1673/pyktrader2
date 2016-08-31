@@ -807,9 +807,14 @@ def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     df[RMS_key][-1] = np.sqrt((df[SPB_key][(-n3):]**2).mean())
 
 def WPR(df, n):
-    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name = "WPR_%s" % str(n))
+    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name = "WPR_%s" % str(n))    
     return res
 
+def wpr(df, n, ma_win = 0):
+    ll = min(df['low'][-n:])
+    hh = max(df['high'][-n:])
+    df['WPR_%s' % str(n)] = (df['close'][-1] - ll)/(hh - ll) * 100
+    
 def PRICE_CHANNEL(df, n, risk = 0.3):
     hh = pd.rolling_max(df['high'], n)
     ll = pd.rolling_min(df['low'], n)
