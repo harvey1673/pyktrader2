@@ -11,7 +11,7 @@ class AsctrendTrader(Strategy):
                                                                     ["RSI", "dh.RSI", "dh.rsi"], \
                                                                     ["SAR", "dh.SAR", "dh.sar"], ]})
     asset_params = dict({'freq': 30, 'wpr_win': 9, 'wpr_level': [70, 30], \
-                        'sar_param': [0.005, 0.02], 'rsi_win': 14, 'rsi_level': [60, 40], 'daily_close': False, }, **Strategy.asset_params)
+                        'sar_param': [0.005, 0.02], 'rsi_win': 14, 'rsi_level': [60, 40], 'rsi_trig': False,'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -77,12 +77,20 @@ class AsctrendTrader(Strategy):
         else:
             self.sar_signal[idx] = 0
         key = 'RSI_%s' % str(self.rsi_win[idx])
-        if (xdf[key][-1] >= self.rsi_level[idx][0]):
-            self.sar_signal[idx] = 1
-        elif (xdf[key][-1] <= self.rsi_level[idx][1]):
-            self.sar_signal[idx] = -1
+        if self.rsi_trig[idx] == True:
+            if dh.crossover(xdf[key], self.rsi_level[idx][0], 1):
+                self.rsi_signal[idx] = 1
+            elif dh.crossover(xdf[key], self.rsi_level[idx][1], -1):
+                self.rsi_signal[idx] = -1
+            else:
+                self.rsi_signal[idx] = 0
         else:
-            self.sar_signal[idx] = 0            
+            if (xdf[key][-1] >= self.rsi_level[idx][0]):
+                self.rsi_signal[idx] = 1
+            elif (xdf[key][-1] <= self.rsi_level[idx][1]):
+                self.rsi_signal[idx] = -1
+            else:
+                self.rsi_signal[idx] = 0
 
     def on_bar(self, idx, freq):
         inst = self.underliers[idx][0]
