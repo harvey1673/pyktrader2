@@ -21,6 +21,7 @@ def asctrend_sim( mdf, config):
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = eval(bar_func))
     asc_period = param[0]
     asc_risk = param[1]
+    rsi_sig = config['rsi_sig']
     asctrend = dh.ASCTREND(xdf, asc_period, risk = asc_risk)
     xdf['asc_signal'] = asctrend["ASCSIG_%s" % str(asc_period)].shift(1)
     xdf['asc_stop'] = asctrend["ASCSTOP_%s" % str(asc_period)].shift(1)
@@ -30,10 +31,12 @@ def asctrend_sim( mdf, config):
     rsi_sell = 50 - rsi_offset
     rsi  = dh.RSI(xdf, n = rsi_period)
     rsi_signal = pd.Series(0, index = rsi.index)
-    #rsi_signal[(rsi >= rsi_buy)] = 1
-    rsi_signal[(rsi >= rsi_buy) & (rsi.shift(1) < rsi_buy)] = 1
-    #rsi_signal[(rsi <= rsi_sell)] = -1
-    rsi_signal[(rsi <= rsi_sell) & (rsi.shift(1) > rsi_sell)] = -1
+    if rsi_sig:
+        rsi_signal[(rsi >= rsi_buy) & (rsi.shift(1) < rsi_buy)] = 1
+        rsi_signal[(rsi <= rsi_sell) & (rsi.shift(1) > rsi_sell)] = -1
+    else:
+        rsi_signal[(rsi >= rsi_buy)] = 1
+        rsi_signal[(rsi <= rsi_sell)] = -1
     xdf['rsi_signal'] = rsi_signal.shift(1)
     if len(param) > 4:
         sar_step = param[4]
@@ -114,18 +117,24 @@ def gen_config_file(filename):
     sim_config['scen_keys'] = ['freq', 'param']
     sim_config['sim_name']   = 'asctrend_sim'
     sim_config['products']   = [ 'rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', \
-                                 'm', 'RM', 'y', 'p', 'a', 'jd', 'cs', 'SR', 'c', 'OI', \
-                                 'pp', 'l', 'TA', 'v', 'MA', 'bu', 'ag', 'cu', 'au', 'al', 'zn', 'CF']
+                                 'm', 'RM', 'y', 'p', 'a', 'jd', 'cs', 'SR', 'c', 'OI', 'CF', \
+                                 'pp', 'l', 'TA', 'v', 'MA', 'bu', 'ag', 'cu', 'au', 'al', 'zn',\
+                                 'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160819'
-    sim_config['freq']  =  ['3Min', '5Min', '15Min']
-    sim_config['param'] =[[ 9, 3, 14, 10, 0.01, 0.1],  [19, 3, 14, 10, 0.01, 0.1], \
-                           [29, 3, 14, 10, 0.01, 0.1], [39, 3, 14, 10, 0.01, 0.1], \
-                           [ 9, 3, 14, 20, 0.01, 0.1], [19, 3, 14, 20, 0.01, 0.1], \
-                           [29, 3, 14, 20, 0.01, 0.1], [39, 3, 14, 20, 0.01, 0.1], ]
+    sim_config['freq']  =  ['30Min', '60Min', '90Min']
+    sim_config['param'] =[[ 9, 3, 14, 20, 0.005, 0.1],[9, 3, 14, 20, 0.01, 0.1], \
+                        [ 9, 3, 14, 20, 0.02, 0.1], [ 9, 3, 14, 20, 0.02, 0.2], \
+                        [14, 3, 14, 20, 0.005, 0.1],[14, 3, 14, 20, 0.01, 0.1], \
+                        [14, 3, 14, 20, 0.02, 0.1], [14, 3, 14, 20, 0.02, 0.2], \
+                        [14, 3, 21, 20, 0.005, 0.1], [14, 3, 21, 20, 0.01, 0.1], \
+                        [14, 3, 21, 20, 0.02, 0.1], [14, 3, 21, 20, 0.02, 0.2], \
+                        [14, 3, 9, 20, 0.005, 0.1], [14, 3, 9, 20, 0.01, 0.1], \
+                        [14, 3, 9, 20, 0.02, 0.1], [14, 3, 9, 20, 0.02, 0.2],]
     sim_config['pos_class'] = 'strat.TradePos'
     config = {'capital': 10000,
               'offset': 0,
+              'rsi_sig': False,
               'trans_cost': 0.0,
               'close_daily': False,
               'unit': 1,
