@@ -33,6 +33,7 @@ def plot_series(df, ind_fields, ind_levels):
     ra = dh.DynamicRecArray(dataframe = df)    
     xdf = ra.data
     indx = np.array(range(len(df)))
+    plt.ion()
     plt.rc('axes', grid=True)
     plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
     textsize = 9
@@ -40,26 +41,27 @@ def plot_series(df, ind_fields, ind_levels):
     rect1 = [left, 0.7, width, 0.2]
     rect2 = [left, 0.3, width, 0.4]
     rect3 = [left, 0.1, width, 0.2]
-
     fig = plt.figure(facecolor='white')
     axescolor = '#f6f6f6'  # the axes background color
-
     ax1 = fig.add_axes(rect1, axisbg=axescolor)  # left, bottom, width, height
     ax2 = fig.add_axes(rect2, axisbg=axescolor, sharex=ax1)
     ax2t = ax2.twinx()
     ax3 = fig.add_axes(rect3, axisbg=axescolor, sharex=ax1)
-
+    ccolors = ['blue', 'red', 'yellow', 'black', 'green']
     fillcolor = 'darkgoldenrod'
-    ax1.plot(indx, xdf[ind_fields[0]], color=fillcolor)
-    #ax1.axhline(ind_levels[0][0], color=fillcolor)
-    #ax1.axhline(ind_levels[0][1], color=fillcolor)
-    #ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][0], where=(xdf[ind_fields[0][0]] >= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
-    #ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][1], where=(xdf[ind_fields[0][0]] <= ind_levels[0][1]), facecolor=fillcolor, edgecolor=fillcolor)
+    c = 0
+    for field in ind_fields[0]:
+        ax1.plot(indx, xdf[field], color=ccolors[c])
+        c = (c + 1) % len(ccolors)
+    ax1.axhline(y=ind_levels[0][0], color=fillcolor)
+    ax1.axhline(y=ind_levels[0][1], color=fillcolor)
+    ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][0], where=(xdf[ind_fields[0][0]] >= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
+    ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][1], where=(xdf[ind_fields[0][0]] <= ind_levels[0][1]), facecolor=fillcolor, edgecolor=fillcolor)
     #ax1.text(0.6, 0.9, 'buy', va='top', transform=ax1.transAxes, fontsize=textsize)
     #ax1.text(0.6, 0.1, 'sell', transform=ax1.transAxes, fontsize=textsize)
-    #ax1.set_ylim(0, 100)
-    #ax1.set_yticks([ind_levels[0][1], ind_levels[0][0]])
-    #ax1.text(0.025, 0.95, ind_fields[0][0], va='top', transform=ax1.transAxes, fontsize=textsize)
+    ax1.set_ylim(-100, 100)
+    ax1.set_yticks([ind_levels[0][1], ind_levels[0][0]])
+    ax1.text(0.025, 0.95, ind_fields[0][0], va='top', transform=ax1.transAxes, fontsize=textsize)
     ax1.set_title('%s' % ind_fields[0][0])
 
     deltas = np.zeros_like(xdf['close'])
@@ -89,12 +91,9 @@ def plot_series(df, ind_fields, ind_levels):
     ax2t.set_yticks([])
 
     fillcolor = 'darkslategrey'
-    ccolors = ['blue', 'red', 'yellow', 'black', 'green']
-    if len(ind_fields[2]) > len(ccolors):
-        ccolors = ccolors * (int(len(ind_fields[2])/len(ccolors))+1)
-    ccolors = ccolors[:len(ind_fields[2])]
-    for field, c in zip(ind_fields[2], ccolors):
-        ax3.plot(indx, xdf[field], color = c, lw=2)
+    for field in ind_fields[2]:
+        ax3.plot(indx, xdf[field], color = ccolors[c], lw=2)
+        c = (c + 1) % len(ccolors)
     #ax3.fill_between(r.date, macd - ema9, 0, alpha=0.5, facecolor=fillcolor, edgecolor=fillcolor)
     ax3.text(0.025, 0.95, 'graph 3', va='top', transform = ax3.transAxes, fontsize=textsize)
 

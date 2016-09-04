@@ -792,8 +792,8 @@ def SAR(df, incr = 0.005, maxaf = 0.02):
     return pd.Series(sar, index = df.index, name = "SAR")
 
 def sar(df, incr = 0.005, maxaf = 0.02, lookback = 100):                          
-    sar = talib.SAR(df['high'][-lookback:].values, df['low'][-lookback:].values, acceleration=incr, maximum=maxaf)
-    df['SAR'][-1] = sar[-1]
+    sar_val = talib.SAR(df['high'][-lookback:], df['low'][-lookback:], acceleration=incr, maximum=maxaf)
+    df['SAR'][-1] = sar_val[-1]
     
 def SPBFILTER(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     if n3 == 0:
@@ -821,7 +821,7 @@ def WPR(df, n):
     res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name = "WPR_%s" % str(n))    
     return res
 
-def wpr(df, n, ma_win = 0):
+def wpr(df, n):
     ll = min(df['low'][-n:])
     hh = max(df['high'][-n:])
     df['WPR_%s' % str(n)] = (df['close'][-1] - ll)/(hh - ll) * 100
@@ -870,7 +870,7 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
         if idy >= max_n - 1:
             corr[idy], pval[idy] = stats.spearmanr(ma_array[idy,:], range(len(ma_series), 0, -1))
             dist[idy] = max(ma_array[idy,:]) - min(ma_array[idy,:])
-    corr_ts = pd.Series(corr, indefax = df.index, name = "MARIBBON_CORR")
+    corr_ts = pd.Series(corr*100, index = df.index, name = "MARIBBON_CORR")
     pval_ts = pd.Series(pval, index = df.index, name = "MARIBBON_PVAL")
     dist_ts = pd.Series(dist, index = df.index, name = "MARIBBON_DIST")
     return pd.concat([corr_ts, pval_ts, dist_ts], join='outer', axis=1)

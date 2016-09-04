@@ -360,9 +360,9 @@ def simnearby_min(config_file):
         res.set_index(['asset', 'scenario'])
         out_res = res[outcol_list]
         if len(summary_df) == 0:
-            summary_df = out_res[:15].copy(deep = True)
+            summary_df = out_res[:30].copy(deep = True)
         else:
-            summary_df = summary_df.append(out_res[:15])
+            summary_df = summary_df.append(out_res[:30])
         fname = config['file_prefix'] + 'summary.csv'
         summary_df.to_csv(fname)
     return
