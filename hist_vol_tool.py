@@ -7,6 +7,7 @@ import math
 import mysqlaccess
 from scipy.stats import norm
 from misc import *
+import statsmodels.tsa.stattools as ts
 
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
@@ -221,3 +222,17 @@ def validate_db_data(tday, filter = False):
             output = instID + ': end earlier'
             inst_list['min'].append(output)        
     print inst_list
+
+def hurst(ts):
+    """Returns the Hurst Exponent of the time series vector ts"""
+    # Create the range of lag values
+    lags = range(2, 100)
+    # Calculate the array of the variances of the lagged differences
+    tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
+    # Use a linear fit to estimate the Hurst Exponent
+    poly = np.polyfit(np.log(lags), np.log(tau), 1)
+    # Return the Hurst exponent from the polyfit output
+    return poly[0]*2.0
+
+def adf_test(tseries, order = 1):
+    return ts.adfuller(tseries, order)
