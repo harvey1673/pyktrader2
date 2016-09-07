@@ -824,7 +824,7 @@ def WPR(df, n):
 def wpr(df, n):
     ll = min(df['low'][-n:])
     hh = max(df['high'][-n:])
-    df['WPR_%s' % str(n)] = (df['close'][-1] - ll)/(hh - ll) * 100
+    df['WPR_%s' % str(n)][-1] = (df['close'][-1] - ll)/(hh - ll) * 100
     
 def PRICE_CHANNEL(df, n, risk = 0.3):
     hh = pd.rolling_max(df['high'], n)
@@ -894,5 +894,5 @@ def AROON(df, n):
     
 def aroon(df, n):
     aroondown, aroonup = AROON(df['high'][-(n+1):], df['low'][-(n+1):], timeperiod= n)
-    df["AROOONDN_%s" % str(n)] = aroondown[-1]
-    df["AROOONUP_%s" % str(n)] = aroonup[-1]
+    df["AROOONDN_%s" % str(n)][-1] = aroondown[-1]
+    df["AROOONUP_%s" % str(n)][-1] = aroonup[-1]

@@ -1,13 +1,13 @@
 #-*- coding:utf-8 -*-
-import pandas as pd
 from base import *
 from misc import *
 import data_handler
-import order as order
+import order
 import datetime
 import csv
 import json
 import os
+import sec_bits
 
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
                    'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'price_unit']
@@ -428,7 +428,7 @@ class Strategy(object):
     def status_notifier(self, msg):
         self.logger.info(msg)
         if len(self.email_notify) > 0:
-            send_mail(EMAIL_HOTMAIL, self.email_notify, '%s trade signal' % (self.name), msg)
+            send_mail(sec_bits.EMAIL_HOTMAIL, self.email_notify, '%s trade signal' % (self.name), msg)
         return
 
     def save_local_variables(self, file_writer):

@@ -10,13 +10,11 @@ import copy
 import csv
 import os.path
 import misc
+import sec_bits
 import pandas as pd
 
-dbconfig = {'user': 'harvey', 
-          'password':'9619252y', 
-          'host':'localhost',
-          'database': 'blueshale',
-          }
+dbconfig = sec_bits.dbconfig
+
 fut_tick_columns = ['instID', 'date','tick_id','hour','min','sec','msec','openInterest','volume','price','high','low','bidPrice1', 'bidVol1','askPrice1','askVol1']
 ss_tick_columns = ['instID', 'date','tick_id','hour','min','sec','msec','openInterest','volume','price','high','low','bidPrice1', 'bidVol1','askPrice1','askVol1']
 min_columns = ['datetime','date', 'open', 'high', 'low', 'close', 'volume', 'openInterest', 'min_id']
