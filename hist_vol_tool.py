@@ -223,10 +223,10 @@ def validate_db_data(tday, filter = False):
             inst_list['min'].append(output)        
     print inst_list
 
-def hurst(ts):
+def hurst(ts, max_shift = 100):
     """Returns the Hurst Exponent of the time series vector ts"""
     # Create the range of lag values
-    lags = range(2, 100)
+    lags = range(2, max_shift)
     # Calculate the array of the variances of the lagged differences
     tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
     # Use a linear fit to estimate the Hurst Exponent

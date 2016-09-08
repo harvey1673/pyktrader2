@@ -570,7 +570,7 @@ def donch_h(df, n, field = 'high'):
 def donch_l(df, n, field = 'low'):
     key = 'DONCH_L'+ field[0].upper() + str(n)
     if np.isnan(df[key][-1]):    
-    df[key][-1] = min(df[field][-n:])
+        df[key][-1] = min(df[field][-n:])
     
 #Standard Deviation
 def HEIKEN_ASHI(df, period1):
@@ -864,7 +864,7 @@ def ASCTREND(df, n, risk = 3, stop_ratio = 0.5, atr_mode = 0):
     stop[trend < 0] = df['high'] + stop_ratio * atr
     return pd.concat([signal, trend, stop], join='outer', axis=1)
     
-def MA_RIBBON(df, ma_series, ma_type = 0):
+def MA_RIBBON(df, ma_series):
     ma_array = np.zeros([len(df), len(ma_series)])
     ema_list = []
     for idx, ma_len in enumerate(ma_series):
@@ -890,7 +890,7 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
 def ma_ribbon(df, ma_series):
     ma_array = np.zeros([len(df)])
     for idx, ma_len in enumerate(ma_series):
-        key = 'EMA_C' + str(n)
+        key = 'EMA_C' + str(ma_len)
         if np.isnan(df[key][-1]):
             ema(df, ma_len, field = 'close')
         ma_array[idx] = df[key][-1]
