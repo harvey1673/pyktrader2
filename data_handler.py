@@ -883,7 +883,7 @@ def MA_RIBBON(df, ma_series, ma_type = 0):
             corr[idy], pval[idy] = stats.spearmanr(ma_array[idy,:], range(len(ma_series), 0, -1))
             dist[idy] = max(ma_array[idy,:]) - min(ma_array[idy,:])
     corr_ts = pd.Series(corr*100, index = df.index, name = "MARIBBON_CORR")
-    pval_ts = pd.Series(pval, index = df.index, name = "MARIBBON_PVAL")
+    pval_ts = pd.Series(pval*100, index = df.index, name = "MARIBBON_PVAL")
     dist_ts = pd.Series(dist, index = df.index, name = "MARIBBON_DIST")
     return pd.concat([corr_ts, pval_ts, dist_ts] + ema_i, join='outer', axis=1)
     
@@ -897,7 +897,7 @@ def ma_ribbon(df, ma_series):
     corr, pval = stats.spearmanr(ma_array, range(len(ma_series), 0, -1))
     dist = max(ma_array) - min(ma_array)
     df["MARIBBON_CORR"][-1] = corr * 100
-    df["MARIBBON_PVAL"][-1] = pval
+    df["MARIBBON_PVAL"][-1] = pval * 100
     df["MARIBBON_DIST"][-1] = dist
     
 def AROON(df, n):
