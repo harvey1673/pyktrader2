@@ -103,6 +103,10 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
+def conv_simdf_to_tradelist(xdf):
+    trade_df = xdf[xdf['pos'] != xdf['pos'].shift(1)]
+    return []
+
 def get_pnl_stats(df_list, start_capital, marginrate, freq):
     sum_pnl = pd.Series(name = 'pnl')
     sum_margin = pd.Series(name='margin')

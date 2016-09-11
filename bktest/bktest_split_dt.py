@@ -10,7 +10,6 @@ import backtest
 
 def dual_thrust_sim( mdf, config):
     close_daily = config['close_daily']
-    marginrate = config['marginrate']
     offset = config['offset']
     k = config['param'][0]
     win = config['param'][1]
@@ -54,105 +53,23 @@ def dual_thrust_sim( mdf, config):
     xdf['MA'] = pd.rolling_mean(xdf.close, chan)
     xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1),
                        xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
-                       xdf['open'], xdf['ATR'].shift(1)], axis=1, keys=['TR','MA', 'chanH', 'chanL', 'dopen', 'ATR']).fillna(0)
+                       xdf['open'], xdf['ATR'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
-    mdf['pos'] = pd.Series([0]*ll, index = mdf.index)
-    mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
-    mdf['traded_price'] = mdf.close
-    curr_pos = []
-    closed_trades = []
-    end_d = mdf.index[-1].date
-    #prev_d = start_d - datetime.timedelta(days=1)
-    tradeid = 0
-    for dd in mdf.index:
-        mslice = mdf.ix[dd]
-        min_id = mslice.min_id
-        min_cnt = (min_id-300)/100 * 60 + min_id % 100 + 1
-        if len(curr_pos) == 0:
-            pos = 0
-        else:
-            pos = curr_pos[0].pos
-        mdf.ix[dd, 'pos'] = pos
-        if (mslice.TR == 0) or (mslice.MA == 0):
-            continue
-        d_open = mslice.dopen
-        rng = max(min_rng * d_open, k * mslice.TR)
-        if (d_open <= 0):
-            continue
-        buytrig  = d_open + rng
-        selltrig = d_open - rng
-        if ('reset_margin' in pos_args) and (SL > 0):
-            pos_args['reset_margin'] = mslice.TR * SL
-        if mslice.MA > mslice.close:
-            buytrig  += f * rng
-        elif mslice.MA < mslice.close:
-            selltrig -= f * rng
-        if (pos != 0) and (rev_buffer > 0):
-            if pos > 0:
-                selltrig = min(curr_pos[0].entry_price - rev_buffer * mslice.ATR, selltrig)
-            elif pos < 0:
-                buytrig = max(curr_pos[0].entry_price + rev_buffer * mslice.ATR, buytrig)
-        if (min_id >= config['exit_min']) and (close_daily or (mslice.date == end_d)):
-            if (pos != 0):
-                curr_pos[0].close(mslice.close - misc.sign(pos) * offset , dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                mdf.set_value(dd, 'traded_price', mslice.close - misc.sign(pos) * offset)
-                pos = 0
-        elif min_id not in no_trade_set:
-            if (pos!=0) and pos_update:
-                curr_pos[0].update_price(mslice.close)
-                if (curr_pos[0].check_exit( mslice.close, SL * mslice.close )):
-                    curr_pos[0].close(mslice.close-offset*misc.sign(pos), dd)
-                    tradeid += 1
-                    curr_pos[0].exit_tradeid = tradeid
-                    closed_trades.append(curr_pos[0])
-                    curr_pos = []
-                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                    mdf.set_value(dd, 'traded_price', mslice.close - misc.sign(pos) * offset)
-                    pos = 0
-            if (mslice.high >= buytrig) and (pos <=0 ):
-                if len(curr_pos) > 0:
-                    curr_pos[0].close(mslice.close+offset, dd)
-                    tradeid += 1
-                    curr_pos[0].exit_tradeid = tradeid
-                    closed_trades.append(curr_pos[0])
-                    curr_pos = []
-                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                    mdf.set_value(dd, 'traded_price', mslice.close - misc.sign(pos) * offset)
-                if (use_chan == False) or (mslice.high > mslice.chanH):
-                    new_pos = pos_class([mslice.contract], [1], unit, mslice.close + offset, mslice.close + offset, **pos_args)
-                    tradeid += 1
-                    new_pos.entry_tradeid = tradeid
-                    new_pos.open(mslice.close + offset, dd)
-                    curr_pos.append(new_pos)
-                    pos = unit
-                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                    mdf.set_value(dd, 'traded_price', mslice.close + misc.sign(pos) * offset)
-            elif (mslice.low <= selltrig) and (pos >=0 ):
-                if len(curr_pos) > 0:
-                    curr_pos[0].close(mslice.close-offset, dd)
-                    tradeid += 1
-                    curr_pos[0].exit_tradeid = tradeid
-                    closed_trades.append(curr_pos[0])
-                    curr_pos = []
-                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                    mdf.set_value(dd, 'traded_price', mslice.close - misc.sign(pos) * offset)
-                if (use_chan == False) or (mslice.low < mslice.chanL):
-                    new_pos = pos_class([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset, **pos_args)
-                    tradeid += 1
-                    new_pos.entry_tradeid = tradeid
-                    new_pos.open(mslice.close - offset, dd)
-                    curr_pos.append(new_pos)
-                    pos = -unit
-                    mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
-                    mdf.set_value(dd, 'traded_price', mslice.close + misc.sign(pos) * offset)
-        mdf.ix[dd, 'pos'] = pos
+    rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['TR']]).max()
+    mdf['signal'] = np.nan
+    mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'signal'] = 1
+    mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'signal'] = -1
+    if close_daily:
+        mdf.ix[ mdf['min_id'] >= config['exit_min'], 'signal'] = 0
+    mdf.ix[-3:, 'pos'] = 0
+    mdf['signal'].fillna(method='ffill')
+    mdf['signal'].fillna(0)
+    mdf['pos'] = mdf['signal'].shift(1)
+    mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
+    mdf['traded_price'] = mdf['open']
+    trade_df = mdf[mdf['pos']!= mdf['pos'].shift(1)]
+    closed_trades = backtest.conv_simdf_to_tradelist(trade_df)
     return (mdf, closed_trades)
-
 
 def gen_config_file(filename):
     sim_config = {}
