@@ -1,13 +1,14 @@
 import backtest
 import misc
+import datetime
 import mysqlaccess
 import data_handler as dh
 import numpy as np
-import matplotlib.colors as colors
+#import matplotlib.colors as colors
 import matplotlib.finance as finance
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
-import matplotlib.mlab as mlab
+#import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 
@@ -28,90 +29,98 @@ def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = dh.bar_conv_func2)
     return xdf
 
-
-def plot_series(df, ind_fields, ind_levels):
-    ra = dh.DynamicRecArray(dataframe = df)    
+def plot_indicators(df, ind_fields, ind_levels):
+    ccolors = ['blue', 'red', 'yellow', 'black', 'green']
+    ra = dh.DynamicRecArray(dataframe = df)
     xdf = ra.data
     indx = np.array(range(len(df)))
     plt.ion()
-    plt.rc('axes', grid=True)
-    plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
-    textsize = 9
-    left, width = 0.1, 0.8
-    rect1 = [left, 0.7, width, 0.2]
-    rect2 = [left, 0.3, width, 0.4]
-    rect3 = [left, 0.1, width, 0.2]
     fig = plt.figure(facecolor='white')
-    axescolor = '#f6f6f6'  # the axes background color
-    ax1 = fig.add_axes(rect1, axisbg=axescolor)  # left, bottom, width, height
-    ax2 = fig.add_axes(rect2, axisbg=axescolor, sharex=ax1)
-    ax2t = ax2.twinx()
-    ax3 = fig.add_axes(rect3, axisbg=axescolor, sharex=ax1)
-    ccolors = ['blue', 'red', 'yellow', 'black', 'green']
-    fillcolor = 'darkgoldenrod'
+    ax0 = plt.subplot2grid((6, 4), (1, 0), rowspan=4, colspan=4)
+    finance.candlestick2_ohlc(ax0, xdf['open'], xdf['high'], xdf['low'], xdf['close'], \
+                              width=0.6, colorup='g', colordown='r')
     c = 0
     for field in ind_fields[0]:
-        ax1.plot(indx, xdf[field], color=ccolors[c])
+        ax0.plot(indx, xdf[field], 'g^', label=field)
         c = (c + 1) % len(ccolors)
-    ax1.axhline(y=ind_levels[0][0], color=fillcolor)
-    ax1.axhline(y=ind_levels[0][1], color=fillcolor)
-    ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][0], where=(xdf[ind_fields[0][0]] >= ind_levels[0][0]), facecolor=fillcolor, edgecolor=fillcolor)
-    ax1.fill_between(indx, xdf[ind_fields[0][0]], ind_levels[0][1], where=(xdf[ind_fields[0][0]] <= ind_levels[0][1]), facecolor=fillcolor, edgecolor=fillcolor)
-    #ax1.text(0.6, 0.9, 'buy', va='top', transform=ax1.transAxes, fontsize=textsize)
-    #ax1.text(0.6, 0.1, 'sell', transform=ax1.transAxes, fontsize=textsize)
-    ax1.set_ylim(-100, 100)
-    ax1.set_yticks([ind_levels[0][1], ind_levels[0][0]])
-    ax1.text(0.025, 0.95, ind_fields[0][0], va='top', transform=ax1.transAxes, fontsize=textsize)
-    ax1.set_title('%s' % ind_fields[0][0])
+    ax0.grid(True, color='b')
+    ax0.xaxis.set_major_locator(mticker.MaxNLocator(10))
+    ax0.yaxis.label.set_color("b")
+    ax0.spines['bottom'].set_color("#5998ff")
+    ax0.spines['top'].set_color("#5998ff")
+    ax0.spines['left'].set_color("#5998ff")
+    ax0.spines['right'].set_color("#5998ff")
+    ax0.tick_params(axis='y', colors='b')
+    plt.gca().yaxis.set_major_locator(mticker.MaxNLocator(prune='upper'))
+    ax0.tick_params(axis='x', colors='b')
+    plt.ylabel('Price Chart')
 
-    deltas = np.zeros_like(xdf['close'])
-    deltas[1:] = np.diff(xdf['close'])
-    up = deltas > 0
-    ax2.vlines(indx[up], xdf['low'][up], xdf['high'][up], color='black', label='_nolegend_')
-    ax2.vlines(indx[~up], xdf['low'][~up], xdf['high'][~up], color='black', label='_nolegend_')
-    lines = []
+    ax0v = ax0.twinx()
+    ax0v.fill_between(indx, 0, xdf['volume'], facecolor='#00ffe8', alpha=.4)
+    ax0v.axes.yaxis.set_ticklabels([])
+    ax0v.grid(False)
+    ax0v.set_ylim(0, xdf['volume'].max())
+    ax0v.spines['bottom'].set_color("#5998ff")
+    ax0v.spines['top'].set_color("#5998ff")
+    ax0v.spines['left'].set_color("#5998ff")
+    ax0v.spines['right'].set_color("#5998ff")
+    ax0v.tick_params(axis='x', colors='b')
+    ax0v.tick_params(axis='y', colors='b')
+
+    ax1 = plt.subplot2grid((6, 4), (0, 0), sharex=ax0, rowspan=1, colspan=4)
+    indCol = '#c1f9f7'
+    posCol = '#386d13'
+    negCol = '#8f2020'
     for field in ind_fields[1]:
-        indline, = ax2.plot(indx, xdf[field], color='blue', lw=2, label=field)
-        lines.append(indline)   
-    #s = '%s O:%1.2f H:%1.2f L:%1.2f C:%1.2f, V:%1.1fM Chg:%+1.2f' % (
-    #    today.strftime('%d-%b-%Y'),
-    #    last.open, last.high,
-    #    last.low, last.close,
-    #    last.volume*1e-6,
-    #    last.close - last.open)
-    #t4 = ax2.text(0.3, 0.9, s, transform=ax2.transAxes, fontsize=textsize)
-    props = font_manager.FontProperties(size=10)
-    leg = ax2.legend(loc='center left', shadow=True, fancybox=True, prop=props)
-    leg.get_frame().set_alpha(0.5)
-
-    volume = (xdf['close']*xdf['volume'])/1e6  # dollar volume in millions
-    vmax = volume.max()
-    poly = ax2t.fill_between(indx, volume, 0, label='Volume', facecolor=fillcolor, edgecolor=fillcolor)
-    ax2t.set_ylim(0, 5*vmax)
-    ax2t.set_yticks([])
-
-    fillcolor = 'darkslategrey'
+        ax1.plot(indx, xdf[field], indCol, linewidth=1)
+    ax1.axhline(ind_levels[1][1], color=negCol)
+    ax1.axhline(ind_levels[1][0], color=posCol)
+    ax1.fill_between(indx, xdf[ind_fields[1][0]], ind_levels[1][0], \
+                     where=(xdf[ind_fields[1][0]] >= ind_levels[1][0]), facecolor=negCol, edgecolor=negCol, alpha=0.5)
+    ax1.fill_between(indx, xdf[ind_fields[1][0]], ind_levels[1][1], \
+                     where=(xdf[ind_fields[1][0]] <= ind_levels[1][1]), facecolor=posCol, edgecolor=posCol, alpha=0.5)
+    ax1.set_yticks([ind_levels[1][1], ind_levels[1][0]])
+    ax1.yaxis.label.set_color("b")
+    ax1.spines['bottom'].set_color("#5998ff")
+    ax1.spines['top'].set_color("#5998ff")
+    ax1.spines['left'].set_color("#5998ff")
+    ax1.spines['right'].set_color("#5998ff")
+    ax1.tick_params(axis='y', colors='b')
+    ax1.tick_params(axis='x', colors='b')
+    plt.ylabel(ind_fields[1][0])
+    ax1.set_title('%s' % ind_fields[1][0])
+    ax2 = plt.subplot2grid((6, 4), (5, 0), sharex=ax0, rowspan=1, colspan=4)
     for field in ind_fields[2]:
-        ax3.plot(indx, xdf[field], color = ccolors[c], lw=2)
+        ax2.plot(indx, xdf[field], color = ccolors[c], lw=0.6)
         c = (c + 1) % len(ccolors)
-    #ax3.fill_between(r.date, macd - ema9, 0, alpha=0.5, facecolor=fillcolor, edgecolor=fillcolor)
-    ax3.text(0.025, 0.95, 'graph 3', va='top', transform = ax3.transAxes, fontsize=textsize)
+    ax2.spines['bottom'].set_color("#5998ff")
+    ax2.spines['top'].set_color("#5998ff")
+    ax2.spines['left'].set_color("#5998ff")
+    ax2.spines['right'].set_color("#5998ff")
+    ax2.tick_params(axis='y', colors='b')
+    ax2.tick_params(axis='x', colors='b')
 
-    #ax3.set_yticks([])
-    # turn off upper axis tick labels, rotate the lower ones, etc
-    for ax in ax1, ax2, ax2t, ax3:
-        if ax != ax3:
-            for label in ax.get_xticklabels():
-                label.set_visible(False)
-        else:
-            for label in ax.get_xticklabels():
-                label.set_rotation(30)
-                label.set_horizontalalignment('right')
-
-        ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d')
+    for ax in ax0, ax0v, ax1, ax2:
+        for label in ax.get_xticklabels():
+            label.set_visible(False)
+    ax1.yaxis.set_major_locator(MyLocator(5, prune='both'))
     ax2.yaxis.set_major_locator(MyLocator(5, prune='both'))
-    ax3.yaxis.set_major_locator(MyLocator(5, prune='both'))
     plt.show()
-    
+
+def test():
+    xdf = get_cont_data('rb1701', datetime.date(2016,1,1), datetime.date(2016,8,19), freq = '30m', nearby = 0, rollrule = '-10b')
+    xdf['WPR'] = dh.WPR(xdf, 9)
+    xdf["SAR"] = dh.SAR(xdf, incr = 0.01, maxaf = 0.1)
+    xdf['RSI'] = dh.RSI(xdf, 14)
+    xdf['MA10'] = dh.MA(xdf, 10)
+    xdf['MA120'] = dh.MA(xdf, 120)
+    ind_fields = [['SAR'], \
+                  ['WPR', 'RSI'], \
+                  ['close', 'MA10', 'MA120']]
+    ind_levels = [[],\
+                  [70, 30],\
+                  []]
+    plot_indicators(xdf, ind_fields, ind_levels)
+
 if __name__=="__main__":
     pass

@@ -109,14 +109,14 @@ class MARibbonTrader(Strategy):
             self.status_notifier(msg)
             save_status = True
             buysell = 0
-        if (self.trade_unit[idx] > 0) and (buysell == 0) and (self.ribbon_pval[idx] < self.pval_th[ifx][0]):
+        if (self.trade_unit[idx] > 0) and (buysell == 0) and (self.ribbon_pval[idx] < self.pval_th[idx][0]):
             if (self.ribbon_corr[idx] >= self.corr_th[idx][0]) and high_chan:
                 buysell = 1
             elif (self.ribbon_corr[idx] <= -self.corr_th[idx][0]) and low_chan:
                 buysell = -1
             if buysell != 0:
                 msg = 'MA ribbon to open position for inst = %s, corr=%s, pval=%s, curr_price= %s, direction=%s, volume=%s' \
-                                        % (len(self.ma_prices[idx]), inst, self.ribbon_corr[idx], self.ribbon_pval[idx], self.curr_prices[idx], buysell, self.trade_unit[idx])
+                     % (len(self.ma_prices[idx]), inst, self.ribbon_corr[idx], self.ribbon_pval[idx], self.curr_prices[idx], buysell, self.trade_unit[idx])
                 self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
                 save_status = True
