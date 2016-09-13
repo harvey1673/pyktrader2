@@ -103,10 +103,71 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
-def conv_simdf_to_tradelist(xdf):
+def conv_simdf_to_tradelist(xdf, slippage = 0):
     trade_df = xdf[xdf['pos'] != xdf['pos'].shift(1)]
-    return []
+    prev_pos = 0
+    tradeid = 0
+    pos_list = []
+    closed_trades = []
+    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf['datetime']):
+        if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
+            if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
+                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)
+            new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
+            tradeid += 1
+            new_pos.entry_tradeid = tradeid
+            new_pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+            pos_list.append(new_pos)
+            prev_pos = pos
+        else:
+            close_idx = -1
+            nlen = len(pos_list)
+            for i, tp in enumerate(reversed(pos_list)):
+                close_idx = i - 1
+                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
+                    break
+                else:
+                    tp.close(tprice - misc.sign(tp.pos)*slippage, dtime)
+                    prev_pos -= tp.pos
+                    tradeid += 1
+                    tp.exit_tradeid = tradeid
+                    closed_trades.append(tp)
+            pos_list = [ pos_list[i] for i in range(0, nlen - close_idx - 1)]
+            if prev_pos != pos:
+                if len(pos_list) == 0:
+                    new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
+                    tradeid += 1
+                    new_pos.entry_tradeid = tradeid
+                    new_pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                    pos_list.append(new_pos)
+                    prev_pos = pos                    
+                else:  
+                    print "Warning: handling partial position for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
+                    partial_tp = copy.deepcopy(pos_list[-1])
+                    partial_tp.pos = prev_pos - pos
+                    partial_tp.close(tprice - misc.sign(tp.pos)*slippage, dtime)
+                    tradeid += 1
+                    partial_tp.exit_tradeid = tradeid
+                    closed_trades.append(partial_tp)
+                    pos_list[-1].pos -= prev_pos - pos
+                    prev_pos = pos
+    if (len(pos_list) !=0) or (prev_pos!=0):
+        print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
+    return closed_trades
 
+def check_bktest_bar_stop(bar, stop_price, direction = 1):
+    price_traded = np.nan
+    if (bar.open - stop_price)*direction <= 0:
+        price_traded = bar.open
+    else:
+        if direction > 0:
+            compare_price = bar.low
+        else:
+            compare_price = bar.high
+        if (compare_price - stop_price)*direction <= 0:
+            price_traded = compare_price
+    return price_traded
+    
 def get_pnl_stats(df_list, start_capital, marginrate, freq):
     sum_pnl = pd.Series(name = 'pnl')
     sum_margin = pd.Series(name='margin')
