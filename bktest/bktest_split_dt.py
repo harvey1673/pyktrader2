@@ -25,7 +25,6 @@ def dual_thrust_sim( mdf, config):
     SL = config['stoploss']
     min_rng = config['min_range']
     chan = config['chan']
-    use_chan = config['use_chan']
     xdf = proc_func(mdf, **proc_args)
     if win == -1:
         tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))], 
@@ -50,15 +49,19 @@ def dual_thrust_sim( mdf, config):
                        xdf['open'], xdf['atr'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
     rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['tr']]).max()
-    mdf['signal'] = np.nan
-    mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'signal'] = 1
-    mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'signal'] = -1
+    mdf['dt_signal'] = np.nan
+    mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'dt_signal'] = 1
+    mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'dt_signal'] = -1
     if close_daily:
-        mdf.ix[ mdf['min_id'] >= config['exit_min'], 'signal'] = 0
-    mdf['signal'] = mdf['signal'].fillna(method='ffill')
-    mdf['signal'] = mdf['signal'].fillna(0)
-    mdf['chan_sig'] = (mdf['high'] >= mdf['chan_h']) & (mdf['signal'] > 0)
-    mdf['pos'] = mdf['signal'].shift(1).fillna(0)
+        mdf.ix[ mdf['min_id'] >= config['exit_min'], 'dt_signal'] = 0
+    mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
+    #mdf['dt_signal'] = mdf['signal'].fillna(0)
+    mdf['chan_sig'] = np.nan
+    mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
+    mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
+    mdf['chan_sig'] = mdf['chan_sig'].fillna(method='ffill').fillna(0)
+    pos =  mdf['dt_signal'] * (unit[0] + (mdf['chan_sig'] * mdf['dt_signal'] > 0) * unit[1])
+    mdf['pos'] = pos.shift(1).fillna(0)
     mdf.ix[-3:, 'pos'] = 0
     mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
     mdf['cost'] = mdf['cost'].fillna(0.0)
@@ -70,9 +73,11 @@ def dual_thrust_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_split_dt.dual_thrust_sim'
-    sim_config['scen_keys'] = ['param']
-    sim_config['sim_name']   = 'DT_Split'
-    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'y', 'p', 'OI', 'a', 'SR', 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn']
+    sim_config['scen_keys'] = ['chan', 'param']
+    sim_config['sim_name']   = 'DT_pctch10_2y'
+    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
+                                'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
+                                'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20150101'
     sim_config['end_date']   = '20160909'
     sim_config['param']  =  [
@@ -85,13 +90,16 @@ def gen_config_file(filename):
         (0.2, 4, 0.5, 0.0), (0.25, 4, 0.5, 0.0),(0.3, 4, 0.5, 0.0), (0.35, 4, 0.5, 0.0),\
         (0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
         ]
-    sim_config['chan'] = [3, 5, 10, 20, 30]
+    sim_config['chan'] = [10, 20]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
-    chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
-                 'low':  {'func': 'dh.DONCH_L', 'args':{}},
+    chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
+                 'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}},
                  }
+    #chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
+    #             'low':  {'func': 'dh.DONCH_L', 'args':{}},
+    #             }
     config = {'capital': 10000,
               'use_chan': True,
               'trans_cost': 0.0,
@@ -100,7 +108,7 @@ def gen_config_file(filename):
               'stoploss': 0.0,
               'min_range': 0.0035,
               'pos_args': {},
-              'proc_args': {'minlist':[1500]},
+              'proc_args': {'minlist':[]},
               'pos_update': False,
               'chan_func': chan_func,
               }
