@@ -15,12 +15,8 @@ def dual_thrust_sim( mdf, config):
     win = config['param'][1]
     multiplier = config['param'][2]
     f = config['param'][3]
-    pos_update = config['pos_update']
-    pos_class = config['pos_class']
-    pos_args  = config['pos_args']
     proc_func = config['proc_func']
     proc_args = config['proc_args']
-    rev_buffer = config.get('rev_buffer', 0)
     chan_func = config['chan_func']
     chan_high = eval(chan_func['high']['func'])
     chan_low  = eval(chan_func['low']['func'])
@@ -30,8 +26,6 @@ def dual_thrust_sim( mdf, config):
     min_rng = config['min_range']
     chan = config['chan']
     use_chan = config['use_chan']
-    no_trade_set = config['no_trade_set']
-    ll = mdf.shape[0]
     xdf = proc_func(mdf, **proc_args)
     if win == -1:
         tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))], 
@@ -46,26 +40,28 @@ def dual_thrust_sim( mdf, config):
         tr= pd.concat([pd.rolling_max(xdf.high, win) - pd.rolling_min(xdf.close, win), 
                        pd.rolling_max(xdf.close, win) - pd.rolling_min(xdf.low, win)], 
                        join='outer', axis=1).max(axis=1)
-    xdf['TR'] = tr
+    xdf['tr'] = tr
     xdf['chan_h'] = chan_high(xdf, chan, **chan_func['high']['args'])
     xdf['chan_l'] = chan_low(xdf, chan, **chan_func['low']['args'])
-    xdf['ATR'] = dh.ATR(xdf, chan)
-    xdf['MA'] = pd.rolling_mean(xdf.close, chan)
-    xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1),
+    xdf['atr'] = dh.ATR(xdf, chan)
+    xdf['ma'] = pd.rolling_mean(xdf.close, chan)
+    xdata = pd.concat([xdf['tr'].shift(1), xdf['ma'].shift(1),
                        xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
-                       xdf['open'], xdf['ATR'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
+                       xdf['open'], xdf['atr'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
-    rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['TR']]).max()
+    rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['tr']]).max()
     mdf['signal'] = np.nan
     mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'signal'] = 1
     mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'signal'] = -1
     if close_daily:
         mdf.ix[ mdf['min_id'] >= config['exit_min'], 'signal'] = 0
+    mdf['signal'] = mdf['signal'].fillna(method='ffill')
+    mdf['signal'] = mdf['signal'].fillna(0)
+    mdf['chan_sig'] = (mdf['high'] >= mdf['chan_h']) & (mdf['signal'] > 0)
+    mdf['pos'] = mdf['signal'].shift(1).fillna(0)
     mdf.ix[-3:, 'pos'] = 0
-    mdf['signal'].fillna(method='ffill')
-    mdf['signal'].fillna(0)
-    mdf['pos'] = mdf['signal'].shift(1)
     mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
+    mdf['cost'] = mdf['cost'].fillna(0.0)
     mdf['traded_price'] = mdf['open']
     trade_df = mdf[mdf['pos']!= mdf['pos'].shift(1)]
     closed_trades = backtest.conv_simdf_to_tradelist(trade_df)
@@ -74,20 +70,22 @@ def dual_thrust_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_split_dt.dual_thrust_sim'
-    sim_config['scen_keys'] = ['param', 'rev_buffer']
-    sim_config['sim_name']   = 'DTsplit'
-    sim_config['products']   = ['y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ni', 'j', 'jm', 'ag', 'cu', 'au', 'm', 'RM', 'ru']
-    sim_config['start_date'] = '20150105'
-    sim_config['end_date']   = '20160603'
-    sim_config['rev_buffer'] = [0, 0.5, 1, 1.5, 2]
+    sim_config['scen_keys'] = ['param']
+    sim_config['sim_name']   = 'DT_Split'
+    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'y', 'p', 'OI', 'a', 'SR', 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn']
+    sim_config['start_date'] = '20150101'
+    sim_config['end_date']   = '20160909'
     sim_config['param']  =  [
-            (0.5, 1, 0.5, 0.0), (0.6, 1, 0.5, 0.0), (0.7, 1, 0.5, 0.0), (0.8, 1, 0.5, 0.0), \
-            (0.9, 1, 0.5, 0.0), (1.0, 1, 0.5, 0.0), (1.1, 1, 0.5, 0.0), \
-            #(0.2, 2, 0.5, 0.0), (0.25,2, 0.5, 0.0), (0.3, 2, 0.5, 0.0), (0.35, 2, 0.5, 0.0),\
-            #(0.4, 2, 0.5, 0.0), (0.45, 2, 0.5, 0.0),(0.5, 2, 0.5, 0.0), \
-            #(0.2, 4, 0.5, 0.0), (0.25, 4, 0.5, 0.0),(0.3, 4, 0.5, 0.0), (0.35, 4, 0.5, 0.0),\
-            #(0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
-            ]
+        (0.5, 0, 0.5, 0.0), (0.6, 0, 0.5, 0.0), (0.7, 0, 0.5, 0.0), (0.8, 0, 0.5, 0.0), \
+        (0.9, 0, 0.5, 0.0), (1.0, 0, 0.5, 0.0), (1.1, 0, 0.5, 0.0), \
+        (0.5, 1, 0.5, 0.0), (0.6, 1, 0.5, 0.0), (0.7, 1, 0.5, 0.0), (0.8, 1, 0.5, 0.0), \
+        (0.9, 1, 0.5, 0.0), (1.0, 1, 0.5, 0.0), (1.1, 1, 0.5, 0.0), \
+        (0.2, 2, 0.5, 0.0), (0.25,2, 0.5, 0.0), (0.3, 2, 0.5, 0.0), (0.35, 2, 0.5, 0.0),\
+        (0.4, 2, 0.5, 0.0), (0.45, 2, 0.5, 0.0),(0.5, 2, 0.5, 0.0), \
+        (0.2, 4, 0.5, 0.0), (0.25, 4, 0.5, 0.0),(0.3, 4, 0.5, 0.0), (0.35, 4, 0.5, 0.0),\
+        (0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
+        ]
+    sim_config['chan'] = [3, 5, 10, 20, 30]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
@@ -95,15 +93,14 @@ def gen_config_file(filename):
                  'low':  {'func': 'dh.DONCH_L', 'args':{}},
                  }
     config = {'capital': 10000,
-              'use_chan': False,
-              'chan': 10,
+              'use_chan': True,
               'trans_cost': 0.0,
               'close_daily': False,
-              'unit': 1,
+              'unit': [0, 1],
               'stoploss': 0.0,
               'min_range': 0.0035,
               'pos_args': {},
-              'proc_args': {'minlist':[]},
+              'proc_args': {'minlist':[1500]},
               'pos_update': False,
               'chan_func': chan_func,
               }

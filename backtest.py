@@ -1,5 +1,6 @@
 import datetime
 import os
+import copy
 import sys
 import json
 import pandas as pd
@@ -109,7 +110,7 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
     tradeid = 0
     pos_list = []
     closed_trades = []
-    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf['datetime']):
+    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf.index):
         if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
             if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)
@@ -118,7 +119,6 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
             new_pos.entry_tradeid = tradeid
             new_pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
             pos_list.append(new_pos)
-            prev_pos = pos
         else:
             close_idx = -1
             nlen = len(pos_list)
@@ -132,7 +132,7 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
                     tradeid += 1
                     tp.exit_tradeid = tradeid
                     closed_trades.append(tp)
-            pos_list = [ pos_list[i] for i in range(0, nlen - close_idx - 1)]
+            pos_list = [ tp for tp in pos_list if not tp.is_closed ]
             if prev_pos != pos:
                 if len(pos_list) == 0:
                     new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
@@ -140,7 +140,6 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
                     pos_list.append(new_pos)
-                    prev_pos = pos                    
                 else:  
                     print "Warning: handling partial position for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
                     partial_tp = copy.deepcopy(pos_list[-1])
@@ -150,7 +149,7 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
                     partial_tp.exit_tradeid = tradeid
                     closed_trades.append(partial_tp)
                     pos_list[-1].pos -= prev_pos - pos
-                    prev_pos = pos
+        prev_pos = pos
     if (len(pos_list) !=0) or (prev_pos!=0):
         print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
     return closed_trades
