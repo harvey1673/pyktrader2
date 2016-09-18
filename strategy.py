@@ -389,19 +389,20 @@ class Strategy(object):
         self.logger.info('need to speed up the trade = %s' % etrade.id)
         pass
 
-    def open_tradepos(self, idx, direction, price):
+    def open_tradepos(self, idx, direction, price, volume = 0):
+        tunit = self.trade_unit[idx] if volume == 0 else volume
         valid_time = self.agent.tick_id + self.trade_valid_time
         insts = self.underliers[idx]
         nAsset = len(insts)
-        trade_vol = [ v * self.trade_unit[idx] * direction for v in self.volumes[idx] ]
+        trade_vol = [ v * tunit * direction for v in self.volumes[idx] ]
         order_type = [self.order_type] * nAsset
         if (self.order_type == OPT_LIMIT_ORDER) and (nAsset > 1):
             order_type[-1] = OPT_MARKET_ORDER
         conv_f = [ self.agent.instruments[inst].multiple for inst in insts ]
         etrade = order.ETrade( insts, trade_vol, order_type, price * direction, [self.num_tick] * nAsset,  \
-                                valid_time, self.name, self.agent.name, conv_f[-1]*self.trade_unit[idx], conv_f)
-        tradepos = eval(self.pos_class)(insts, self.volumes[idx], direction * self.trade_unit[idx], \
-                                price, price, conv_f[-1]*self.trade_unit[idx], **self.pos_args)
+                                valid_time, self.name, self.agent.name, conv_f[-1]*tunit, conv_f)
+        tradepos = eval(self.pos_class)(insts, self.volumes[idx], direction * tunit, \
+                                price, price, conv_f[-1]*tunit, **self.pos_args)
         tradepos.entry_tradeid = etrade.id
         self.submitted_trades[idx].append(etrade)
         self.positions[idx].append(tradepos)

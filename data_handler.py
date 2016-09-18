@@ -910,3 +910,27 @@ def aroon(df, n):
     aroondown, aroonup = AROON(df['high'][-(n+1):], df['low'][-(n+1):], timeperiod= n)
     df["AROOONDN_%s" % str(n)][-1] = aroondown[-1]
     df["AROOONUP_%s" % str(n)][-1] = aroonup[-1]
+
+def DT_RNG(df, win = 2, ratio = 0.7):
+    if win == 0:
+        tr_ts = pd.concat([(pd.rolling_max(df['high'], 2) - pd.rolling_min(df['close'], 2))*0.5,
+                        (pd.rolling_max(df['close'], 2) - pd.rolling_min(df['low'], 2))*0.5,
+                        df['high'] - df['close'],
+                        df['close'] - df['low']],
+                        join='outer', axis=1).max(axis=1)
+    else:
+        tr_ts = pd.concat([pd.rolling_max(df['high'], win) - pd.rolling_min(df['close'], win),
+                       pd.rolling_max(df['close'], win) - pd.rolling_min(df['low'], win)],
+                       join='outer', axis=1).max(axis=1)
+    return pd.Series(tr_ts, name = 'DTRNG%s_%s' % (win, ratio))
+
+def dt_rng(df, win = 2, ratio = 0.7):
+    key = 'DTRNG%s_%s' % (win, ratio)
+    if win > 0:
+        df[key][-1] = max(max(df['high'][-win:]) - min(df['close'][-win:]),
+                                max(df['close'][-win:]) - min(df['low'][-win:]))
+    elif win == 0:
+        df[key][-1] = max(max(df['high'][-2:]) - min(df['close'][-2:]),
+                                max(df['close'][-2:]) - min(df['low'][-2:]))
+        df[key][-1] = max(df[key][-1] * 0.5, df['high'][-1] - df['close'][-1],
+                                df['close'][-1] - df['low'][-1])

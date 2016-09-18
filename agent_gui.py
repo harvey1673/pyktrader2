@@ -272,6 +272,33 @@ class DTSplitDChanStratGui(StratGui):
                             'Freq': 'int',
                             }
 
+class DTSplitChanAddonStratGui(StratGui):
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'AddonRatio', 'Lookbacks', 'Ratios', 'CloseTday']
+        self.status_fields = ['TdayOpen', 'OpenIdx', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
+        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'Lookbacks':'int',
+                            'Ratios': 'float',
+                            'AddonRatio': 'float',
+                            'CloseTday': 'bool',
+                            'TdayOpen': 'float',
+                            'OpenIdx': 'int',
+                            'CurrPrices': 'float',
+                            'CurRng':'float',
+                            'ChanHigh': 'float',
+                            'ChanLow': 'float',
+                            'NumTick': 'int',
+                            'Channels': 'int',
+                            'OrderType': 'str',
+                            'MinRng': 'float',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
+
 class BBandPChanStratGui(StratGui):   
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
@@ -684,6 +711,8 @@ class Gui(tk.Tk):
                 self.strat_gui[strat_name] = DTStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['DTSplitDChanFilter']:
                 self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
+            elif strat.__class__.__name__ in ['DTSplitChanAddon']:
+                self.strat_gui[strat_name] = DTSplitChanAddonStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['BbandPChanTrader']:
                 self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['MASystemTrader']:
