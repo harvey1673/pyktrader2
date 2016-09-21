@@ -15,6 +15,7 @@ def dual_thrust_sim( mdf, config):
     win = config['param'][1]
     multiplier = config['param'][2]
     f = config['param'][3]
+    fillfwd = config['DT_fillfwd']
     proc_func = config['proc_func']
     proc_args = config['proc_args']
     chan_func = config['chan_func']
@@ -54,8 +55,11 @@ def dual_thrust_sim( mdf, config):
     mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'dt_signal'] = -1
     if close_daily:
         mdf.ix[ mdf['min_id'] >= config['exit_min'], 'dt_signal'] = 0
-    mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
-    #mdf['dt_signal'] = mdf['signal'].fillna(0)
+    if fillfwd:
+        dt_signal = mdf['dt_signal'].fillna(method='ffill')
+    else:
+        dt_signal = mdf['dt_signal']
+    mdf['dt_signal'] = dt_signal.fillna(0)
     mdf['chan_sig'] = np.nan
     mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
     mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
@@ -66,15 +70,14 @@ def dual_thrust_sim( mdf, config):
     mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
     mdf['cost'] = mdf['cost'].fillna(0.0)
     mdf['traded_price'] = mdf['open']
-    trade_df = mdf[mdf['pos']!= mdf['pos'].shift(1)]
-    closed_trades = backtest.conv_simdf_to_tradelist(trade_df)
+    closed_trades = backtest.conv_simdf_to_tradelist(mdf)
     return (mdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_split_dt.dual_thrust_sim'
     sim_config['scen_keys'] = ['chan', 'param']
-    sim_config['sim_name']   = 'DT_pctch10_2y'
+    sim_config['sim_name']   = 'DTsig_pctch45_2y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
@@ -94,8 +97,8 @@ def gen_config_file(filename):
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
-    chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
-                 'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}},
+    chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 55, 'field': 'high'}},
+                 'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 45, 'field': 'low'}},
                  }
     #chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
     #             'low':  {'func': 'dh.DONCH_L', 'args':{}},
@@ -104,6 +107,7 @@ def gen_config_file(filename):
               'use_chan': True,
               'trans_cost': 0.0,
               'close_daily': False,
+              'DT_fillfwd': False,
               'unit': [0, 1],
               'stoploss': 0.0,
               'min_range': 0.0035,

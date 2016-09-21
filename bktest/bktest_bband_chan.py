@@ -9,8 +9,6 @@ import backtest
 import sys
 
 def bband_chan_sim( mdf, config):
-    start_equity = config['capital']
-    marginrate = config['marginrate']
     offset = config['offset']
     pos_class = config['pos_class']
     pos_args  = config['pos_args']

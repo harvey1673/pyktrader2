@@ -104,8 +104,8 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
-def conv_simdf_to_tradelist(xdf, slippage = 0):
-    trade_df = xdf[xdf['pos'] != xdf['pos'].shift(1)]
+def conv_simdf_to_tradelist(df, slippage = 0):
+    xdf = df[df['pos'] != df['pos'].shift(1)]
     prev_pos = 0
     tradeid = 0
     pos_list = []
@@ -120,10 +120,7 @@ def conv_simdf_to_tradelist(xdf, slippage = 0):
             new_pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
             pos_list.append(new_pos)
         else:
-            close_idx = -1
-            nlen = len(pos_list)
             for i, tp in enumerate(reversed(pos_list)):
-                close_idx = i - 1
                 if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
                     break
                 else:

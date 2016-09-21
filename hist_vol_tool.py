@@ -201,8 +201,9 @@ def variance_ratio(ts, freqs):
 
 def price_stats(df):
     stats  = {}
-    stats['20H'] = max(df['high'][-20:])
-    stats['20H'] = min(df['low'][-20:])
+    stats['H20'] = max(df['high'][-20:])
+    stats['L20'] = min(df['low'][-20:])
+    stats['']
 
 def validate_db_data(tday, filter = False):
     all_insts = filter_main_cont(tday, filter)
