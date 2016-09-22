@@ -104,7 +104,7 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
-def conv_simdf_to_tradelist(df, slippage = 0):
+def simdf_to_trades1(df, slippage = 0):
     xdf = df[df['pos'] != df['pos'].shift(1)]
     prev_pos = 0
     tradeid = 0
@@ -151,6 +151,56 @@ def conv_simdf_to_tradelist(df, slippage = 0):
         print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
     return closed_trades
 
+def simdf_to_trades2(df, slippage = 0.0):
+    xdf = df[df['pos'] != df['pos'].shift(1)]
+    prev_pos = 0
+    tradeid = 0
+    pos_list = []
+    closed_trades = []
+    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf.index):
+        if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
+            if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
+                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)            
+            npos = abs(pos-prev_pos)
+            new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+            for pos in new_pos:
+                tradeid += 1
+                pos.entry_tradeid = tradeid
+                pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+            pos_list = pos_list + new_pos            npos = abs(pos-prev_pos)
+            new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+            for pos in new_pos:
+                tradeid += 1
+                pos.entry_tradeid = tradeid
+                pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+            pos_list = pos_list + new_pos
+        else:
+            for i, tp in enumerate(reversed(pos_list)):
+                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
+                    break
+                else:
+                    tp.close(tprice - misc.sign(tp.pos)*slippage, dtime)
+                    prev_pos -= tp.pos
+                    tradeid += 1
+                    tp.exit_tradeid = tradeid
+                    closed_trades.append(tp)
+            pos_list = [ tp for tp in pos_list if not tp.is_closed ]
+            if prev_pos != pos:
+                if len(pos_list) == 0:
+                    npos = abs(pos-prev_pos)
+                    new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+                    for pos in new_pos:
+                        tradeid += 1
+                        pos.entry_tradeid = tradeid
+                        pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                    pos_list = pos_list + new_pos                    
+                else:  
+                    print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
+        prev_pos = pos
+    if (len(pos_list) !=0) or (prev_pos!=0):
+        print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
+    return closed_trades
+    
 def check_bktest_bar_stop(bar, stop_price, direction = 1):
     price_traded = np.nan
     if (bar.open - stop_price)*direction <= 0:
