@@ -15,7 +15,7 @@ def dual_thrust_sim( mdf, config):
     win = config['param'][1]
     multiplier = config['param'][2]
     f = config['param'][3]
-    fillfwd = config['DT_fillfwd']
+    combo_signal = config['combo_signal']
     proc_func = config['proc_func']
     proc_args = config['proc_args']
     chan_func = config['chan_func']
@@ -55,14 +55,15 @@ def dual_thrust_sim( mdf, config):
     mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'dt_signal'] = -1
     if close_daily:
         mdf.ix[ mdf['min_id'] >= config['exit_min'], 'dt_signal'] = 0
-    if fillfwd:
-        dt_signal = mdf['dt_signal'].fillna(method='ffill')
-    else:
-        dt_signal = mdf['dt_signal']
-    mdf['dt_signal'] = dt_signal.fillna(0)
+    addon_signal = copy.deepcopy(mdf['dt_signal'])
+    mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
     mdf['chan_sig'] = np.nan
-    mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
-    mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
+    if combo_signal:
+        mdf.ix[(mdf['high'] >= mdf['chan_h']) && (addon_signal > 0), 'chan_sig'] = 1
+        mdf.ix[(mdf['low'] <= mdf['chan_l']) && (addon_signal < 0), 'chan_sig'] = -1
+    else:
+        mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
+        mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
     mdf['chan_sig'] = mdf['chan_sig'].fillna(method='ffill').fillna(0)
     pos =  mdf['dt_signal'] * (unit[0] + (mdf['chan_sig'] * mdf['dt_signal'] > 0) * unit[1])
     mdf['pos'] = pos.shift(1).fillna(0)
@@ -107,7 +108,7 @@ def gen_config_file(filename):
               'use_chan': True,
               'trans_cost': 0.0,
               'close_daily': False,
-              'DT_fillfwd': False,
+              'combo_signal': False,
               'unit': [0, 1],
               'stoploss': 0.0,
               'min_range': 0.0035,
