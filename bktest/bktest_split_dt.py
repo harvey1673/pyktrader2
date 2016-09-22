@@ -71,7 +71,7 @@ def dual_thrust_sim( mdf, config):
     mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
     mdf['cost'] = mdf['cost'].fillna(0.0)
     mdf['traded_price'] = mdf['open']
-    closed_trades = backtest.conv_simdf_to_tradelist(mdf)
+    closed_trades = backtest.simdf_to_trades1(mdf)
     return (mdf, closed_trades)
 
 def gen_config_file(filename):
