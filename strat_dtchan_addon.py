@@ -7,7 +7,7 @@ from strategy import *
  
 class DTSplitChanAddon(Strategy):
     common_params =  dict({'open_period': [300, 1500, 2100], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'price_limit_buffer': 5}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'addon_ratio': 1.0, 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -141,9 +141,10 @@ class DTSplitChanAddon(Strategy):
             self.logger.warning("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name))
             return save_status
         min_id = int(self.agent.tick_id/1000.0)
+        max_pos = sum(v > 0.0 for v in self.vol_ratio[idx])
         num_pos = len(self.positions[idx])
         buysell = 0
-        if num_pos > 2:
+        if num_pos > max_pos:
             self.logger.warning('something wrong - number of tradepos is more than 2')
             return save_status
         elif num_pos >= 1:
@@ -162,42 +163,33 @@ class DTSplitChanAddon(Strategy):
                 self.status_notifier(msg)
                 save_status = True
             return save_status
-        if ((buy_price >= buy_trig) and (buysell <=0)) or ((sell_price <= sell_trig) and (buysell >=0)):
-            if buysell!=0:
-                msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, num_pos=%s' \
+        if ((buy_price >= buy_trig) and (buysell <0)) or ((sell_price <= sell_trig) and (buysell > 0)):            
+            msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, num_pos=%s' \
                                     % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, num_pos)
-                for tp in self.positions[idx]:
-                    self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * self.num_tick * tick_base)
-                self.status_notifier(msg)
-                save_status = True
-                num_pos = 0
-            if self.trade_unit[idx] <= 0:
-                return save_status
-            if  (buy_price >= buy_trig):
-                buysell = 1
-            else:
-                buysell = -1
-            if buy_price >= buy_trig or sell_price <= sell_trig:
-                msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
-                                        % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, self.trade_unit[idx])
-                self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
-                self.status_notifier(msg)
-                save_status = True
-                num_pos = 1
-        if (buysell!=0) and (self.channels[idx] > 0) and ((buy_price >= self.chan_high[idx]) or (sell_price <= self.chan_low[idx])):
-            if (num_pos < 2) and (((buysell > 0) and (buy_price >= self.chan_high[idx])) or ((buysell < 0) and (sell_price <= self.chan_low[idx]))):
-                addon_vol = int(self.addon_ratio[idx]*self.trade_unit[idx])
-                msg = 'DT to add position for inst = %s, high=%s, low=%s, buy= %s, sell= %s, direction=%s, volume=%s' \
-                                        % (inst, self.chan_high[idx], self.chan_low[idx], buy_price, sell_price, buysell, addon_vol)
-                self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base, addon_vol)
-                self.status_notifier(msg)
-                save_status = True
-                num_pos = 2
-            if (num_pos == 2) and (((buysell > 0) and (sell_price <= self.chan_low[idx])) or ((buysell < 0) and (buy_price >= self.chan_high[idx]))):
-                msg = 'DT to remove position for inst = %s, high=%s, low=%s, buy= %s, sell= %s, direction=%s, volume=%s' \
-                                        % (inst, self.chan_high[idx], self.chan_low[idx], buy_price, sell_price, buysell, self.positions[idx][-1].pos)
-                self.close_tradepos(idx, self.positions[idx][-1], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
-                self.status_notifier(msg)
-                save_status = True
-                num_pos = 1
+            for tp in self.positions[idx]:
+                self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * self.num_tick * tick_base)
+            self.status_notifier(msg)
+            save_status = True
+            num_pos = 0
+        if (self.trade_unit[idx] <= 0):
+            return save_status
+        if  (buy_price >= buy_trig):
+            buysell = 1
+        else:
+            buysell = -1
+        if (buysell!=0) and (self.vol_ratio[idx][0]>0) and (num_pos == 0):
+            new_vol = int(self.trade_unit[idx] * self.vol_ratio[idx][0])
+            msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
+                                        % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, new_vol)
+            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base, new_vol)
+            self.status_notifier(msg)
+            save_status = True
+            num_pos = 1
+        if (num_pos < max_pos) and (self.vol_ratio[idx][1]>0) and (((buysell > 0) and (buy_price >= self.chan_high[idx])) or ((buysell < 0) and (sell_price <= self.chan_low[idx]))):
+            addon_vol = int(self.vol_ratio[idx][1]*self.trade_unit[idx])
+            msg = 'DT to add position for inst = %s, high=%s, low=%s, buy= %s, sell= %s, direction=%s, volume=%s' \
+                                    % (inst, self.chan_high[idx], self.chan_low[idx], buy_price, sell_price, buysell, addon_vol)
+            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base, addon_vol)
+            self.status_notifier(msg)
+            save_status = True
         return save_status
