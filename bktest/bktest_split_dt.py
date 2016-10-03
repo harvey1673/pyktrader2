@@ -1,6 +1,7 @@
 import sys
 import json
 import misc
+import copy
 import data_handler as dh
 import pandas as pd
 import numpy as np
@@ -59,8 +60,8 @@ def dual_thrust_sim( mdf, config):
     mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
     mdf['chan_sig'] = np.nan
     if combo_signal:
-        mdf.ix[(mdf['high'] >= mdf['chan_h']) && (addon_signal > 0), 'chan_sig'] = 1
-        mdf.ix[(mdf['low'] <= mdf['chan_l']) && (addon_signal < 0), 'chan_sig'] = -1
+        mdf.ix[(mdf['high'] >= mdf['chan_h']) & (addon_signal > 0), 'chan_sig'] = 1
+        mdf.ix[(mdf['low'] <= mdf['chan_l']) & (addon_signal < 0), 'chan_sig'] = -1
     else:
         mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
         mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
@@ -77,12 +78,12 @@ def dual_thrust_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest_split_dt.dual_thrust_sim'
-    sim_config['scen_keys'] = ['chan', 'param']
-    sim_config['sim_name']   = 'DTsig_pctch45_2y'
+    sim_config['scen_keys'] = ['param']
+    sim_config['sim_name']   = 'DTdaily_1y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
-    sim_config['start_date'] = '20150101'
+    sim_config['start_date'] = '20151001'
     sim_config['end_date']   = '20160909'
     sim_config['param']  =  [
         (0.5, 0, 0.5, 0.0), (0.6, 0, 0.5, 0.0), (0.7, 0, 0.5, 0.0), (0.8, 0, 0.5, 0.0), \
@@ -94,22 +95,21 @@ def gen_config_file(filename):
         (0.2, 4, 0.5, 0.0), (0.25, 4, 0.5, 0.0),(0.3, 4, 0.5, 0.0), (0.35, 4, 0.5, 0.0),\
         (0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
         ]
-    sim_config['chan'] = [10, 20]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
-    chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 55, 'field': 'high'}},
-                 'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 45, 'field': 'low'}},
-                 }
-    #chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
-    #             'low':  {'func': 'dh.DONCH_L', 'args':{}},
+    #chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
+    #             'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}},
     #             }
+    chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
+                 'low':  {'func': 'dh.DONCH_L', 'args':{}},
+                 }
     config = {'capital': 10000,
-              'use_chan': True,
               'trans_cost': 0.0,
               'close_daily': False,
               'combo_signal': False,
-              'unit': [0, 1],
+              'chan': 5,
+              'unit': [1, 0],
               'stoploss': 0.0,
               'min_range': 0.0035,
               'pos_args': {},

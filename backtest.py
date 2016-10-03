@@ -167,7 +167,7 @@ def simdf_to_trades2(df, slippage = 0.0):
                 tradeid += 1
                 pos.entry_tradeid = tradeid
                 pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
-            pos_list = pos_list + new_pos            npos = abs(pos-prev_pos)
+            pos_list = pos_list + new_pos
             new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
             for pos in new_pos:
                 tradeid += 1
@@ -363,9 +363,11 @@ def simnearby_min(config_file):
     with open(config_file, 'r') as fp:
         sim_config = json.load(fp)
     bktest_split = sim_config['sim_func'].split('.')
-    bktest_module = __import__(bktest_split[0])
-    run_sim = getattr(bktest_module, bktest_split[1])
+    run_sim = __import__(bktest_split[0])
+    for i in range(1, len(bktest_split)):
+        run_sim = getattr(run_sim, bktest_split[i])
     dir_name = config_file.split('.')[0]
+    dir_name = dir_name.split(os.path.sep)[-1]
     test_folder = get_bktest_folder()
     file_prefix = test_folder + dir_name + os.path.sep
     if not os.path.exists(file_prefix):
@@ -483,9 +485,11 @@ def simcontract_min(config_file):
     with open(config_file, 'r') as fp:
         sim_config = json.load(fp)
     bktest_split = sim_config['sim_func'].split('.')
-    bktest_module = __import__(bktest_split[0])
-    run_sim = getattr(bktest_module, bktest_split[1])
+    run_sim = __import__(bktest_split[0])
+    for i in range(1, len(bktest_split)):
+        run_sim = getattr(run_sim, bktest_split[i])
     dir_name = config_file.split('.')[0]
+    dir_name = dir_name.split(os.path.sep)[-1]
     test_folder = get_bktest_folder()
     file_prefix = test_folder + dir_name + os.path.sep
     if not os.path.exists(file_prefix):

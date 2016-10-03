@@ -63,16 +63,16 @@ class AsctrendTrader(Strategy):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]].data
         key = 'WPR_%s' % str(self.wpr_win[idx])
-        if (xdf[key][-1] >= self.wpr_level[idx][0]) and (xdf[key][-2] < self.wpr_level[idx][0]):
+        if dh.crossover(xdf[key], self.wpr_level[idx][0], 1):
             self.wpr_signal[idx] = 1
-        elif (xdf[key][-1] <= self.wpr_level[idx][1]) and (xdf[key][-2] > self.wpr_level[idx][1]):
-            self.wpr_signal[idx] = 1
+        elif dh.crossover(xdf[key], self.wpr_level[idx][1], -1):
+            self.wpr_signal[idx] = -1
         else:
             self.wpr_signal[idx] = 0
         key = 'SAR'
-        if (xdf[key][-1] > 0):
+        if (xdf[key][-1] < xdf['close'][-1]):
             self.sar_signal[idx] = 1
-        elif (xdf[key][-1] < 0):
+        elif (xdf[key][-1] > xdf['close'][-1]):
             self.sar_signal[idx] = -1
         else:
             self.sar_signal[idx] = 0

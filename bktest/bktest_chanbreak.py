@@ -14,10 +14,8 @@ def chanbreak_sim( mdf, config):
     freq = config['freq']
     str_freq = str(freq) + 'Min'
     xdf = dh.conv_ohlc_freq(mdf, str_freq)
-    start_equity = config['capital']
     tcost = config['trans_cost']
     unit = config['unit']
-    marginrate = config['marginrate']
     offset = config['offset']
     win = config['win']
     pos_class = config['pos_class']
@@ -42,8 +40,6 @@ def chanbreak_sim( mdf, config):
     closed_trades = []
     end_d = mdf.index[-1].date()
     tradeid = 0
-    x_idx = 0
-    max_idx = len(xdf.index)
     for idx, dd in enumerate(mdf.index):
         mslice = mdf.ix[dd]
         min_id = mslice.min_id

@@ -56,8 +56,8 @@ def dual_thrust_sim( mdf, config):
     xdata = pd.concat([xdf['open'], xdf['high'], xdf['low'], xdf['close']], axis=1, keys=['xopen','xhigh', 'xlow', 'xclose'])
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
     ll = mdf.shape[0]
-    mdf['pos'] = pd.Series([0]*ll, index = mdf.index)
-    mdf['cost'] = pd.Series([0]*ll, index = mdf.index)
+    mdf['pos'] = 0
+    mdf['cost'] = 0
     start_d = ddf.index[0]
     end_d = mdf.index[-1].date()
     prev_d = start_d - datetime.timedelta(days=1)
