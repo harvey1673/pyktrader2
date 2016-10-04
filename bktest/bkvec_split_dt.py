@@ -1,4 +1,7 @@
-import sys
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 import json
 import misc
 import copy
@@ -77,14 +80,14 @@ def dual_thrust_sim( mdf, config):
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest_split_dt.dual_thrust_sim'
+    sim_config['sim_func']  = 'bktest.bkvec_split_dt.dual_thrust_sim'
     sim_config['scen_keys'] = ['param']
     sim_config['sim_name']   = 'DTdaily_1y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20151001'
-    sim_config['end_date']   = '20160909'
+    sim_config['end_date']   = '20160930'
     sim_config['param']  =  [
         (0.5, 0, 0.5, 0.0), (0.6, 0, 0.5, 0.0), (0.7, 0, 0.5, 0.0), (0.8, 0, 0.5, 0.0), \
         (0.9, 0, 0.5, 0.0), (1.0, 0, 0.5, 0.0), (1.1, 0, 0.5, 0.0), \

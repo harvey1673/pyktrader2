@@ -1,3 +1,7 @@
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 import misc
 import json
 import data_handler as dh
@@ -15,7 +19,8 @@ def bband_chan_sim( mdf, config):
     pos_update = config.get('pos_update', False)
     stoploss = config.get('stoploss', 0.0)
     param = config['param']
-    bar_func = eval(config['bar_conv_func'])
+    bar_func = config.get('bar_conv_func', 'dh.bar_conv_func2')
+    bar_func = eval(bar_func)
     std_func = eval(config['std_func'])
     #tick_base = config['tick_base']
     close_daily = config['close_daily']
@@ -49,18 +54,18 @@ def bband_chan_sim( mdf, config):
     if close_daily:
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
-    ll = xdf.shape[0]
     long_signal = pd.Series(np.nan, index = xdf.index)
-    long_signal[xdf['open']>=xdf['high_band']] = 1
-    long_signal[(xdf['open']<=xdf['dn_exit']) && (xdf['open'].shift(1) > xdf['dn_exit'].shift(1))] = 0
+    long_signal[(xdf['open']>=xdf['high_band']) & (xdf['boll_ma'].notnull())] = 1
+    long_signal[(xdf['open']<=xdf['dn_exit']) & (xdf['boll_ma'].notnull())] = 0
     long_signal[xdf['close_ind']] = 0
     long_signal = long_signal.fillna(method='ffill').fillna(0)
     short_signal = pd.Series(np.nan, index = xdf.index)
-    short_signal[xdf['open']<=xdf['low_band']] = -1
-    short_signal[(xdf['open']>=xdf['up_exit']) && (xdf['open'].shift(1) < xdf['up_exit'].shift(1))] = 0
+    short_signal[(xdf['open']<=xdf['low_band']) & (xdf['boll_ma'].notnull())] = -1
+    short_signal[(xdf['open']>=xdf['up_exit']) & (xdf['boll_ma'].notnull())] = 0
     short_signal[xdf['close_ind']] = 0
     short_signal = short_signal.fillna(method='ffill').fillna(0)
-    if len(xdf[(long_signal>0) && (short_signal<0)])>0:
+    if len(xdf[(long_signal>0) & (short_signal<0)])>0:
+        print xdf[(long_signal > 0) & (short_signal < 0)]
         print "something wrong with the position as long signal and short signal happen the same time"
     xdf['pos'] = long_signal + short_signal
     xdf['cost'] = abs(xdf['pos'] - xdf['pos'].shift(1)) * (offset + xdf['open'] * tcost)
@@ -72,11 +77,12 @@ def bband_chan_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest.bkvec_bband_chan.bband_chan_sim'
-    sim_config['scen_keys'] = ['param', 'pos_args']
-    sim_config['sim_name']   = 'BandChan_sar_30min_HL'
-    sim_config['products']   = ['rb', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', 'a', 'l', 'pp', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au']
+    sim_config['scen_keys'] = ['param']
+    sim_config['sim_name']   = 'BandChan_30min_HL_2y'
+    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', \
+                                'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', 'ag', 'au', 'zn', 'IF', 'IC', 'IH']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160608'
+    sim_config['end_date']   = '20160930'
     sim_config['need_daily'] = False
     #sim_config['close_daily']  =  [ False, True]
     sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.25, 5), (20, 1.25, 10), (20, 1.25, 20), (20, 1.25, 40), \
@@ -85,13 +91,13 @@ def gen_config_file(filename):
                            (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), (40, 2, 10), (40, 2, 20), (40, 2, 40), (40, 2, 80), \
                            (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.25, 10), (80, 1.25, 20), (80, 1.25, 40), (80, 1.25, 80), \
                            (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80), (80, 2, 10), (80, 2, 20), (80, 2, 40), (80, 2, 80) ]
-    sim_config['pos_class'] = 'strat.ParSARTradePos'
-    sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-                                {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-                                {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-                                {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-                                {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-                                {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
+    sim_config['pos_class'] = 'strat.TradePos'
+    #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
+    #                            {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+    #                            {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
+    #                            {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
                   'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
@@ -103,10 +109,11 @@ def gen_config_file(filename):
               'exit_stop': 0.0,
               'close_daily': False,
               'pos_update': True,
+              'pos_args': {},
               'std_func': 'dh.STDEV',
               'exit_min': 2055,
               'chan_func': chan_func,
-              'bsr_func': 'bar_conv_func1',
+              'bar_conv_func': 'dh.bar_conv_func2'
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:

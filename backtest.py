@@ -161,18 +161,18 @@ def simdf_to_trades2(df, slippage = 0.0):
         if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
             if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)            
-            npos = abs(pos-prev_pos)
+            npos = int(abs(pos-prev_pos))
             new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
-            for pos in new_pos:
+            for tpos in new_pos:
                 tradeid += 1
-                pos.entry_tradeid = tradeid
-                pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                tpos.entry_tradeid = tradeid
+                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
             pos_list = pos_list + new_pos
             new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
-            for pos in new_pos:
+            for tpos in new_pos:
                 tradeid += 1
-                pos.entry_tradeid = tradeid
-                pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                tpos.entry_tradeid = tradeid
+                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
             pos_list = pos_list + new_pos
         else:
             for i, tp in enumerate(reversed(pos_list)):
@@ -187,12 +187,12 @@ def simdf_to_trades2(df, slippage = 0.0):
             pos_list = [ tp for tp in pos_list if not tp.is_closed ]
             if prev_pos != pos:
                 if len(pos_list) == 0:
-                    npos = abs(pos-prev_pos)
+                    npos = int(abs(pos-prev_pos))
                     new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
-                    for pos in new_pos:
+                    for tpos in new_pos:
                         tradeid += 1
-                        pos.entry_tradeid = tradeid
-                        pos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                        tpos.entry_tradeid = tradeid
+                        tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
                     pos_list = pos_list + new_pos                    
                 else:  
                     print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
@@ -363,7 +363,7 @@ def simnearby_min(config_file):
     with open(config_file, 'r') as fp:
         sim_config = json.load(fp)
     bktest_split = sim_config['sim_func'].split('.')
-    run_sim = __import__(bktest_split[0])
+    run_sim = __import__('.'.join(bktest_split[:-1]))
     for i in range(1, len(bktest_split)):
         run_sim = getattr(run_sim, bktest_split[i])
     dir_name = config_file.split('.')[0]
@@ -485,7 +485,7 @@ def simcontract_min(config_file):
     with open(config_file, 'r') as fp:
         sim_config = json.load(fp)
     bktest_split = sim_config['sim_func'].split('.')
-    run_sim = __import__(bktest_split[0])
+    run_sim = __import__('.'.join(bktest_split[:-1]))
     for i in range(1, len(bktest_split)):
         run_sim = getattr(run_sim, bktest_split[i])
     dir_name = config_file.split('.')[0]
