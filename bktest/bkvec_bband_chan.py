@@ -50,67 +50,23 @@ def bband_chan_sim( mdf, config):
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
     ll = xdf.shape[0]
-    xdf['open_signal'] = np.nan
-    xdf.ix[xdf['open']>=xdf['high_band'],'open_signal'] = 1
-    xdf.ix[xdf['open']<=xdf['low_band'], 'open_signal'] = -1
-    xdf['pos'] = 0
-    xdf['cost'] = 0
-    xdf['traded_price'] = xdf.open
-    curr_pos = []
-    closed_trades = []
-    tradeid = 0
-    for idx, dd in enumerate(xdf.index):
-        mslice = xdf.loc[dd]
-        if len(curr_pos) == 0:
-            pos = 0
-        else:
-            pos = curr_pos[0].pos
-        xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.boll_ma) or np.isnan(mslice.chan_h):
-            continue
-        if mslice.close_ind:
-            if pos!=0:
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-        else:
-            if ((mslice.open > mslice.up_exit) and (pos<0)) or ((mslice.open < mslice.dn_exit) and (pos>0)):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-            if ((mslice.open >= mslice.high_band) or (mslice.open <= mslice.low_band)) and (pos==0):
-                target_pos = ( mslice.open >= mslice.high_band) * unit - (mslice.open <= mslice.low_band) * unit
-                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
-                tradeid += 1
-                new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
-                curr_pos.append(new_pos)
-                pos = target_pos
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        if pos_update and pos != 0:
-            if curr_pos[0].check_exit(mslice.open, stoploss * mslice.boll_std):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-            else:
-                curr_pos[0].update_bar(mslice)
-        xdf.set_value(dd, 'pos', pos)
+    long_signal = pd.Series(np.nan, index = xdf.index)
+    long_signal[xdf['open']>=xdf['high_band']] = 1
+    long_signal[(xdf['open']<=xdf['dn_exit']) && (xdf['open'].shift(1) > xdf['dn_exit'].shift(1))] = 0
+    long_signal[xdf['close_ind']] = 0
+    long_signal = long_signal.fillna(method='ffill').fillna(0)
+    short_signal = pd.Series(np.nan, index = xdf.index)
+    short_signal[xdf['open']<=xdf['low_band']] = -1
+    short_signal[(xdf['open']>=xdf['up_exit']) && (xdf['open'].shift(1) < xdf['up_exit'].shift(1))] = 0
+    short_signal[xdf['close_ind']] = 0
+    short_signal = short_signal.fillna(method='ffill').fillna(0)
+    if len(xdf[(long_signal>0) && (short_signal<0)])>0:
+        print "something wrong with the position as long signal and short signal happen the same time"
+    xdf['pos'] = long_signal + short_signal
+    xdf['cost'] = abs(xdf['pos'] - xdf['pos'].shift(1)) * (offset + xdf['open'] * tcost)
+    xdf['cost'] = xdf['cost'].fillna(0.0)
+    xdf['traded_price'] = xdf.open + (xdf['pos'] - xdf['pos'].shift(1)) * offset
+    closed_trades = backtest.simdf_to_trades1(xdf, slippage = offset )
     return (xdf, closed_trades)
 
 def gen_config_file(filename):
