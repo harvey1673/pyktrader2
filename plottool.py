@@ -4,12 +4,11 @@ import datetime
 import mysqlaccess
 import data_handler as dh
 import numpy as np
-#import matplotlib.colors as colors
 import matplotlib.finance as finance
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
-#import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
+import ts_tool as tstool
 import matplotlib.font_manager as font_manager
 
 class MyLocator(mticker.MaxNLocator):
@@ -18,16 +17,7 @@ class MyLocator(mticker.MaxNLocator):
 
     def __call__(self, *args, **kwargs):
         return mticker.MaxNLocator.__call__(self, *args, **kwargs)
-        
-def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule = '-10b'):
-    if nearby == 0:
-        mdf = mysqlaccess.load_min_data_to_df('fut_min', asset, start_date, end_date, minid_start = 300, minid_end = 2114, database = 'hist_data')
-        mdf['contract'] = asset
-    else:
-        mdf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'm', need_shift=True, database = 'hist_data')
-    mdf = backtest.cleanup_mindata(mdf, asset)
-    xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = dh.bar_conv_func2)
-    return xdf
+
 
 def plot_indicators(df, ind_fields, ind_levels):
     ccolors = ['blue', 'red', 'yellow', 'black', 'green']
@@ -108,7 +98,7 @@ def plot_indicators(df, ind_fields, ind_levels):
     plt.show()
 
 def test():
-    xdf = get_cont_data('rb1701', datetime.date(2016,1,1), datetime.date(2016,8,19), freq = '30m', nearby = 0, rollrule = '-10b')
+    xdf = tstool.get_cont_data('rb1701', datetime.date(2016,1,1), datetime.date(2016,8,19), freq = '30m', nearby = 0, rollrule = '-10b')
     xdf['WPR'] = dh.WPR(xdf, 9)
     xdf["SAR"] = dh.SAR(xdf, incr = 0.01, maxaf = 0.1)
     xdf['RSI'] = dh.RSI(xdf, 14)
