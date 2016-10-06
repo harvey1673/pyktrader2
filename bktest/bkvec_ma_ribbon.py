@@ -1,3 +1,7 @@
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 import misc
 import json
 import data_handler as dh
@@ -6,14 +10,9 @@ import numpy as np
 import strategy as strat
 import datetime
 import backtest
-import sys
 
 def MA_sim( mdf, config):
     offset = config['offset']
-    pos_class = config['pos_class']
-    pos_args  = config['pos_args']
-    pos_update = config.get('pos_update', False)
-    stoploss = config.get('stoploss', 0.0)
     ma_list = config['ma_list']
     param = config['param']
     corr_entry = param[0]
@@ -30,7 +29,6 @@ def MA_sim( mdf, config):
         use_chan = True
     close_daily = config['close_daily']
     tcost = config['trans_cost']
-    unit = config['unit']
     freq = config['freq']   
     if int(freq[:-3]) == 1:
         xdf = mdf
@@ -52,18 +50,20 @@ def MA_sim( mdf, config):
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
     long_signal = pd.Series(np.nan, index = xdf.index) 
-    long_flag = (xdf.ribbon_corr >= corr_entry) & (xdf.ribbon_pval < pval_entry)
+    long_flag = (ribbon_corr >= corr_entry) & (ribbon_pval < pval_entry)
     if use_chan:
         long_flag = long_flag & (xdf['open'] >= xdf['chan_high'])
     long_signal[long_flag] = 1
-    long_signal[(xdf.ribbon_corr < corr_exit) | (xdf.ribbon_pval > pval_exit)] = 0
+    long_signal[(ribbon_corr < corr_exit) | (ribbon_pval > pval_exit)] = 0
+    long_signal[xdf['close_ind']] = 0
     long_signal = long_signal.fillna(method='ffill').fillna(0)
     short_signal = pd.Series(np.nan, index = xdf.index)    
-    short_flag = (xdf.ribbon_corr <= -corr_entry) & (xdf.ribbon_pval < pval_entry)
+    short_flag = (ribbon_corr <= -corr_entry) & (ribbon_pval < pval_entry)
     if use_chan:
-        short_flag = long_flag & (xdf['open'] <= xdf['chan_low'])    
+        short_flag = short_flag & (xdf['open'] <= xdf['chan_low'])
     short_signal[short_flag] = -1
-    short_signal[(xdf.ribbon_corr > -corr_exit) | (xdf.ribbon_pval > pval_exit)] = 0
+    short_signal[(ribbon_corr > -corr_exit) | (ribbon_pval > pval_exit)] = 0
+    short_signal[xdf['close_ind']] = 0
     short_signal = short_signal.fillna(method='ffill').fillna(0)    
     if len(xdf[(long_signal>0) & (short_signal<0)])>0:
         print xdf[(long_signal > 0) & (short_signal < 0)]
@@ -77,33 +77,26 @@ def MA_sim( mdf, config):
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest.bkvec__ma_ribbon.MA_sim'
+    sim_config['sim_func']  = 'bktest.bkvec_ma_ribbon.MA_sim'
     sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'ribbon_customMA_'
+    sim_config['sim_name']   = 'ribbon_custom_2y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', \
                                 'SR', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', \
                                 'ag', 'au', 'IF', 'IH', 'TF', 'T']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160819'
+    sim_config['end_date']   = '20160930'
     sim_config['need_daily'] = False
-    sim_config['freq'] = ['15min', '30min', '60min', '90min']
-    sim_config['param'] =[[0, 0, 0.02, 0.2], [0, 0, 0.05, 0.2], [0, 0, 0.08, 0.2], [0, 0, 0.1, 0.2],\
-                          [0, 0, 0.02, 0.3], [0, 0, 0.05, 0.3], [0, 0, 0.08, 0.3], [0, 0, 0.1, 0.3],\
-                          [0, 0, 0.02, 0.4], [0, 0, 0.05, 0.4], [0, 0, 0.08, 0.4], [0, 0, 0.1, 0.4],]
+    sim_config['freq'] = ['5min', '15min', '30min', '60min']
+    sim_config['param']=[[0, 0, 2, 20], [0, 0, 5, 20], [0, 0, 10, 20],\
+                          [0, 0, 2, 30], [0, 0, 5, 30], [0, 0, 10, 30],\
+                          [0, 0, 2, 40], [0, 0, 5, 40], [0, 0, 10, 40],]
     sim_config['pos_class'] = 'strat.TradePos'
-    #sim_config['pos_class'] = 'strat.ParSARTradePos'
-    #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-    #                            {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-    #                            {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
     sim_config['offset']    = 1
     config = {'capital': 10000,              
               'trans_cost': 0.0,
+              'offset': 1,
               'unit': 1,
-              'ma_list': range(10, 160, 10),
-              'trade_ind': 'MARIBBON_CORR',
+              'ma_list': [5, 10, 20, 30, 40, 60, 90, 120, 150],
               'use_chan': False, 
               'stoploss': 0.0,
               'close_daily': False,

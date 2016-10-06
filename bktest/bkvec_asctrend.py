@@ -3,6 +3,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
 import misc
+import backtest
 import data_handler as dh
 import pandas as pd
 import numpy as np
@@ -69,9 +70,11 @@ def asctrend_sim( mdf, config):
     short_signal = pd.Series(np.nan, index = xdf.index)
     long_signal[(xdf['wpr_signal']>0) & (xdf['rsi_signal']>0) & (xdf['sar_signal']>0)] = 1
     long_signal[(xdf['wpr_signal']<0) | (xdf['rsi_signal']<0)] = 0
+    long_signal[xdf['close_ind']] = 0
     long_signal = long_signal.fillna(method='ffill').fillna(0)
     short_signal[(xdf['wpr_signal']<0) & (xdf['rsi_signal']<0) & (xdf['sar_signal']<0)] = 1
     short_signal[(xdf['wpr_signal']>0) | (xdf['rsi_signal']>0)] = 0
+    short_signal[xdf['close_ind']] = 0
     short_signal = short_signal.fillna(method='ffill').fillna(0)
     if len(xdf[(long_signal>0) & (short_signal<0)])>0:
         print xdf[(long_signal > 0) & (short_signal < 0)]
@@ -93,8 +96,8 @@ def gen_config_file(filename):
                                  'pp', 'l', 'TA', 'v', 'MA', 'bu', 'ag', 'cu', 'au', 'al', 'zn',\
                                  'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160819'
-    sim_config['freq']  =  ['30Min', '60Min', '90Min']
+    sim_config['end_date']   = '20160930'
+    sim_config['freq']  =  ['15Min', '30Min', '60Min']
     sim_config['param'] =[[ 9, 3, 14, 20, 0.005, 0.1],[9, 3, 14, 20, 0.01, 0.1], \
                         [ 9, 3, 14, 20, 0.02, 0.1], [ 9, 3, 14, 20, 0.02, 0.2], \
                         [14, 3, 14, 20, 0.005, 0.1],[14, 3, 14, 20, 0.01, 0.1], \

@@ -885,7 +885,7 @@ def MA_RIBBON(df, ma_series):
     corr_ts = pd.Series(corr*100, index = df.index, name = "MARIBBON_CORR")
     pval_ts = pd.Series(pval*100, index = df.index, name = "MARIBBON_PVAL")
     dist_ts = pd.Series(dist, index = df.index, name = "MARIBBON_DIST")
-    return pd.concat([corr_ts, pval_ts, dist_ts] + ema_i, join='outer', axis=1)
+    return pd.concat([corr_ts, pval_ts, dist_ts] + ema_list, join='outer', axis=1)
     
 def ma_ribbon(df, ma_series):
     ma_array = np.zeros([len(df)])
