@@ -24,9 +24,18 @@ def asctrend_sim( mdf, config):
     asc_period = param[0]
     asc_risk = param[1]
     rsi_sig = config['rsi_sig']
-    asctrend = dh.ASCTREND(xdf, asc_period, risk = asc_risk)
-    xdf['asc_signal'] = asctrend["ASCSIG_%s" % str(asc_period)].shift(1)
-    xdf['asc_stop'] = asctrend["ASCSTOP_%s" % str(asc_period)].shift(1)
+    wpr_sig = config.get('wpr_sig', True)
+    wpr = dh.WPR(xdf, asc_period)
+    wpr_buy = 67 + asc_risk
+    wpr_sell = 33 - asc_risk    
+    wpr_signal = pd.Series(0, index = wpr.index)
+    if wpr_sig:
+        wpr_signal[(wpr >= wpr_buy) & (wpr.shift(1) < wpr_buy)] = 1
+        wpr_signal[(wpr <= wpr_sell) & (wpr.shift(1) > wpr_sell)] = -1
+    else:
+        wpr_signal[(wpr >= wpr_buy)] = 1
+        wpr_signal[(wpr <= wpr_sell)] = -1
+    xdf['wpr_signal'] = wpr_signal.shift(1).fillna(0)
     rsi_period = param[2]
     rsi_offset = param[3]
     rsi_buy = 50 + rsi_offset 
@@ -39,7 +48,7 @@ def asctrend_sim( mdf, config):
     else:
         rsi_signal[(rsi >= rsi_buy)] = 1
         rsi_signal[(rsi <= rsi_sell)] = -1
-    xdf['rsi_signal'] = rsi_signal.shift(1)
+    xdf['rsi_signal'] = rsi_signal.shift(1).fillna(0)
     if len(param) > 4:
         sar_step = param[4]
         sar_max = param[5]
@@ -56,61 +65,22 @@ def asctrend_sim( mdf, config):
     if close_daily:
         daily_end = (xdf['date']!=xdf['date'].shift(-1))
         xdf['close_ind'] = xdf['close_ind'] | daily_end
-    xdf['pos'] = 0
-    xdf['cost'] = 0
-    xdf['traded_price'] = xdf.open
-    curr_pos = []
-    closed_trades = []
-    tradeid = 0
-    for idx, dd in enumerate(xdf.index):
-        mslice = xdf.loc[dd]
-        if len(curr_pos) == 0:
-            pos = 0
-        else:
-            pos = curr_pos[0].pos
-        xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.sar_stop) or np.isnan(mslice.asc_stop):
-            continue
-        buy_trig  = (mslice.asc_signal > 0) and (mslice.rsi_signal > 0) and (mslice.sar_signal > 0)
-        sell_trig = (mslice.asc_signal < 0) and (mslice.rsi_signal < 0) and (mslice.sar_signal < 0)
-        buy_close  = (mslice.asc_signal < 0) or (mslice.rsi_signal < 0)
-        sell_close = (mslice.asc_signal > 0) or (mslice.rsi_signal > 0)
-        if mslice.close_ind:
-            if (pos != 0):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset , dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-        else:
-            if pos_update and pos != 0:
-                curr_pos[0].update_price(mslice.asc_stop)
-                pos_close = curr_pos[0].check_exit(mslice.open, 0)
-            else:
-                pos_close = False
-            if (buy_close and (pos > 0)) or (sell_close and (pos < 0)) or pos_close:
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0       
-            if (buy_trig or sell_trig) and (pos==0):
-                target_pos = buy_trig * unit - sell_trig * unit
-                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.asc_stop, **pos_args)
-                tradeid += 1
-                new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
-                curr_pos.append(new_pos)
-                pos = target_pos
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        xdf.set_value(dd, 'pos', pos)
+    long_signal = pd.Series(np.nan, index = xdf.index)
+    short_signal = pd.Series(np.nan, index = xdf.index)
+    long_signal[(xdf['wpr_signal']>0) & (xdf['rsi_signal']>0) & (xdf['sar_signal']>0)] = 1
+    long_signal[(xdf['wpr_signal']<0) | (xdf['rsi_signal']<0)] = 0
+    long_signal = long_signal.fillna(method='ffill').fillna(0)
+    short_signal[(xdf['wpr_signal']<0) & (xdf['rsi_signal']<0) & (xdf['sar_signal']<0)] = 1
+    short_signal[(xdf['wpr_signal']>0) | (xdf['rsi_signal']>0)] = 0
+    short_signal = short_signal.fillna(method='ffill').fillna(0)
+    if len(xdf[(long_signal>0) & (short_signal<0)])>0:
+        print xdf[(long_signal > 0) & (short_signal < 0)]
+        print "something wrong with the position as long signal and short signal happen the same time"    
+    xdf['pos'] = long_signal + short_signal
+    xdf['cost'] = abs(xdf['pos'] - xdf['pos'].shift(1)) * (offset + xdf['open'] * tcost)
+    xdf['cost'] = xdf['cost'].fillna(0.0)
+    xdf['traded_price'] = xdf.open + (xdf['pos'] - xdf['pos'].shift(1)) * offset
+    closed_trades = backtest.simdf_to_trades1(xdf, slippage = offset )
     return (xdf, closed_trades)
     
 def gen_config_file(filename):
