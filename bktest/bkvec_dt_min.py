@@ -17,17 +17,12 @@ def dual_thrust_sim( mdf, config):
     offset = config['offset']
     k = config['param'][0]
     win = config['param'][1]
-    multiplier = config['param'][2]
-    f = config['param'][3]
-    combo_signal = config['combo_signal']
     proc_func = config['proc_func']
     proc_args = config['proc_args']
     chan_func = config['chan_func']
     chan_high = eval(chan_func['high']['func'])
     chan_low  = eval(chan_func['low']['func'])
     tcost = config['trans_cost']
-    unit = config['unit']
-    SL = config['stoploss']
     min_rng = config['min_range']
     chan = config['chan']
     xdf = proc_func(mdf, **proc_args)
@@ -103,9 +98,7 @@ def gen_config_file(filename):
                  }
     config = {'capital': 10000,
               'trans_cost': 0.0,
-              'close_daily': False,
-              'combo_signal': False,              
-              'unit': [1, 0],
+              'close_daily': False,           
               'stoploss': 0.0,
               'min_range': 0.002,
               'pos_args': {},
