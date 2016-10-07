@@ -31,92 +31,85 @@ def dual_thrust_sim( mdf, config):
     min_rng = config['min_range']
     chan = config['chan']
     xdf = proc_func(mdf, **proc_args)
-    if win == -1:
-        tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))], 
-                       join='outer', axis=1).max(axis=1)
-    elif win == 0:
-        tr = pd.concat([(pd.rolling_max(xdf.high, 2) - pd.rolling_min(xdf.close, 2))*multiplier, 
-                        (pd.rolling_max(xdf.close, 2) - pd.rolling_min(xdf.low, 2))*multiplier,
-                        xdf.high - xdf.close, 
-                        xdf.close - xdf.low], 
-                        join='outer', axis=1).max(axis=1)
-    else:
-        tr= pd.concat([pd.rolling_max(xdf.high, win) - pd.rolling_min(xdf.close, win), 
-                       pd.rolling_max(xdf.close, win) - pd.rolling_min(xdf.low, win)], 
-                       join='outer', axis=1).max(axis=1)
+    tr= pd.concat([pd.rolling_max(xdf.high, win) - pd.rolling_min(xdf.close, win), 
+                   pd.rolling_max(xdf.close, win) - pd.rolling_min(xdf.low, win)], 
+                   join='outer', axis=1).max(axis=1)
     xdf['tr'] = tr
     xdf['chan_h'] = chan_high(xdf, chan, **chan_func['high']['args'])
     xdf['chan_l'] = chan_low(xdf, chan, **chan_func['low']['args'])
-    xdf['atr'] = dh.ATR(xdf, chan)
-    xdf['ma'] = pd.rolling_mean(xdf.close, chan)
+    sar_param = config['sar_param']
+    sar = dh.SAR(xdf, **sar+param)
+    sar_signal = pd.Series(0, index = sar.index)
+    sar_signal[(sar < xdf['close'])] = 1
+    sar_signal[(sar > xdf['close'])] = -1    
+    #xdf['atr'] = dh.ATR(xdf, chan)
     xdata = pd.concat([xdf['tr'].shift(1), xdf['ma'].shift(1),
                        xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
-                       xdf['open'], xdf['atr'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
+                       xdf['open'], sar_signal.shift(1).fillna(0)], axis=1, keys=['tr','chan_h', 'chan_l', 'xopen', 'sar']).fillna(0)
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
     rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['tr']]).max()
-    mdf['dt_signal'] = np.nan
-    mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'dt_signal'] = 1
-    mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'dt_signal'] = -1
+    long_signal = pd.Series(np.nan, index = mdf.index)
+    long_signal[(mdf['high'] >= mdf['xopen'] + rng) & (mdf['high'] >= mdf['chan_h']) & (sar_signal > 0)] = 1
+    long_signal[(mdf['high'] <= mdf['xopen'] - rng) | (mdf['low'] <= mdf['chan_l']) | (sar_signal < 0)] = 0
     if close_daily:
-        mdf.ix[ mdf['min_id'] >= config['exit_min'], 'dt_signal'] = 0
-    addon_signal = copy.deepcopy(mdf['dt_signal'])
-    mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
-    mdf['chan_sig'] = np.nan
-    if combo_signal:
-        mdf.ix[(mdf['high'] >= mdf['chan_h']) & (addon_signal > 0), 'chan_sig'] = 1
-        mdf.ix[(mdf['low'] <= mdf['chan_l']) & (addon_signal < 0), 'chan_sig'] = -1
-    else:
-        mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
-        mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
-    mdf['chan_sig'] = mdf['chan_sig'].fillna(method='ffill').fillna(0)
-    pos =  mdf['dt_signal'] * (unit[0] + (mdf['chan_sig'] * mdf['dt_signal'] > 0) * unit[1])
-    mdf['pos'] = pos.shift(1).fillna(0)
+        long_signal[(mdf['min_id']>=config['exit_min'])] = 0
+    long_signal = long_signal.shift(1)
+    long_signal = long_signal.fillna(method='ffill').fillna(0)
+    short_signal = pd.Series(np.nan, index = mdf.index)
+    short_signal[(mdf['low'] <= mdf['xopen'] - rng) & (mdf['low'] <= mdf['chan_l']) & (sar_signal < 0)] = 1
+    short_signal[(mdf['low'] >= mdf['xopen'] + rng) | (mdf['high'] >= mdf['chan_h']) | (sar_signal > 0)] = 0
+    if close_daily:
+        short_signal[(mdf['min_id']>=config['exit_min'])] = 0
+    short_signal = short_signal.shift(1)
+    short_signal = short_signal.fillna(method='ffill').fillna(0)
+    if len(mdf[(long_signal>0)&(short_signal<0)]) > 0:
+        print "Warning: long and short signal happen at the same time"
+    mdf['pos'] = long_signal + short_signal
     mdf.ix[-3:, 'pos'] = 0
-    mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
-    mdf['cost'] = mdf['cost'].fillna(0.0)
-    mdf['traded_price'] = mdf['open']
-    closed_trades = backtest.simdf_to_trades1(mdf, slippage = offset )
+    xdf['cost'] = abs(xdf['pos'] - xdf['pos'].shift(1)) * (offset + xdf['open'] * tcost)
+    xdf['cost'] = xdf['cost'].fillna(0.0)
+    xdf['traded_price'] = xdf.open + (xdf['pos'] - xdf['pos'].shift(1)) * offset
+    closed_trades = backtest.simdf_to_trades1(xdf, slippage = offset )
     return (mdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest.bkvec_dt_min.dual_thrust_sim'
     sim_config['scen_keys'] = ['param']
-    sim_config['sim_name']   = 'DTdaily_1y'
+    sim_config['sim_name']   = 'DTsplit3_1y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20151001'
     sim_config['end_date']   = '20160930'
     sim_config['param']  =  [
-        (0.5, 0, 0.5, 0.0), (0.6, 0, 0.5, 0.0), (0.7, 0, 0.5, 0.0), (0.8, 0, 0.5, 0.0), \
-        (0.9, 0, 0.5, 0.0), (1.0, 0, 0.5, 0.0), (1.1, 0, 0.5, 0.0), \
-        (0.5, 1, 0.5, 0.0), (0.6, 1, 0.5, 0.0), (0.7, 1, 0.5, 0.0), (0.8, 1, 0.5, 0.0), \
-        (0.9, 1, 0.5, 0.0), (1.0, 1, 0.5, 0.0), (1.1, 1, 0.5, 0.0), \
-        (0.2, 2, 0.5, 0.0), (0.25,2, 0.5, 0.0), (0.3, 2, 0.5, 0.0), (0.35, 2, 0.5, 0.0),\
-        (0.4, 2, 0.5, 0.0), (0.45, 2, 0.5, 0.0),(0.5, 2, 0.5, 0.0), \
-        (0.2, 4, 0.5, 0.0), (0.25, 4, 0.5, 0.0),(0.3, 4, 0.5, 0.0), (0.35, 4, 0.5, 0.0),\
-        (0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
+        (0.6, 1), (0.9, 1), (1.2, 1), (1.5, 1), (1.8, 1), \
+        (0.5, 2), (0.75, 2),(1.0, 2), (1.25, 2), (1.5, 2),\
+        (0.3, 4), (0.45, 4), (0.6, 4), (0.75, 4), (0.9, 4), \
+        (0.2, 8), (0.3, 8), (0.4, 8), (0.5, 8), (0.6, 8),\
+        (0.2, 12), (0.25, 8), (0.3, 8), (0.35, 8), (0.4, 12),\
         ]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
-    #chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
-    #             'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}},
+    sim_config['chan'] = [10, 20, 30, 40]
+    sim_config['sar_param'] = [{'incr': 0.005, 'maxaf': 0.02}, {'incr': 0.01, 'maxaf': 0.02}, \
+                               {'incr': 0.01, 'maxaf': 0.1}, {'incr': 0.02, 'maxaf': 0.1}]
+    #chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 75, 'field': 'high'}},
+    #             'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 25, 'field': 'low'}},
     #             }
-    chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
-                 'low':  {'func': 'dh.DONCH_L', 'args':{}},
+    chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{'close'}},
+                 'low':  {'func': 'dh.DONCH_L', 'args':{'close'}},
                  }
     config = {'capital': 10000,
               'trans_cost': 0.0,
               'close_daily': False,
-              'combo_signal': False,
-              'chan': 5,
+              'combo_signal': False,              
               'unit': [1, 0],
               'stoploss': 0.0,
-              'min_range': 0.0035,
+              'min_range': 0.002,
               'pos_args': {},
-              'proc_args': {'minlist':[]},
+              'proc_args': {'minlist':[1500, 1900]},
               'pos_update': False,
               'chan_func': chan_func,
               }
