@@ -79,7 +79,7 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest.bkvec_ma_ribbon.MA_sim'
     sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'ribbon_custom_2y'
+    sim_config['sim_name']   = 'ribbon_ma5_2y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', \
                                 'SR', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', \
                                 'ag', 'au', 'IF', 'IH', 'TF', 'T']
@@ -87,7 +87,7 @@ def gen_config_file(filename):
     sim_config['end_date']   = '20160930'
     sim_config['need_daily'] = False
     sim_config['freq'] = ['5min', '15min', '30min', '60min']
-    sim_config['param']=[[0, 0, 2, 20], [0, 0, 5, 20], [0, 0, 10, 20],\
+    sim_config['param']=[[0.9, 0, 2, 20], [0, 0, 5, 20], [0, 0, 10, 20],\
                           [0, 0, 2, 30], [0, 0, 5, 30], [0, 0, 10, 30],\
                           [0, 0, 2, 40], [0, 0, 5, 40], [0, 0, 10, 40],]
     sim_config['pos_class'] = 'strat.TradePos'
@@ -96,7 +96,7 @@ def gen_config_file(filename):
               'trans_cost': 0.0,
               'offset': 1,
               'unit': 1,
-              'ma_list': [5, 10, 20, 30, 40, 60, 90, 120, 150],
+              'ma_list': [10, 20, 30, 60, 120],
               'use_chan': False, 
               'stoploss': 0.0,
               'close_daily': False,

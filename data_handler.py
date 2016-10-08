@@ -102,7 +102,7 @@ def day_split(mdf, minlist = [1500], index_col = 'datetime'):
     mdf['min_idx'] = 0
     for idx, mid in enumerate(minlist):
         mdf.loc[mdf['min_id']>=mid, 'min_idx'] = idx + 1
-    mdf['date_idx'] = mdf.index.date
+    mdf['date_idx'] = mdf.date
     xdf = mdf.groupby([mdf['date_idx'], mdf['min_idx']]).apply(ohlcsum).reset_index()
     if index_col != None:
         xdf = xdf.set_index('datetime')
@@ -211,8 +211,14 @@ def conv_ohlc_freq2(df, freq, index_col = 'datetime'):
 def crossover(ts, value = 0, direction = 1):
     return ((ts[-1] - value)*direction>0) and ((ts[-2] - value)*direction<0)
 
+def CROSSOVER(ts, value = 0, direction = 1):
+    return ((ts - value)*direction > 0) & ((ts.shift(1) - value)*direction < 0)
+
 def crossover2(ts1, ts2, value = 0, direction = 1):
     return ((ts1[-1] - ts2[-1] - value)*direction>0) and ((ts1[-2] - ts2[-2] - value)*direction<0)
+
+def CROSSOVER2(ts1, ts2, value = 0, direction = 1):
+    return ((ts1 - ts2)*direction > 0) & ((ts1.shift(1) - ts2.shift(1))*direction < 0)
 
 def TR(df):
     tr_df = pd.concat([df['high'] - df['close'], abs(df['high'] - df['close'].shift(1)), abs(df['low'] - df['close'].shift(1))], join='outer', axis=1)

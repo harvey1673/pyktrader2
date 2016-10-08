@@ -13,26 +13,22 @@ import strategy as strat
 def asctrend_sim( mdf, config):
     offset = config['offset']
     tcost = config['trans_cost']
-    unit = config['unit']
     bar_func = config.get('bar_conv_func', 'dh.bar_conv_func2')
     param = config['param']    
     freq = config['freq']
-    pos_update = config.get('pos_update', False)
-    pos_class = config['pos_class']
-    pos_args  = config['pos_args']    
     close_daily = config['close_daily']    
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = eval(bar_func))
-    asc_period = param[0]
-    asc_risk = param[1]
+    wpr_period = param[0]
+    wpr_level = param[1]
     rsi_sig = config['rsi_sig']
     wpr_sig = config.get('wpr_sig', True)
-    wpr = dh.WPR(xdf, asc_period)
-    wpr_buy = 67 + asc_risk
-    wpr_sell = 33 - asc_risk    
+    wpr = dh.WPR(xdf, wpr_period)
+    wpr_buy = 50 + wpr_level
+    wpr_sell = 50 - wpr_level
     wpr_signal = pd.Series(0, index = wpr.index)
     if wpr_sig:
-        wpr_signal[(wpr >= wpr_buy) & (wpr.shift(1) < wpr_buy)] = 1
-        wpr_signal[(wpr <= wpr_sell) & (wpr.shift(1) > wpr_sell)] = -1
+        wpr_signal[dh.CROSSOVER(wpr, wpr_buy, 1)] = 1
+        wpr_signal[dh.CROSSOVER(wpr, wpr_sell, -1)] = -1
     else:
         wpr_signal[(wpr >= wpr_buy)] = 1
         wpr_signal[(wpr <= wpr_sell)] = -1
@@ -44,8 +40,8 @@ def asctrend_sim( mdf, config):
     rsi  = dh.RSI(xdf, n = rsi_period)
     rsi_signal = pd.Series(0, index = rsi.index)
     if rsi_sig:
-        rsi_signal[(rsi >= rsi_buy) & (rsi.shift(1) < rsi_buy)] = 1
-        rsi_signal[(rsi <= rsi_sell) & (rsi.shift(1) > rsi_sell)] = -1
+        rsi_signal[dh.CROSSOVER(rsi, rsi_buy, 1)] = 1
+        rsi_signal[dh.CROSSOVER(rsi, rsi_sell, -1)] = -1
     else:
         rsi_signal[(rsi >= rsi_buy)] = 1
         rsi_signal[(rsi <= rsi_sell)] = -1
@@ -72,7 +68,7 @@ def asctrend_sim( mdf, config):
     long_signal[(xdf['wpr_signal']<0) | (xdf['rsi_signal']<0)] = 0
     long_signal[xdf['close_ind']] = 0
     long_signal = long_signal.fillna(method='ffill').fillna(0)
-    short_signal[(xdf['wpr_signal']<0) & (xdf['rsi_signal']<0) & (xdf['sar_signal']<0)] = 1
+    short_signal[(xdf['wpr_signal']<0) & (xdf['rsi_signal']<0) & (xdf['sar_signal']<0)] = -1
     short_signal[(xdf['wpr_signal']>0) | (xdf['rsi_signal']>0)] = 0
     short_signal[xdf['close_ind']] = 0
     short_signal = short_signal.fillna(method='ffill').fillna(0)
@@ -89,27 +85,26 @@ def asctrend_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest.bkvec_asctrend.asctrend_sim'
-    sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'asctrend_sim'
+    sim_config['scen_keys'] = ['freq', 'param', 'wpr_sig', 'rsi_sig']
+    sim_config['sim_name']   = 'ascwpr20rsi10_1y'
     sim_config['products']   = [ 'rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', \
                                  'm', 'RM', 'y', 'p', 'a', 'jd', 'cs', 'SR', 'c', 'OI', 'CF', \
                                  'pp', 'l', 'TA', 'v', 'MA', 'bu', 'ag', 'cu', 'au', 'al', 'zn',\
                                  'IF', 'IH', 'IC', 'TF', 'T']
-    sim_config['start_date'] = '20150102'
+    sim_config['start_date'] = '20151002'
     sim_config['end_date']   = '20160930'
     sim_config['freq']  =  ['15Min', '30Min', '60Min']
-    sim_config['param'] =[[ 9, 3, 14, 20, 0.005, 0.1],[9, 3, 14, 20, 0.01, 0.1], \
-                        [ 9, 3, 14, 20, 0.02, 0.1], [ 9, 3, 14, 20, 0.02, 0.2], \
-                        [14, 3, 14, 20, 0.005, 0.1],[14, 3, 14, 20, 0.01, 0.1], \
-                        [14, 3, 14, 20, 0.02, 0.1], [14, 3, 14, 20, 0.02, 0.2], \
-                        [14, 3, 21, 20, 0.005, 0.1], [14, 3, 21, 20, 0.01, 0.1], \
-                        [14, 3, 21, 20, 0.02, 0.1], [14, 3, 21, 20, 0.02, 0.2], \
-                        [14, 3, 9, 20, 0.005, 0.1], [14, 3, 9, 20, 0.01, 0.1], \
-                        [14, 3, 9, 20, 0.02, 0.1], [14, 3, 9, 20, 0.02, 0.2],]
+    sim_config['param'] =[[ 9, 20, 14, 10, 0.005, 0.1],[9, 20, 14, 10, 0.01, 0.1], \
+                        [ 9, 20, 14, 10, 0.02, 0.1], [ 9, 20, 14, 10, 0.02, 0.2], \
+                        [14, 20, 21, 10, 0.005, 0.1], [14, 20, 21, 10, 0.01, 0.1], \
+                        [14, 20, 21, 10, 0.02, 0.1], [14, 20, 21, 10, 0.02, 0.2], \
+                        [14, 20, 9, 10, 0.005, 0.1], [14, 20, 9, 10, 0.01, 0.1], \
+                        [14, 20, 9, 10, 0.02, 0.1], [14, 20, 9, 10, 0.02, 0.2],]
+    sim_config['wpr_sig'] = [True, False]
+    sim_config['rsi_sig'] = [True, False]
     sim_config['pos_class'] = 'strat.TradePos'
     config = {'capital': 10000,
               'offset': 0,
-              'rsi_sig': False,
               'trans_cost': 0.0,
               'close_daily': False,
               'unit': 1,

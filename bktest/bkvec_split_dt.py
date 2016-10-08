@@ -81,12 +81,12 @@ def dual_thrust_sim( mdf, config):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_func']  = 'bktest.bkvec_split_dt.dual_thrust_sim'
-    sim_config['scen_keys'] = ['param']
-    sim_config['sim_name']   = 'DTdaily_1y'
+    sim_config['scen_keys'] = ['param', 'chan']
+    sim_config['sim_name']   = 'DTsigdchan_2y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
-    sim_config['start_date'] = '20151001'
+    sim_config['start_date'] = '20150102'
     sim_config['end_date']   = '20160930'
     sim_config['param']  =  [
         (0.5, 0, 0.5, 0.0), (0.6, 0, 0.5, 0.0), (0.7, 0, 0.5, 0.0), (0.8, 0, 0.5, 0.0), \
@@ -101,6 +101,7 @@ def gen_config_file(filename):
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
+    sim_config['chan'] = [3, 5, 10, 20, 30]
     #chan_func = {'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
     #             'low':  {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 10, 'field': 'low'}},
     #             }
@@ -110,9 +111,9 @@ def gen_config_file(filename):
     config = {'capital': 10000,
               'trans_cost': 0.0,
               'close_daily': False,
-              'combo_signal': False,
-              'chan': 5,
-              'unit': [1, 0],
+              'combo_signal': True,
+              #'chan': 5,
+              'unit': [0, 1],
               'stoploss': 0.0,
               'min_range': 0.0035,
               'pos_args': {},
