@@ -175,8 +175,10 @@ class DTSplitChanAddon(Strategy):
             return save_status
         if  (buy_price >= buy_trig):
             buysell = 1
-        else:
+        elif (sell_price <= sell_trig):
             buysell = -1
+        else:
+            buysell = 0
         if (buysell!=0) and (self.vol_ratio[idx][0]>0) and (num_pos == 0):
             new_vol = int(self.trade_unit[idx] * self.vol_ratio[idx][0])
             msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
