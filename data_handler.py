@@ -235,8 +235,10 @@ def CMI(df, n):
 
 def cmi(df, n):
     key = 'CMI'+str(n)
-    if (len(df) >= n) and np.isnan(df[key][-1]):
+    if (len(df) >= n):
         df[key][-1] = abs(df['close'][-1] - df['close'][-n])/(max(df['high'][-n:]) - min(df['low'][-n:]))*100
+    else:
+        df[key][-1] = np.nan
 
 def ATR(df, n = 20):
     tr = TR(df)
@@ -245,7 +247,6 @@ def ATR(df, n = 20):
     return ts_atr
 
 def atr(df, n = 20):
-    
     new_tr = max(df['high'][-1]-df['low'][-1], abs(df['high'][-1] - df['close'][-2]), abs(df['low'][-1] - df['close'][-2]))
     alpha = 2.0/(n+1)
     df['ATR'+str(n)][-1] = df['ATR'+str(n)][-2] * (1-alpha) + alpha * new_tr
@@ -278,9 +279,8 @@ def EMA(df, n, field = 'close'):
 
 def ema(df, n, field =  'close'):    
     key = 'EMA_' + field[0].upper() + str(n)
-    if np.isnan(df[key][-1]):
-        alpha = 2.0/(n+1)
-        df[key][-1] = df[key][-2] * (1-alpha) + df[field][-1] * alpha
+    alpha = 2.0/(n+1)
+    df[key][-1] = df[key][-2] * (1-alpha) + df[field][-1] * alpha
 
 def KAMA(df, n, field = 'close'):
     return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field[0].upper() + str(n), index = df.index)
@@ -570,13 +570,11 @@ def DONCH_L(df, n, field = 'low'):
 
 def donch_h(df, n, field = 'high'):
     key = 'DONCH_H'+ field[0].upper() + str(n)
-    if np.isnan(df[key][-1]):
-        df[key][-1] = max(df[field][-n:])
+    df[key][-1] = max(df[field][-n:])
  
 def donch_l(df, n, field = 'low'):
     key = 'DONCH_L'+ field[0].upper() + str(n)
-    if np.isnan(df[key][-1]):    
-        df[key][-1] = min(df[field][-n:])
+    df[key][-1] = min(df[field][-n:])
     
 #Standard Deviation
 def HEIKEN_ASHI(df, period1):
@@ -665,8 +663,7 @@ def PCT_CHANNEL(df, n = 20, pct = 50, field = 'close'):
 
 def pct_channel(df, n = 20, pct = 50, field = 'close'):
     key =  'PCT%sCH%s' % (pct, n)
-    if np.isnan(df[key][-1]):
-        df[key][-1] = np.percentile(df[field][-n:], pct)
+    df[key][-1] = np.percentile(df[field][-n:], pct)
 
 def COND_PCT_CHAN(df, n = 20, pct = 50, field = 'close', direction=1):
     out = pd.Series(index=df.index, name = 'C_CH%s_PCT%s' % (n, pct))
@@ -897,8 +894,7 @@ def ma_ribbon(df, ma_series):
     ma_array = np.zeros([len(df)])
     for idx, ma_len in enumerate(ma_series):
         key = 'EMA_C' + str(ma_len)
-        if np.isnan(df[key][-1]):
-            ema(df, ma_len, field = 'close')
+        ema(df, ma_len, field = 'close')
         ma_array[idx] = df[key][-1]
     corr, pval = stats.spearmanr(ma_array, range(len(ma_series), 0, -1))
     dist = max(ma_array) - min(ma_array)
