@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import pandas as pd
 import pprint
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.tsa.johansen import coint_johansen
+from johansen_test import coint_johansen
 
 def plot_price_series(df, ts_lab1, ts_lab2):
     #months = mdates.MonthLocator()  # every month
@@ -38,7 +38,7 @@ def plot_scatter_series(df, ts_lab1, ts_lab2):
 def plot_series(ts):
     #months = mdates.MonthLocator()  # every month
     fig, ax = plt.subplots()
-    ax.plot(df.index, ts, label=ts.name)
+    ax.plot(ts.index, ts, label=ts.name)
     #ax.xaxis.set_major_locator(months)
     #ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     #ax.set_xlim(datetime.datetime(2012, 1, 1), datetime.datetime(2013, 1, 1))
@@ -104,25 +104,25 @@ def vratio(ts, lag = 2, cor = 'hom'):
     #t = (std((a[lag:]) - (a[1:-lag+1])))**2;  
     #b = (std((a[2:]) - (a[1:-1]) ))**2;  
     n = len(ts)  
-    mu  = sum(ts[1:]-ts[:-1])/n;  
-    m= (n-lag+1)*(1-lag/n);  
+    mu  = sum(ts[1:]-ts[:-1])/n
+    m= (n-lag+1)*(1-lag/n)
     #print( mu, m, lag)  
     b=sum(np.square(ts[1:]-ts[:-1]-mu))/(n-1)  
     t=sum(np.square(ts[lag:]-ts[:-lag]-lag*mu))/m  
-    vratio = t/(lag*b);  
+    vratio = t/(lag*b)
     la = float(lag)  
     if cor == 'hom':  
         varvrt=2*(2*la-1)*(la-1)/(3*la*n)  
     elif cor == 'het':  
         varvrt=0;  
-        sum2=sum(np.square(ts[1:]-ts[:-1]-mu));  
+        sum2=sum(np.square(ts[1:]-ts[:-1]-mu))
         for j in range(lag-1):  
-            sum1a=np.square(ts[j+1:]-ts[j:-1]-mu);  
+            sum1a=np.square(ts[j+1:]-ts[j:-1]-mu)
             sum1b=np.square(ts[1:n-j]-ts[0:n-j-1]-mu)  
-            sum1=dot(sum1a,sum1b);  
-            delta=sum1/(sum2**2);  
+            sum1=np.dot(sum1a,sum1b)
+            delta=sum1/(sum2**2)
             varvrt=varvrt+((2*(la-j)/la)**2)*delta  
-    zscore = (vratio - 1) / sqrt(float(varvrt))  
+    zscore = (vratio - 1) / np.sqrt(float(varvrt))
     pval = bsopt.cnorm(zscore)
     return  vratio, zscore, pval
         
@@ -185,11 +185,11 @@ def get_johansen(y, p):
 def signal_stats(df, signal, time_limit = None):
     long_signal = pd.Series(np.nan, index = df.index)
     long_signal[(signal > 0) & (signal.shift(1) <= 0)] = 1
-    long_signal[(signal <= 0))] = 0
+    long_signal[(signal <= 0)] = 0
     long_signal = long_signal.fillna(method = 'ffill', limit = time_limit)
 
     short_signal = pd.Series(np.nan, index = df.index)
     short_signal[(signal < 0) & (signal.shift(1) >= 0)] = 1
-    short_signal[(signal >= 0))] = 0
+    short_signal[(signal >= 0)] = 0
     short_signal = short_signal.fillna(method = 'ffill', limit = time_limit)
     
