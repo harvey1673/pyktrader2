@@ -1,18 +1,17 @@
 import backtest
 import misc
 import math
+import bsopt
 import mysqlaccess
 import data_handler as dh
-from scipy.stats import norm
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
-import pandas.io.data as web
 import pprint
-import statsmodels.tsa.stattools as ts
-from pandas.stats.api import ols
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.johansen import coint_johansen
 
 def plot_price_series(df, ts_lab1, ts_lab2):
     #months = mdates.MonthLocator()  # every month
@@ -62,22 +61,6 @@ def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = dh.bar_conv_func2)
     return xdf
 
-def variance_ratio(ts, freqs):
-    data = ts.values
-    nlen = len(data)
-    res = {'n': [], 'ln':[]}
-    var1 = np.var(data[1:] - data[:-1])
-    lnvar1 = np.var(np.log(data[1:]/data[:-1]))
-    for freq in freqs:
-        nrow = nlen/freq
-        nsize = freq * nrow
-        shaped_arr = np.reshape(data[:nsize], (nrow, freq))
-        diff = shaped_arr[1:,freq-1] - shaped_arr[:-1,freq-1]
-        res['n'].append(np.var(diff)/freq/var1)
-        ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
-        res['ln'].append(np.var(ln_diff)/freq/lnvar1)
-    return res
-
 def validate_db_data(tday, filter = False):
     all_insts = misc.filter_main_cont(tday, filter)
     data_count = {}
@@ -97,6 +80,52 @@ def validate_db_data(tday, filter = False):
             inst_list['min'].append(output)        
     print inst_list
 
+
+def variance_ratio(ts, freqs):
+    data = ts.values
+    nlen = len(data)
+    res = {'n': [], 'ln':[]}
+    var1 = np.var(data[1:] - data[:-1])
+    lnvar1 = np.var(np.log(data[1:]/data[:-1]))
+    for freq in freqs:
+        nrow = nlen/freq
+        nsize = freq * nrow
+        shaped_arr = np.reshape(data[:nsize], (nrow, freq))
+        diff = shaped_arr[1:,freq-1] - shaped_arr[:-1,freq-1]
+        res['n'].append(np.var(diff)/freq/var1)
+        ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
+        res['ln'].append(np.var(ln_diff)/freq/lnvar1)
+    return res
+
+def vratio(ts, lag = 2, cor = 'hom'):  
+    """ the implementation found in the blog Leinenbock  
+    http://www.leinenbock.com/variance-ratio-test/  
+    """  
+    #t = (std((a[lag:]) - (a[1:-lag+1])))**2;  
+    #b = (std((a[2:]) - (a[1:-1]) ))**2;  
+    n = len(ts)  
+    mu  = sum(ts[1:]-ts[:-1])/n;  
+    m= (n-lag+1)*(1-lag/n);  
+    #print( mu, m, lag)  
+    b=sum(np.square(ts[1:]-ts[:-1]-mu))/(n-1)  
+    t=sum(np.square(ts[lag:]-ts[:-lag]-lag*mu))/m  
+    vratio = t/(lag*b);  
+    la = float(lag)  
+    if cor == 'hom':  
+        varvrt=2*(2*la-1)*(la-1)/(3*la*n)  
+    elif cor == 'het':  
+        varvrt=0;  
+        sum2=sum(np.square(ts[1:]-ts[:-1]-mu));  
+        for j in range(lag-1):  
+            sum1a=np.square(ts[j+1:]-ts[j:-1]-mu);  
+            sum1b=np.square(ts[1:n-j]-ts[0:n-j-1]-mu)  
+            sum1=dot(sum1a,sum1b);  
+            delta=sum1/(sum2**2);  
+            varvrt=varvrt+((2*(la-j)/la)**2)*delta  
+    zscore = (vratio - 1) / sqrt(float(varvrt))  
+    pval = bsopt.cnorm(zscore)
+    return  vratio, zscore, pval
+        
 def hurst(ts, max_shift = 100):
     """Returns the Hurst Exponent of the time series vector ts"""
     # Create the range of lag values
@@ -109,24 +138,58 @@ def hurst(ts, max_shift = 100):
     return poly[0]*2.0
 
 def adf_test(tseries, order = 1):
-    return ts.adfuller(tseries, order)
+    return adfuller(tseries, order)
 
 def cadf_test(df1, df2, sdat, edate, idx = 'close', order = 1):
     df = pd.concat([df1[idx], df2[idx]], axis = 1, keys = ['asset1', 'asset2'])
     plot_price_series(df, 'asset1', 'asset2')
     plot_scatter_series(df, 'asset1', 'asset2')
-    res = ols(y = df['asset1'], x = df['asset2'])
+    res = pd.stats.api.ols(y = df['asset1'], x = df['asset2'])
     beta_hr = res.beta.x
     res = df['asset1'] - beta_hr*df['asset2']
     plot_series(res)
     cadf = adf_test(res, order)
     pprint.pprint(cadf)
 
-    res = ols(y = df['asset2'], x = df['asset1'])
+    res = pd.stats.api.ols(y = df['asset2'], x = df['asset1'])
     beta_hr = res.beta.x
     res = df['asset2'] - beta_hr*df['asset1']
     plot_series(res)
     cadf = adf_test(res, order)
     pprint.pprint(cadf)
     
- 
+def half_time(ts):
+    ndata = ts.values
+    dts = ndata[1:] - ndata[:-1]
+    xlag = ndata[:-1]
+    res = np.polyfit(xlag, dts, 1)
+    return -np.log(2)/res[0]
+    
+def get_johansen(y, p):
+        """
+        Get the cointegration vectors at 95% level of significance
+        given by the trace statistic test.
+        """
+        N, l = y.shape
+        jres = coint_johansen(y, 0, p)
+        trstat = jres.lr1                       # trace statistic
+        tsignf = jres.cvt                       # critical values
+
+        for i in range(l):
+            if trstat[i] > tsignf[i, 1]:     # 0: 90%  1:95% 2: 99%
+                r = i + 1
+        jres.r = r
+        jres.evecr = jres.evec[:, :r]
+        return jres
+        
+def signal_stats(df, signal, time_limit = None):
+    long_signal = pd.Series(np.nan, index = df.index)
+    long_signal[(signal > 0) & (signal.shift(1) <= 0)] = 1
+    long_signal[(signal <= 0))] = 0
+    long_signal = long_signal.fillna(method = 'ffill', limit = time_limit)
+
+    short_signal = pd.Series(np.nan, index = df.index)
+    short_signal[(signal < 0) & (signal.shift(1) >= 0)] = 1
+    short_signal[(signal >= 0))] = 0
+    short_signal = short_signal.fillna(method = 'ffill', limit = time_limit)
+    
