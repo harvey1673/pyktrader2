@@ -85,10 +85,10 @@ class Instrument(object):
         self.ask_vol5 = 0
         self.bid_price5 = 0.0
         self.bid_vol5 = 0        
-        self.up_limit = 0
-        self.down_limit = 0
+        self.up_limit = 1e10
+        self.down_limit = -1e10
         self.last_traded = 0
-        self.max_holding = (100, 100)
+        self.max_holding = (500, 500)
         self.mid_price = 0.0
         self.cont_mth = 205012 # only used by option and future
         self.expiry = datetime.date(2050,12,31)
