@@ -1,0 +1,39 @@
+http://doc.algotrader.ch/html/Execution_Algos.html
+
+SlicingOrder
+Splits an order into several slices, where the quantity of each slice is randomized between minVolPct and maxVolPct of the current volume offered at the exchange. In addition minQuantity and maxQuantity restriction can be imposed. If maxVolPct is zero, then the current market volume will not be considered when sizing the order. If maxQuantity is zero, then no maximum quantity will be enforced on top of the market volume restriction. The SlicingAlgo will make sure that the remainingQty for the next slice is greater than minQuantity.
+
+Note
+Maximum quantity rules have precedence over minimum quantity rules
+
+Example:
+minVolPct: 25%, minQuantity: 10, maxVolPct: 100%, maxQuantity: 100, BUY order, quantity: 40, vol ask: 10
+minimum quantity: Max(25% x 10, 20) = 20
+maximum quantity: Min(100% x 10, 100) = 10
+This will therefore result in an order of quantity 10
+Each order will stay in the market for minDuration to maxDuration seconds (if it is not filled before that). Between each slice there will be a random delay of minDelay to maxDelay seconds. In addition, the SlicingOrder has a sophisticated pricing logic. The first order/slice starts out 1 tick above the market. Depending on whether a slice gets filled, the price of the next slice is adjusted. If a slice gets filled, the price of the next slice will be reduced by one tick (for BUY orders). If the slice does not get filled, the price of the next slice is increased by one tick (for BUY orders).
+
+VWAPOrder
+The VWAP Execution Algo seeks to achieve the Volume-Weighted Average price (VWAP). VWAP is a trading benchmark used by many institutional investors. VWAP is calculated by adding up the market value traded for every transaction (price multiplied by number of contracts traded) and then dividing by the total contract traded.
+
+The VWAP Execution Algo retrieves historical prices for the number of days specified in the lookbackPeriod parameter and splits the trading day into buckets with a length in minutes according to the bucketSize parameter. Child orders will be time sliced between minInterval to maxInterval seconds. Optionally startTime (default value: now) and endTime (default value: end of trading day) can be specified. In addition a quantityRandomFactor can be applied to randomize quantities of child orders. The VWAP Execution Algo accepts a maximum participation rate of 50% of the historical volume.
+
+When a VWAP orders is either fully-executed or cancelled a message containing the average price, the benchmark price as well as the execution duration is logged to the console.
+
+TargetPositionOrder
+The target position order seeks to bring the actual position to an intended target quantity. The algo starts off by looking up the actual position quantity, calculating the delta between the actual and target quantity and issuing a market order to fill the difference. In many cases the execution algorithm differs little from sending a simple market order. However, orders can take some time to fully execute. In the meantime the target position may change as a result of market movements, strategy events, manual intervention, and so on. The target quantity of a TargetPositionOrder can be altered at any point of time which will cause the algo to re-evaluate its actual state and cancel or modify currently pending order and issue a new order if necessary to match the expected target position. The algo also reacts intelligently to any stray fills that can occur when an order gets filled while a cancellation or modification request is in the transit or awaiting execution in the request queue.
+
+By default TargetPositionOrder is considered to be fully executed once its target position has been reached. The order is then removed from the order book. Often however strategies might want to maintain a particular position over a longer period of time. TargetPositionOrder can be issued with keepAlive attribute set to true to make the algo active until explicitly canceled. The order will transition into Status#TARGET_REACHED state once fully executed and will stay there until the target is adjusted or the order is canceled.
+
+TrailingLimitOrder
+A Trailing Limit submits an order directly to the exchange with a limit price set a fixed distance away from the current market price. The limit price is adjusted relative to the market price when the market moves in favor of the order. This Execution Algo is typically used when entering a position on an instrument with a Bullish view.
+
+For a BUY order the limit price will be set a specific amount (defined by the trailingAmount parameter) below the current market price. In case the market price rises, the limit price is increased also once the specified minimum amount (defined by the increment parameter) is exceeded. If the market price falls, the limit price stays untouched. If the market price falls below the limit price the order will get filled by the exchange (depending on adequate liquidity).
+
+For a SELL order the limit price will be set a specific amount (defined by the trailingAmount parameter) above the current market price. In case the market price falls, the limit price is decreased also once the specified minimum amount (defined by the increment parameter) is exceeded. If the market price rises, the limit price stays untouched. If the market price rises above the limit price the order will get filled by the exchange (depending on adequate liquidity).
+
+TickwiseIncrementalOrder
+Sends the entire Order as one Slice. The price of the order is set according to the current market price. The order is first set at startOffsetTicks ticks above the market (for BUY orders). If the order is not filled within a defined period of time, the price of the order is increased by one tick up to a maximum of endOffsetTicks ticks below the other side of the market.
+
+VariableIncrementalOrder
+Sends the entire Order as one Slice. The price of the order is set according to the current market price. The order is first set at startOffsetPct (% of the spread) above the market (for BUY orders). If the order is not filled within a defined period of time, the price of the order is increased by increment (%of the spread) up to a maximum of endOffsetPct (% of the spread) below the other side of the market.
