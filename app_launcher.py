@@ -43,7 +43,7 @@ def save(name, config_file, tday, filter):
     except KeyboardInterrupt:
         save_agent.exit()
 
-def run(name, config_file, tday, agent_class = 'agent.Agent'):
+def run_gui(name, config_file, tday, agent_class = 'agent.Agent'):
     base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
@@ -53,6 +53,24 @@ def run(name, config_file, tday, agent_class = 'agent.Agent'):
     myGui = Gui(myApp)
     # myGui.iconbitmap(r'c:\Python27\DLLs\thumbs-up-emoticon.ico')
     myGui.mainloop()
+
+def run(name, config_file, tday, agent_class = 'agent.Agent'):
+    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
+                   format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
+                   to_console = True,
+                   console_level = logging.INFO)
+    scur_day = datetime.datetime.strptime(tday, '%Y%m%d').date()
+    cls_str = agent_class.split('.')
+    with open(config_file, 'r') as infile:
+        config = json.load(infile)
+    agent_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
+    agent = agent_cls(name=name, tday=scur_day, config=config)
+    try:
+        agent.restart()
+        while 1:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        agent.exit()
 
 if __name__ == '__main__':
     args = sys.argv[1:]
