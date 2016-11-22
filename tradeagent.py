@@ -698,10 +698,11 @@ class Agent(MktDataMixin):
         order_prices = []
         trade_ref = exec_trade.id
         for inst, v, tick in zip(exec_trade.instIDs, exec_trade.volumes, exec_trade.slip_ticks):
+            tick_base = self.instruments[inst].tick_base
             if v>0:
-                order_prices.append(min(self.instruments[inst].bid_price1+self.instruments[inst].tick_base*tick, self.instruments[inst].up_limit))
+                order_prices.append(min(self.instruments[inst].bid_price1+tick_base*tick, self.instruments[inst].up_limit - tick_base))
             else:
-                order_prices.append(max(self.instruments[inst].ask_price1-self.instruments[inst].tick_base*tick, self.instruments[inst].down_limit))
+                order_prices.append(max(self.instruments[inst].ask_price1-tick_base*tick, self.instruments[inst].down_limit + tick_base))
         curr_price = sum([p*v*cf for p, v, cf in zip(order_prices, exec_trade.volumes, exec_trade.conv_f)])/exec_trade.price_unit
         if curr_price <= exec_trade.limit_price: 
             required_margin = 0
