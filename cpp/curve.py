@@ -5,7 +5,7 @@ from misc import *
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas  
-from functools import lru_cache  
+from repoze.lru import lru_cache
 
 class Curve:
     class InterpMode:
@@ -37,7 +37,7 @@ class Curve:
     def from_fn(cls, t0, fn):
         return cls(t0, fn)
 
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=100)
     def __call__(self, t): # t can be float or numpy.arrays
         return self.__discount_factor(t) / self.__df_t0
 

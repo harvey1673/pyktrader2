@@ -1,6 +1,5 @@
 ﻿#-*- coding:utf-8 -*-
-from abc import ABC, abstractclassmethod
-from functools import lru_cache
+from repoze.lru import lru_cache
 from misc import *  
 from rate_index import *  
 import numpy as np
@@ -19,16 +18,14 @@ class LegFactory:
                  spotlag='2D', 
                  paylag='0D', 
                  rollrule=RollingRule.Backward,
-                                                   
                  notl_base=1e6,
                  notl_amort_abs=None,
                  notl_amort_rel=None,
                  notl_amort_freq=1,
-                 
                  rate_spread=0.0, # rate adjustment
                  rate_leverage=1.0,
                  **kwargs):
-        super().__init__(**kwargs)
+        #super(LegFactory, self).__init__(**kwargs)
         self.frequency = Period(frequency) 
         self.calendar = calendar
         self.daycount = daycount 
@@ -57,11 +54,14 @@ class LegFactory:
 
     def __notl_generator(self, n):
         if self.notl_amort_abs is not None:
-            yield from self.notl_base + np.arange(n) // self.notl_amort_freq * self.notl_amort_abs # '//' integer division
+            for stuff in self.notl_base + np.arange(n) / self.notl_amort_freq * self.notl_amort_abs: # '//' integer division
+                yield stuff
         elif self.notl_amort_rel is not None:
-            yield from self.notl_base * (1 + self.notl_amort_rel) ** (np.arange(n) // self.notl_amort_freq) 
+            for stuff in self.notl_base * (1 + self.notl_amort_rel) ** int(np.arange(n)/self.notl_amort_freq):
+                yield stuff
         else:
-            yield from self.notl_base * np.ones(n)       
+            for stuff in self.notl_base * np.ones(n):
+                yield stuff
 
     def roll_date(self, start, period):
         if isinstance(period, Period):
@@ -76,7 +76,7 @@ class LegFactory:
             raise BaseException('invalid date rolling ...')   
         return Date.convert(date)  
 
-    def schedule(self, *, tradedate=None, expiry=None, start=None, tenor=None):
+    def schedule(self, tradedate=None, expiry=None, start=None, tenor=None):
         """
         'expiry', 'start' both are None ==> spot swap
             effdate = spotdate = tradedate (+) spotlag
@@ -122,7 +122,7 @@ class LegFactory:
                 raise BaseException('invalid schedule rolling rule ...') 
             return [effdate] + [self.roll_date(effdate, Period(n, Period.Units.Months)) for n in accr_end_months]
 
-    def create(self, *, tradedate=None, expiry=None, start=None, tenor=None):
+    def create(self, tradedate=None, expiry=None, start=None, tenor=None):
         """
         'expiry', 'start' both are None ==> spot swap
             effdate = spotdate = tradedate (+) spotlag
@@ -188,7 +188,7 @@ class LegFactory:
             self.np_acovs = np.array([p.accr_cov for p in self.cp])        
             self.np_effnotl = self.np_acovs * np.array([p.notional for p in self.cp])
 
-        def value(self, proj, disc, *, spread=0.0):
+        def value(self, proj, disc, spread=0.0):
             """
             the coupons of the leg must be unpaid yet as of today (assuming today is the valuation date):                    
             |-----|-----------------------|---|
@@ -283,7 +283,7 @@ class LegFactory:
 
 
 class ExerciseSchedule:
-    def __init__(self, frequency, calendar, *,                                 
+    def __init__(self, frequency, calendar,
                  dayroll=DayRoll.ModifiedFollowing, endmonth=True, spotlag='2D', 
                  paylag='0D', rollrule=LegFactory.RollingRule.Backward):
         self.factory = LegFactory(frequency, calendar, None, FixedIndexFactory(None), dayroll=dayroll, 
@@ -298,12 +298,12 @@ class ExerciseSchedule:
 
 
 class InterestRateSwapFactory:
-    def __init__(self, *, rleg_fac, pleg_fac, tenor=None):
+    def __init__(self, rleg_fac, pleg_fac, tenor=None):
         self.rleg_fac = rleg_fac  # receiver leg factory
         self.pleg_fac = pleg_fac  # payer leg factory
         self.tenor = tenor 
 
-    def create(self, *, tradedate=None, expiry=None, start=None, tenor=None):
+    def create(self, tradedate=None, expiry=None, start=None, tenor=None):
         if tenor is None:
             tenor = self.tenor
         rleg = self.rleg_fac.create(tradedate=tradedate, expiry=expiry, start=start, tenor=tenor)        

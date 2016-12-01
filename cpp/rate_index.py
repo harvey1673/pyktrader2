@@ -1,6 +1,6 @@
 ﻿#-*- coding:utf-8 -*-
-from abc import ABC, abstractclassmethod
-from functools import lru_cache
+from abc import abstractmethod
+from repoze.lru import lru_cache
 from misc import *
 from utilities import *    
 from curve import Curve
@@ -9,7 +9,7 @@ from scipy.stats import norm
 from scipy.optimize import brentq as solver
 import copy
 
-class IndexFactory(ABC): 
+class IndexFactory(object):
     def __init__(self): 
         self.fixing_pool = {}
 
@@ -28,15 +28,15 @@ class IndexFactory(ABC):
     def remove_fixing(self, date):
         self.fixing_pool.pop(date)
 
-    @abstractclassmethod
+    @abstractmethod
     def create(self, period):
         pass
 
-    class Index(ABC):
+    class Index(object):
         def __init__(self, fixing):      
             self.fixing = fixing
 
-        @abstractclassmethod
+        @abstractmethod
         def forward(self, proj):
             pass 
 
@@ -47,7 +47,7 @@ class IndexFactory(ABC):
 
 class FixedIndexFactory(IndexFactory): # Simply follows accrual schedule
     def __init__(self, fixrate=0.0):
-        super().__init__()
+        super(FixedIndexFactory, self).__init__()
         self.fixrate = fixrate
 
     def create(self, period):
@@ -68,7 +68,7 @@ class FloatIndexFactory(IndexFactory):
     
     class Index(IndexFactory.Index):
         def __init__(self, fixing, fixdate, effdate, matdate, coverage): 
-            super().__init__(fixing)       
+            super(FloatIndexFactory.Index, self).__init__(fixing)
             self.fixdate = fixdate
             self.effdate = effdate
             self.matdate = matdate
@@ -84,8 +84,8 @@ class FloatIndexFactory(IndexFactory):
 
 
 class LiborIndexFactory(FloatIndexFactory):
-    def __init__(self, tenor, calendar, daycount, *, spotlag='2D', dayroll=DayRoll.ModifiedFollowing, endmonth=True): 
-        super().__init__()
+    def __init__(self, tenor, calendar, daycount, spotlag='2D', dayroll=DayRoll.ModifiedFollowing, endmonth=True):
+        super(LiborIndexFactory, self).__init__()
         self.tenor = Period(tenor)
         self.daycount = daycount
         spotlag = Period(spotlag) 
@@ -110,7 +110,7 @@ class LiborIndexFactory(FloatIndexFactory):
 
 
 class RangeIndexFactory(FloatIndexFactory): ##### need extra work for aged deal...
-    def __init__(self, *,       
+    def __init__(self,
                  hw=None, 
                  baserate=None,
                  index_fac=None,       # range leg rate index factory, e.g. Libor3M
@@ -120,7 +120,7 @@ class RangeIndexFactory(FloatIndexFactory): ##### need extra work for aged deal.
                  lockout=('skipped',None), # lock-out period, e.g. ('crystallized', -5) or ('skipped', -3)
                  digi_gap=1e-5,     # strike gap of digital spread, e.g. 1bp    
                  **kwargs):
-        super().__init__(**kwargs)
+        super(RangeIndexFactory, self).__init__(**kwargs)
         self.baserate = baserate
         self.hw = hw
         assert isinstance(index_fac, LiborIndexFactory)  
@@ -144,14 +144,14 @@ class RangeIndexFactory(FloatIndexFactory): ##### need extra work for aged deal.
             print("    lockout %s --> [%s, %s]" % (dates[self.lk_days], dates[self.lk_days + 1], dates[-1]))
         return libors
 
-    @lru_cache(maxsize=None)#@cache_function(1)
+    @lru_cache(maxsize=100)#@cache_function(1)
     def __parse_libors(self, libors): # paytime is dummy argument for hashing
         ts = HashableArray([l.effdate.t for l in libors])
         te = HashableArray([l.matdate.t for l in libors])
         cov = np.array([l.coverage for l in libors])                 
         return ts, te, cov   
 
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=100)
     def __xi(self, t0, ts, te): # paytime is dummy argument for hashing; = xi2(t0,ts,ts,te), and xi2(t0,ts,ts,ts) = 0; avoid zero
         return np.array([self.hw.vol.xi2(t0,a,a,b) ** 0.5 for a, b in zip(ts, te)]) + 1e-20 # avoid zero 
 

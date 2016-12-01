@@ -8,12 +8,12 @@ PRINT = 0
     
 class LinearFlat(interp1d): # linear interpolation with flat extension
     def __init__(self, x, y):
-        return super().__init__(x, y, kind='linear', bounds_error=False, fill_value=(y[0],y[-1]))
+        return super(LinearFlat, self).__init__(x, y, kind='linear', bounds_error=False, fill_value=(y[0],y[-1]))
 
 
 class CubicSplineFlat(UnivariateSpline): # cubic spline interpolation with flat extension
     def __init__(self, x, y):
-        return super().__init__(x, y, s=0, ext=3)
+        return super(CubicSplineFlat, self).__init__(x, y, s=0, ext=3)
 
 
 class FlatCubicSpline(UnivariateSpline): # cubic spline interpolation with zero 1st and 2nd derivative at edges
@@ -21,7 +21,7 @@ class FlatCubicSpline(UnivariateSpline): # cubic spline interpolation with zero 
         epsilon = 1e-8 # mimic zero 1st and 2nd derivatives at edges
         x = np.hstack((x[0] * (1 - epsilon), x, x[-1] * (1 + epsilon)))
         y = np.hstack((y[0], y, y[-1]))
-        super().__init__(x, y,  s=0, ext=3)
+        super(FlatCubicSpline, self).__init__(x, y,  s=0, ext=3)
 
 
 class HashableArray(np.ndarray):
@@ -35,7 +35,7 @@ class HashableArray(np.ndarray):
         return hash(self.tostring())
 
     def __getitem__(self, *args):
-        return HashableArray(super().__getitem__(*args))    
+        return HashableArray(super(HashableArray, self).__getitem__(*args))
 
 
 class DayCount:
@@ -92,7 +92,7 @@ class Date(ql.Date):
 
     @classmethod
     def maxDate(cls):
-        return cls.convert(super().maxDate()) 
+        return cls.convert(super(Date, cls).maxDate())
     
     @classmethod
     def convert(cls, date):
@@ -104,9 +104,9 @@ class Date(ql.Date):
 
     def __init__(self, *args):
         if isinstance(args[0], str): # e.g. '2012-11-23'
-            super().__init__(*[int(s) for s in args[0].split('-')][::-1])
+            super(Date, self).__init__(*[int(s) for s in args[0].split('-')][::-1])
         else: # other format
-            super().__init__(*args)
+            super(Date, self).__init__(*args)
         self.t = self.year_frac(self.origin, self)
 
     def __ge__(self, x): # ql.Date from Python SWIG has no '>=' and '<=' 
@@ -119,7 +119,7 @@ class Date(ql.Date):
         return self.t
 
     def __add__(self, n):
-        return self.convert(super().__add__(int(n)))
+        return self.convert(super(Date, self).__add__(int(n)))
 
     def __sub__(self, n):
         if isinstance(n, ql.Date): 
@@ -142,7 +142,7 @@ class Period(ql.Period): # make it hashable
         Weeks = ql.Weeks
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(Period, self).__init__(*args, **kwargs)
         self.__hash = hash(str(self))
 
     def __ge__(self, x): # ql.Period from Python SWIG has no '>=' and '<='
@@ -177,7 +177,7 @@ class Period(ql.Period): # make it hashable
 class Schedule(ql.Schedule):
     DateGeneration = ql.DateGeneration
     def __init__(self, effdate, matdate, freq, calendar, dayroll, rollrule, endmonth):
-        super().__init__(effdate, matdate, freq, calendar, dayroll, dayroll, rollrule, endmonth)
+        super(Schedule, self).__init__(effdate, matdate, freq, calendar, dayroll, dayroll, rollrule, endmonth)
 
     def dates(self):
         return np.array([Date.convert(d) for d in self]) # np.hstack(map(Date.convert, self))
