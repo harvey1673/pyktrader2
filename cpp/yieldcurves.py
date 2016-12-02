@@ -52,14 +52,14 @@ def str2tenor(input):
     return tenor
     
 def create_rateswap(spot_date, trade_data):    
-    margin = trade_data.get('margin', 0.0)
-    lev = trade_data.get('leverage', 1.0)
-    strike = trade_data['strike']
-    start = str2tenor(trade_data.get('start_date', None))
-    expiry = str2tenor(trade_data.get('expiry', None))
-    tenor = str2tenor(trade_data.get('tenor', None))
+    margin = trade_data.get('Margin', 0.0)
+    lev = trade_data.get('Leverage', 1.0)
+    strike = trade_data['Strike']
+    start = str2tenor(trade_data.get('StartDate', None))
+    expiry = str2tenor(trade_data.get('Expiry', None))
+    tenor = str2tenor(trade_data.get('Tenor', None))
     libor_fac = rate_index.LiborIndexFactory('3M', Calendar.US_UK, DayCount.ACT360)
-    spotdate = libor_fac.roll_date(today, 'spot') 
+    spotdate = libor_fac.roll_date(spot_date, 'spot') 
     flt_fac = cashflow.LegFactory('3M', misc.Calendar.US_UK, misc.DayCount.ACT360, index_fac=libor_fac, rate_spread=margin, 
                     rate_leverage= lev)
     fix_fac = cashflow.LegFactory('6M', misc.Calendar.US_UK, misc.DayCount._30E360, index_fac=FixedIndexFactory(strike))    
@@ -70,14 +70,13 @@ def create_rateswap(spot_date, trade_data):
 def price_irs(swap, indexcurve, disccurve = None):
     if oiscurve == None:
         disccurve = indexcurve
-    return swap.value(indexcurve.discount, indexcurve.discount, disccurve)
+    return swap.value(indexcurve.discount, indexcurve.discount, disccurve)    
     
-def riskcalc(market_input, trade_input, req_results):
-    yield_curve = calibrate_ycurve(market_data)
+def riskcalc(market_data, trade_data, req_results):
     market_data = json.load(market_input)
     trade_data = json.load(trade_input)
-
-    
+    trade_type = trade_data['TradeType']
+    yield_curve = calibrate_ycurve(market_data)    
     libor_fac = LiborIndexFactory('3M', Calendar.US_UK, DayCount.ACT360)
     spotdate = libor_fac.roll_date(today, 'spot')
     flt_fac = LegFactory('3M', Calendar.US_UK, DayCount.ACT360, index_fac=libor_fac)
