@@ -3,7 +3,7 @@ import logging
 from base import *
 from misc import *
 import datetime
-import order
+import trade
 
 class TradeExecBase(object):
     def __init__(self, etrade):

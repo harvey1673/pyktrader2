@@ -13,7 +13,7 @@ from gateway import *
 from ctpDataType import *
 import logging
 import datetime
-import order
+import position
 
 # 以下为一些VT类型和CTP类型的映射字典
 # 价格类型映射
@@ -104,9 +104,9 @@ class CtpGateway(Gateway):
         if inst.name in self.intraday_close_ratio:
             pos_args['intraday_close_ratio'] = self.intraday_close_ratio[inst.name]
         if inst.exchange == 'SHFE':
-            pos_cls = order.SHFEPosition
+            pos_cls = position.SHFEPosition
         else:
-            pos_cls = order.GrossPosition
+            pos_cls = position.GrossPosition
         return (pos_cls, pos_args)
 
     def connect(self):

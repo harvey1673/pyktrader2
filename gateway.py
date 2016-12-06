@@ -7,6 +7,7 @@ import csv
 import workdays
 import json
 import order
+import position
 from misc import *
 from eventEngine import *
 from vtConstant import *
@@ -78,7 +79,7 @@ class Gateway(object):
         self.account_info['prev_capital'] = self.account_info['curr_capital']
 
     def get_pos_class(self, inst):
-        return (order.GrossPosition, {})
+        return (position.GrossPosition, {})
 
     def add_instrument(self, instID):
         self.instruments.append(instID)

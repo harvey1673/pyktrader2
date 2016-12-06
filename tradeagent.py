@@ -6,7 +6,8 @@ import logging
 import copy
 import bisect
 import mysqlaccess
-import order as order
+import order
+import trade
 import os
 import instrument
 import ctp
@@ -538,7 +539,7 @@ class Agent(MktDataMixin):
             self.prepare_data_env(inst, mid_day = True)
         self.get_eod_positions()
         self.get_all_orders()
-        self.ref2trade = order.load_trade_list(self.scur_day, self.folder)
+        self.ref2trade = trade.load_trade_list(self.scur_day, self.folder)
         for trade_id in self.ref2trade:
             etrade = self.ref2trade[trade_id]
             orderdict = etrade.order_dict
@@ -550,7 +551,7 @@ class Agent(MktDataMixin):
             strat = self.strategies[strat_name]
             strat.initialize()
             strat_trades = [etrade for etrade in self.ref2trade.values() if (etrade.strategy == strat.name) \
-                            and (etrade.status != order.ETradeStatus.StratConfirm)]
+                            and (etrade.status != trade.ETradeStatus.StratConfirm)]
             for trade in strat_trades:
                 strat.add_live_trades(trade)
             
@@ -577,7 +578,7 @@ class Agent(MktDataMixin):
         trade_refs = []
         for trade_id in self.ref2trade:
             etrade = self.ref2trade[trade_id]
-            if (etrade.status == order.ETradeStatus.StratConfirm) and (sum([abs(v) for v in etrade.filled_vol]) == 0):
+            if (etrade.status == trade.ETradeStatus.StratConfirm) and (sum([abs(v) for v in etrade.filled_vol]) == 0):
                 for inst in etrade.order_dict:
                     for iorder in etrade.order_dict[inst]:
                         self.ref2order.pop(iorder.order_ref, None)
@@ -589,7 +590,7 @@ class Agent(MktDataMixin):
             self.logger.debug(u'保存执行状态.....................')
             for gway in self.gateways:
                 self.gateways[gway].save_order_list(self.scur_day)
-            order.save_trade_list(self.scur_day, self.ref2trade, self.folder)
+            trade.save_trade_list(self.scur_day, self.ref2trade, self.folder)
     
     def run_eod(self):
         if self.eod_flag:
@@ -603,17 +604,17 @@ class Agent(MktDataMixin):
         for trade_id in self.ref2trade:
             etrade = self.ref2trade[trade_id]
             etrade.update()
-            if etrade.status == order.ETradeStatus.Pending or etrade.status == order.ETradeStatus.Processed:
-                etrade.status = order.ETradeStatus.Cancelled
+            if etrade.status == trade.ETradeStatus.Pending or etrade.status == trade.ETradeStatus.Processed:
+                etrade.status = trade.ETradeStatus.Cancelled
                 strat = self.strategies[etrade.strategy]
                 strat.on_trade(etrade)
-            elif etrade.status == order.ETradeStatus.PFilled:
-                etrade.status = order.ETradeStatus.Cancelled
+            elif etrade.status == trade.ETradeStatus.PFilled:
+                etrade.status = trade.ETradeStatus.Cancelled
                 self.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
                 pfilled_dict[trade_id] = etrade
         if len(pfilled_dict)>0:
             file_prefix = self.folder + 'PFILLED_'
-            order.save_trade_list(self.scur_day, pfilled_dict, file_prefix) 
+            trade.save_trade_list(self.scur_day, pfilled_dict, file_prefix)
         for strat_name in self.strat_list:
             strat = self.strategies[strat_name]
             strat.day_finalize()
@@ -625,7 +626,7 @@ class Agent(MktDataMixin):
         self.ref2order = {}
         for inst in self.instruments:
             self.instruments[inst].prev_close = self.cur_day[inst]['close']
-            self.instruments[inst].volume = 0            
+            self.instruments[inst].volume = 0
 
     def day_switch(self, event):
         newday = event.dict['date']
@@ -715,7 +716,7 @@ class Agent(MktDataMixin):
                 if ((v>0) and (v > pos.can_close.long + pos.can_yclose.long + pos.can_open.long)) or \
                         ((v<0) and (-v > pos.can_close.short + pos.can_yclose.short + pos.can_open.short)):
                     self.logger.warning("ETrade %s is cancelled due to position limit on leg %s: %s" % (exec_trade.id, idx, inst))
-                    exec_trade.status = order.ETradeStatus.Cancelled
+                    exec_trade.status = trade.ETradeStatus.Cancelled
                     strat = self.strategies[exec_trade.strategy]
                     strat.on_trade(exec_trade)
                     return False
@@ -780,7 +781,7 @@ class Agent(MktDataMixin):
                     self.ref2order[iorder.order_ref] = iorder
                     if iorder.status == order.OrderStatus.Ready:
                         pending_orders.append(iorder.order_ref)
-            exec_trade.status = order.ETradeStatus.Processed
+            exec_trade.status = trade.ETradeStatus.Processed
             return pending_orders
         else:
             return pending_orders
@@ -790,17 +791,17 @@ class Agent(MktDataMixin):
         trade_ref = exec_trade.id
         if exec_trade.id not in self.ref2trade:
             self.ref2trade[exec_trade.id] = exec_trade
-        if exec_trade.status == order.ETradeStatus.Pending:
+        if exec_trade.status == trade.ETradeStatus.Pending:
             if exec_trade.valid_time < self.tick_id:
-                exec_trade.status = order.ETradeStatus.Cancelled
+                exec_trade.status = trade.ETradeStatus.Cancelled
                 strat = self.strategies[exec_trade.strategy]
                 strat.on_trade(exec_trade)
             else:
                 pending_orders = self.process_trade(exec_trade)
-        elif (exec_trade.status == order.ETradeStatus.Processed) or (exec_trade.status == order.ETradeStatus.PFilled):
+        elif (exec_trade.status == trade.ETradeStatus.Processed) or (exec_trade.status == trade.ETradeStatus.PFilled):
             #exec_trade.update()
             if exec_trade.valid_time < self.tick_id:
-                if exec_trade.status != order.ETradeStatus.Done:
+                if exec_trade.status != trade.ETradeStatus.Done:
                     exec_trade.valid_time = self.tick_id + self.cancel_protect_period
                     new_orders = {}
                     for inst in exec_trade.instIDs:
@@ -815,7 +816,7 @@ class Agent(MktDataMixin):
                                     self.trade_update(event)
                                 else:
                                     self.cancel_order(iorder)
-                                if exec_trade.status == order.ETradeStatus.PFilled:                                        
+                                if exec_trade.status == trade.ETradeStatus.PFilled:
                                     cond = {iorder:order.OrderStatus.Cancelled}
                                     norder = order.Order(iorder.position,
                                                 0,
@@ -847,7 +848,7 @@ class Agent(MktDataMixin):
         trade_ref = event.dict['trade_ref']
         mytrade = self.ref2trade[trade_ref]
         pending_orders = mytrade.update()
-        if (mytrade.status == order.ETradeStatus.Done) or (mytrade.status == order.ETradeStatus.Cancelled):            
+        if (mytrade.status == trade.ETradeStatus.Done) or (mytrade.status == trade.ETradeStatus.Cancelled):
             strat = self.strategies[mytrade.strategy]
             strat.on_trade(mytrade)
             self.save_state()
