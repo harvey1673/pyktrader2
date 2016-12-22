@@ -7,6 +7,7 @@ import datetime
 import csv
 import os.path
 import order
+import trade_executor
 
 class ETradeStatus:
     Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
@@ -14,8 +15,7 @@ class ETradeStatus:
 def save_trade_list(curr_date, trade_list, file_prefix):
     filename = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
     with open(filename,'wb') as log_file:
-        file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
-        
+        file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);        
         file_writer.writerow(['id', 'insts', 'volumes', 'filledvol', 'filledprice', 'otypes', 'slipticks',
                               'order_dict','limitprice', 'validtime',
                               'strategy','book','status', 'price_unit', 'conv_f'])
@@ -172,22 +172,26 @@ class XTrade(object):
     # def get_instances(cls):
     #    return list(ETrade.instances)
 
-    def __init__(self, instIDs, vols, pos, limit_price, strategy, book, price_unit=1, conv_factor=[]):
+    def __init__(self, instIDs, units, vol, limit_price, price_unit = 1, strategy = None, agent = None ):
         self.id = next(self.id_generator)
         self.instIDs = instIDs
-        self.volumes = vols
-        self.filled_vol = [0] * len(vols)
-        self.filled_price = [0] * len(vols)
+        self.units = units
+        self.vol = vol
+        self.filled_vol = [0] * len(instIDs)
+        self.filled_price = [0] * len(units)
         self.limit_price = limit_price
         self.price_unit = price_unit
-        self.strategy = strategy
-        self.book = book
+        if strategy!= None:
+            self.strategy = strategy.name
+        else:
+            self.strategy = "dummy"
+        if agent!=None:
+            self.book = agent.name
+        else:
+            self.book = "dummy"
         self.status = ETradeStatus.Pending
-        self.conv_f = [1] * len(instIDs)
-        if len(conv_factor) > 0:
-            self.conv_f = conv_factor
         self.order_dict = {}
-        # ETrade.instances.add(self)
+        self.algo = trade_executor.ExecAlgoBasic(self)
 
     def final_price(self):
         return sum(
