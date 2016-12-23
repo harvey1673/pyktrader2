@@ -70,22 +70,30 @@ class XspeedGateway(VtGateway):
         self.tdConnected = False        # 交易API连接状态
         
         self.qryEnabled = False         # 是否要启动循环查询
+        self.td_conn_mode = TERT_QUICK
+        self.intraday_close_ratio = {}
         
     #----------------------------------------------------------------------
+    def get_pos_class(self, inst):
+        ratio = 1
+        pos_args = {}
+        if inst.name in self.intraday_close_ratio:
+            pos_args['intraday_close_ratio'] = self.intraday_close_ratio[inst.name]
+        if inst.exchange == 'SHFE':
+            pos_cls = order.SHFEPosition
+        else:
+            pos_cls = order.GrossPosition
+        return (pos_cls, pos_args)
+        
     def connect(self):
         """连接"""
         # 载入json文件
-        fileName = self.gatewayName + '_connect.json'
-        path = os.path.abspath(os.path.dirname(__file__))
-        fileName = os.path.join(path, fileName)
-        
+        fileName = self.file_prefix + 'connect.json'        
         try:
             f = file(fileName)
         except IOError:
-            log = VtLogData()
-            log.gatewayName = self.gatewayName
-            log.logContent = u'读取连接配置出错，请检查'
-            self.onLog(log)
+            logContent = u'读取连接配置出错，请检查'
+            self.onLog(logContent, level = logging.WARNING)
             return
         
         # 解析json文件
@@ -95,11 +103,10 @@ class XspeedGateway(VtGateway):
             password = str(setting['password'])
             tdAddress = str(setting['tdAddress'])
             mdAddress = str(setting['mdAddress'])
+            self.intraday_close_ratio = setting.get('intraday_close_ratio', {})
         except KeyError:
-            log = VtLogData()
-            log.gatewayName = self.gatewayName
-            log.logContent = u'连接配置缺少字段，请检查'
-            self.onLog(log)
+            logContent = u'连接配置缺少字段，请检查'
+            self.onLog(logContent, level = logging.WARNING)
             return            
         
         # 创建行情和交易接口对象
@@ -115,14 +122,53 @@ class XspeedGateway(VtGateway):
         self.mdApi.subscribe(subscribeReq)
         
     #----------------------------------------------------------------------
-    def sendOrder(self, orderReq):
+    def sendOrder(self, iorder):
         """发单"""
-        return self.tdApi.sendOrder(orderReq)
+        inst = iorder.instrument
+        if not self.order_stats[inst.name]['status']:
+            iorder.on_cancel()
+            if iorder.trade_ref > 0:
+                event = Event(type=EVENT_ETRADEUPDATE)
+                event.dict['trade_ref'] = iorder.trade_ref
+                self.eventEngine.put(event)
+            logContent = 'Canceling order = %s for instrument = %s is disabled for trading due to position control' % (iorder.local_id, inst.name)
+            self.onLog( logContent, level = logging.WARNING)
+            return
+        # 上期所不支持市价单
+        if (iorder.price_type == OPT_MARKET_ORDER):
+            if (inst.exchange == 'SHFE' or inst.exchange == 'CFFEX'):
+                iorder.price_type = OPT_LIMIT_ORDER
+                if iorder.direction == ORDER_BUY:
+                    iorder.limit_price = inst.up_limit
+                else:
+                    iorder.limit_price = inst.down_limit
+                self.onLog('sending limiting local_id=%s inst=%s for SHFE and CFFEX, change to limit order' % (iorder.local_id, inst.name), level = logging.DEBUG)
+            else:
+                iorder.limit_price = 0.0
+        iorder.status = order.OrderStatus.Sent
+        self.tdApi.sendOrder(iorder)
+        
+        self.order_stats[inst.name]['submit'] += 1
+        self.order_stats['total_submit'] += 1
+
+        if self.order_stats[inst.name]['submit'] >= self.order_constraints['submit_limit']:
+            self.order_stats[inst.name]['status'] = False
+        if self.order_stats['total_submit'] >= self.order_constraints['total_submit']:
+            for instID in self.order_stats:
+                self.order_stats[instID]['status'] = False
+        return
         
     #----------------------------------------------------------------------
-    def cancelOrder(self, cancelOrderReq):
+    def cancelOrder(self, iorder):
         """撤单"""
-        self.tdApi.cancelOrder(cancelOrderReq)
+                """撤单"""
+        self.tdApi.cancelOrder(iorder)
+        inst = iorder.instrument
+        self.order_stats[inst.name]['cancel'] += 1
+        self.order_stats['total_cancel'] += 1
+        self.onLog( u'A_CC:取消命令: OrderRef=%s, OrderSysID=%s, exchange=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' % (iorder.local_id, \
+                            iorder.sys_id, inst.exchange, inst.name, iorder.volume, iorder.filled_volume, iorder.cancelled_volume), level = logging.DEBUG)     		
+        
         
     #----------------------------------------------------------------------
     def qryAccount(self):
