@@ -22,20 +22,17 @@ class ExecAlgoBase(object):
         self.etrade.update()
         return self.etrade.status
     
-    def resume(self):
-        if self.update() >= trade.ETradeStatus.Done:
-            return True
-        if not self.is_working:
-            self.is_working = True
-        return False
+    def process(self):
+        pass
                                 
     def suspend(self):
         pass       
 
-class ExecAlgoBasic(ExecAlgoBase):
+class ExecAlgoFixTimer(ExecAlgoBase):
     def __init__(self, etrade, *args, **kw):
         super(ExecAlgoBasic, self).__init__( *args, **kw)
         
-    def resume(self):
-        super(ExecAlgoBasic, self).resume()
+    def process(self):
+        
+        
         
