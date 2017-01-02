@@ -5,6 +5,9 @@ from misc import *
 import datetime
 import trade
 
+class TradeExecStatus:
+    Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
+
 class ExecAlgoBase(object):
     def __init__(self, etrade, agent, min_vol = 1, max_vol = 20, start_time = None, end_time = None, stop_price = None):
         self.etrade = etrade
@@ -30,9 +33,7 @@ class ExecAlgoBase(object):
 
 class ExecAlgoFixTimer(ExecAlgoBase):
     def __init__(self, etrade, *args, **kw):
-        super(ExecAlgoBasic, self).__init__( *args, **kw)
+        super(ExecAlgoFixTimer, self).__init__( *args, **kw)
         
     def process(self):
-        
-        
-        
+        pass
