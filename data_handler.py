@@ -273,6 +273,9 @@ def STDEV(df, n, field = 'close'):
 def stdev(df, n, field = 'close'):
     df['STDEV_' + field[0].upper() + str(n)][-1] = np.std(df[field][-n:])
 
+def MAVAR(df, n, field = 'close'):
+    ma_ts = MA(df, n, field)
+
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
     return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field[0].upper() + str(n), index = df.index)
@@ -281,6 +284,20 @@ def ema(df, n, field =  'close'):
     key = 'EMA_' + field[0].upper() + str(n)
     alpha = 2.0/(n+1)
     df[key][-1] = df[key][-2] * (1-alpha) + df[field][-1] * alpha
+
+def EMAVAR(df, n, field = 'close'):
+    ema_ts = EMA(df, n, field)
+    alpha = 2.0 / (n + 1)
+    var_adj = (1-alpha) * (df[field] - ema_ts.shift(1).fillna(0))**2
+    evar_ts = pd.Series(talib.EMA(var_adj.values, n), name = 'EVAR_' + field[0].upper() + str(n), index = df.index)
+    return pd.concat([ema_ts, evar_ts], join='outer', axis=1)
+
+def emavar(df, n ,field = 'close'):
+    ema(df, n, field)
+    alpha = 2.0 / (n + 1)
+    key_var = 'EVAR_' + field[0].upper() + str(n)
+    key_ema = 'EMA_' + field[0].upper() + str(n)
+    df[key_var][-1] = (1-alpha) * ( df[key_var][-2] + alpha * ((df[field][-1] - df[key_ema][-2])**2))
 
 def KAMA(df, n, field = 'close'):
     return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field[0].upper() + str(n), index = df.index)
@@ -325,22 +342,22 @@ def STOCH(df, n = 14, slowk_period = 3, slowd_period = 3):
     sk = pd.Series(slowk, index = df.index, name = "STOCHSK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period)))
     sd = pd.Series(slowd, index = df.index, name = "STOCHSD_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period)))
     return pd.concat([fk, sk, sd], join='outer', axis=1)
-    
+
+def stoch(df, n=14, slowk_period=3, slowd_period=3):
+    key1 = "STOCHFK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
+    df[key1][-1] = (df['close'][-1] - min(df['low'][-n:])) / (max(df['high'][-n:]) - min(df['low'][-n:])) * 100
+    alpha = 2.0 / (slowk_period + 1)
+    key2 = "STOCHSK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
+    df[key2][-1] = df[key2][-2] * (1 - alpha) + df[key1][-1] * alpha
+    alpha = 2.0 / (slowd_period + 1)
+    key3 = "STOCHSD_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
+    df[key3][-1] = df[key3][-2] * (1 - alpha) + df[key2][-1] * alpha
+
 def STOCHF(df, n = 14, fastd_period = 3):
     fastk, fastd = talib.STOCHF(df['high'].values, df['low'].values, df['close'].values, fastk_period = n, fastd_period=fastd_period)
     fk = pd.Series(fastk, index = df.index, name = "STOCFK_%s_%s" % (str(n), str(fastd_period)))
     sk = pd.Series(fastd, index = df.index, name = "STOCSK_%s_%s" % (str(n), str(fastd_period)))
     return pd.concat([fk, sk], join='outer', axis=1)
-    
-def stoch(df, n = 14, slowk_period = 3, slowd_period = 3):    
-    key1 = "STOCHFK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
-    df[key1][-1] = (df['close'][-1] - min(df['low'][-n:]))/(max(df['high'][-n:]) - min(df['low'][-n:]))*100
-    alpha = 2.0/(slowk_period+1)
-    key2 = "STOCHSK_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))
-    df[key2][-1] = df[key2][-2] * (1- alpha) + df[key1][-1] * alpha
-    alpha = 2.0/(slowd_period+1)
-    key3 = "STOCHSD_%s_%s_%s" % (str(n), str(slowk_period), str(slowd_period))    
-    df[key3][-1] = df[key3][-2] * (1-alpha) + df[key2][-1] * alpha
 
 def stochf(df, n = 14, fastd_period = 3):    
     key1 = "STOCHFK_%s_%s" % (str(n), str(fastd_period))
