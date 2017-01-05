@@ -5,12 +5,12 @@ from misc import *
 import datetime
 import trade
 
-class TradeExecStatus:
-    Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
+class TradeStatus:
+    Pending, OrderSent, PFilled, Done, Cancelled, StratConfirm = range(6)
 
 class ExecAlgoBase(object):
-    def __init__(self, etrade, agent, min_vol = 1, max_vol = 20, start_time = None, end_time = None, stop_price = None):
-        self.etrade = etrade
+    def __init__(self, xtrade, agent, min_vol = 1, max_vol = 20, start_time = None, end_time = None, stop_price = None):
+        self.xtrade = xtrade
         self.agent = agent
         self.start_time = start_time
         self.end_time = end_time
@@ -22,8 +22,8 @@ class ExecAlgoBase(object):
         pass
     
     def update(self):
-        self.etrade.update()
-        return self.etrade.status
+        self.xtrade.update()
+        return self.xtrade.status
     
     def process(self):
         pass
@@ -32,8 +32,19 @@ class ExecAlgoBase(object):
         pass       
 
 class ExecAlgoFixTimer(ExecAlgoBase):
-    def __init__(self, etrade, *args, **kw):
-        super(ExecAlgoFixTimer, self).__init__( *args, **kw)
-        
+    def __init__(self, xtrade, agent, min_vol = 1, max_vol = 20, start_time = None, end_time = None, stop_price = None, time_period = 600):
+        super(ExecAlgoFixTimer, self).__init__(xtrade, agent, min_vol, max_vol, start_time, end_time, stop_price)
+        self.timer_period = time_period
+        self.next_timer = None
+
+    def calc_price(self):
+        sum([p * v * cf for p, v, cf in zip(order_prices, self.xtrade.volumes, self.xtrade.conv_f)]) / self.xtrade.price_unit
+
     def process(self):
+        if self.xtrade.status == TradeStatus.Pending:
+            pass
         pass
+
+
+
+

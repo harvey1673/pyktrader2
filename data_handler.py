@@ -273,15 +273,15 @@ def STDEV(df, n, field = 'close'):
 def stdev(df, n, field = 'close'):
     df['STDEV_' + field[0].upper() + str(n)][-1] = np.std(df[field][-n:])
 
-def MAVAR(df, n, field = 'close'):
+def SMAVAR(df, n, field = 'close'):
     ma_ts = MA(df, n, field)
-    std_ts = pd.Series(pd.rolling_mean(df[field]**2, n) - ma_ts**2, name = 'VAR_' + field[0].upper() + str(n))
+    var_ts = pd.Series(pd.rolling_mean(df[field]**2, n) - ma_ts**2, name = 'SVAR_' + field[0].upper() + str(n))
     return pd.concat([ma_ts, var_ts], join='outer', axis=1)
 
-def mavar(df, n, field = 'close'):
+def smavar(df, n, field = 'close'):
     ma(df, n, field)
-    key_var = 'VAR_' + field[0].upper() + str(n)
-    key_ma = 'MA_' + field[0].upper() + str(n)
+    key_var = 'SVAR_' + field[0].upper() + str(n)
+    key_ma = 'SMA_' + field[0].upper() + str(n)
     df[key_var][-1] = df[key_var][-2] + df[key_ma][-1-n]**2 - df[key_ma][-1]**2 + (df[field][-1]**2 - df[field][-1-n]**2)/n
 
 #Exponential Moving Average
