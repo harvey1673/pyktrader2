@@ -41,7 +41,6 @@ def load_trade_list(curr_date, file_prefix):
     logfile = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
     if not os.path.isfile(logfile):
         return {}
-
     trade_dict = {} 
     with open(logfile, 'rb') as f:
         reader = csv.reader(f)
@@ -156,100 +155,6 @@ class ETrade(object):
                 Done_status = False
             if self.filled_vol[idx] > 0:
                 PFill_status = True                            
-        if Zero_Volume:
-            self.status = ETradeStatus.Cancelled
-        elif Done_status:
-            self.status = ETradeStatus.Done
-        elif PFill_status:
-            self.status = ETradeStatus.PFilled
-        return pending_orders
-
-
-class XTrade(object):
-    # instances = weakref.WeakSet()
-    id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
-    # @classmethod
-    # def get_instances(cls):
-    #    return list(ETrade.instances)
-
-    def __init__(self, instIDs, units, vol, limit_price, price_unit = 1, strategy = None, agent = None ):
-        self.id = next(self.id_generator)
-        self.instIDs = instIDs
-        self.units = units
-        self.vol = vol
-        self.filled_vol = [0] * len(instIDs)
-        self.filled_price = [0] * len(units)
-        self.limit_price = limit_price
-        self.price_unit = price_unit
-        if strategy!= None:
-            self.strategy = strategy.name
-        else:
-            self.strategy = "dummy"
-        if agent!=None:
-            self.book = agent.name
-        else:
-            self.book = "dummy"
-        self.status = ETradeStatus.Pending
-        self.order_dict = {}
-        self.algo = trade_executor.ExecAlgoBasic(self)
-
-    def final_price(self):
-        return sum(
-            [v * p * cf for (v, p, cf) in zip(self.filled_vol, self.filled_price, self.conv_f)]) / self.price_unit
-
-    def update(self):
-        pending_orders = []
-        if self.status in [ETradeStatus.Done, ETradeStatus.Cancelled, ETradeStatus.StratConfirm]:
-            return pending_orders
-        elif len(self.order_dict) == 0:
-            self.status = ETradeStatus.Pending
-            return pending_orders
-        Done_status = True
-        PFill_status = False
-        Zero_Volume = True
-        volumes = [0] * len(self.instIDs)
-        for idx, inst in enumerate(self.instIDs):
-            for iorder in self.order_dict[inst]:
-                if (iorder.status in [order.OrderStatus.Done, order.OrderStatus.Cancelled]) and (
-                    len(iorder.conditionals) == 0):
-                    continue
-                if len(iorder.conditionals) == 1 and (order.OrderStatus.Cancelled in iorder.conditionals.values()):
-                    sorder = iorder.conditionals.keys()[0]
-                    if sorder.status == order.OrderStatus.Cancelled and iorder.status == order.OrderStatus.Waiting:
-                        iorder.volume = sorder.cancelled_volume
-                        iorder.status = order.OrderStatus.Ready
-                        iorder.conditionals = {}
-                        pending_orders.append(iorder.order_ref)
-                        logging.debug('order %s is ready after %s is canceld, the remaining volume is %s' \
-                                      % (iorder.order_ref, sorder.order_ref, iorder.volume))
-                elif len(iorder.conditionals) > 0:
-                    for o in iorder.conditionals:
-                        if ((o.status == order.OrderStatus.Cancelled) and (
-                            iorder.conditionals[o] == order.OrderStatus.Done)) \
-                                or ((o.status == order.OrderStatus.Done) and (
-                                    iorder.conditionals[o] == order.OrderStatus.Cancelled)):
-                            iorder.on_cancel()
-                            iorder.conditions = {}
-                            break
-                        elif (o.status != iorder.conditionals[o]):
-                            break
-                    else:
-                        logging.debug('conditions for order %s are met, changing status to be ready' % iorder.order_ref)
-                        iorder.status = order.OrderStatus.Ready
-                        pending_orders.append(iorder.order_ref)
-                        iorder.conditionals = {}
-            self.filled_vol[idx] = sum([iorder.filled_volume for iorder in self.order_dict[inst]])
-            if self.filled_vol[idx] > 0:
-                self.filled_price[idx] = sum(
-                    [iorder.filled_volume * iorder.filled_price for iorder in self.order_dict[inst]]) / self.filled_vol[
-                                             idx]
-            volumes[idx] = sum([iorder.volume for iorder in self.order_dict[inst]])
-            if volumes[idx] > 0:
-                Zero_Volume = False
-            if self.filled_vol[idx] < volumes[idx]:
-                Done_status = False
-            if self.filled_vol[idx] > 0:
-                PFill_status = True
         if Zero_Volume:
             self.status = ETradeStatus.Cancelled
         elif Done_status:

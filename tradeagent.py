@@ -552,8 +552,8 @@ class Agent(MktDataMixin):
             strat.initialize()
             strat_trades = [etrade for etrade in self.ref2trade.values() if (etrade.strategy == strat.name) \
                             and (etrade.status != trade.ETradeStatus.StratConfirm)]
-            for trade in strat_trades:
-                strat.add_live_trades(trade)
+            for etrade in strat_trades:
+                strat.add_live_trades(etrade)
             
         for gway in self.gateways:
             gateway = self.gateways[gway]
