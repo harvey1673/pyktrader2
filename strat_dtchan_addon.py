@@ -7,7 +7,7 @@ from strategy import *
  
 class DTSplitChanAddon(Strategy):
     common_params =  dict({'open_period': [300, 1500, 2100], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'price_limit_buffer': 5}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 20, 'trend_factor': 0.5, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -15,25 +15,28 @@ class DTSplitChanAddon(Strategy):
         self.chan_high = [0.0] * numAssets
         self.chan_low  = [0.0] * numAssets
         self.tday_open = [0.0] * numAssets
+        self.ma_level = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
         self.open_idx = [0] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
 
     def register_func_freq(self):
-        for under, chan in zip(self.underliers, self.channels):
-            if chan <= 0:
-                continue
-            for infunc in self.data_func:
-                name  = infunc[0]
-                sfunc = eval(infunc[1])
-                rfunc = eval(infunc[2])
-                if len(infunc) > 3:
-                    fargs = infunc[3]
-                else:
-                    fargs = {}
-                fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
-                self.agent.register_data_func(under[0], 'd', fobj)
+        for under, chan, machan in zip(self.underliers, self.channels, self.ma_chan):
+            if chan > 0:                
+                for infunc in self.data_func:
+                    name  = infunc[0]
+                    sfunc = eval(infunc[1])
+                    rfunc = eval(infunc[2])
+                    if len(infunc) > 3:
+                        fargs = infunc[3]
+                    else:
+                        fargs = {}
+                    fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
+                    self.agent.register_data_func(under[0], 'd', fobj)
+            if machan > 0:
+                fobj = BaseObject(name = "MA_C" + str(machan), sfunc = fcustom(dh.MA, n = machan), rfunc = fcustom(dh.ma, n = machan))
+                self.agent.register_data_func(under[0], 'd', fobj)             
 
     def register_bar_freq(self):
         for idx, under in enumerate(self.underliers):
@@ -60,6 +63,8 @@ class DTSplitChanAddon(Strategy):
                 self.chan_high[idx] = ddf[key][-1]
                 key = self.channel_keys[1] + str(self.channels[idx])
                 self.chan_low[idx]  = ddf[key][-1]
+            if self.ma_chan[idx]>0:
+                self.ma_level[idx] = ddf['MA_C'+str(self.ma_chan[idx])][-1]
             if last_date < min_date:
                 last_min = mdf['min_id'][-1]
                 pid = 0
@@ -152,8 +157,15 @@ class DTSplitChanAddon(Strategy):
         tick_base = self.tick_base[idx]
         t_open = self.tday_open[idx]
         rng = max(self.cur_rng[idx] * self.ratios[idx], t_open * self.min_rng[idx])
-        buy_trig  = min( t_open + rng, self.agent.instruments[inst].up_limit - self.price_limit_buffer * tick_base)
-        sell_trig = max( t_open - rng, self.agent.instruments[inst].down_limit + self.price_limit_buffer * tick_base)
+        up_fact = 1.0
+        dn_fact = 1.0
+        if (self.ma_chan[idx] > 0):
+            if (t_open < self.ma_level[idx]):
+                up_fact += self.trend_factor[idx]
+            else:
+                dn_fact += self.trend_factor[idx]            
+        buy_trig  = min( t_open + up_fact * rng, self.agent.instruments[inst].up_limit - self.price_limit_buffer * tick_base)
+        sell_trig = max( t_open - dn_fact * rng, self.agent.instruments[inst].down_limit + self.price_limit_buffer * tick_base)
         if (min_id >= self.last_min_id[idx]):
             if (buysell!=0) and (self.close_tday[idx]):
                 msg = 'DT to close position before EOD for inst = %s, direction=%s, num_pos=%s, current min_id = %s' \
