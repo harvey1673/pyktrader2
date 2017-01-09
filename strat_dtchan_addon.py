@@ -7,7 +7,7 @@ from strategy import *
  
 class DTSplitChanAddon(Strategy):
     common_params =  dict({'open_period': [300, 1500, 2100], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'price_limit_buffer': 5}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 20, 'trend_factor': 0.5, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
