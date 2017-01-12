@@ -235,7 +235,6 @@ class MktDataMixin(object):
         self.eventEngine.register(EVENT_DB_WRITE, self.write_mkt_data)
 
 class Agent(MktDataMixin):
- 
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         '''
             trader为交易对象
@@ -268,6 +267,8 @@ class Agent(MktDataMixin):
             self.add_gateway(gateway_class, gateway_name)
         self.type2gateway = {}
         self.inst2strat = {}
+        self.spread_data = {}
+        self.inst2spread = {}
         self.inst2gateway = {}
         self.strat_list = []
         self.strategies = {}
@@ -363,6 +364,16 @@ class Agent(MktDataMixin):
                 else:
                     self.logger.warning("No Gateway is assigned to instID = %s" % name)
             super(Agent, self).add_instrument(name)
+
+    def add_spread(self, instIDs, weights, price_unit):
+        key = (tuple(instIDs), tuple(weights))
+        if key not in self.spread_data:
+            self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
+            self.spread_data[key].update()
+            for inst in instIDs:
+                if inst not in self.inst2spread:
+                    self.inst2spread[inst] = []
+                self.inst2spread[inst].append(key)
 
     def add_strategy(self, strat):
         if strat.name not in self.strat_list:
@@ -554,7 +565,7 @@ class Agent(MktDataMixin):
                             and (etrade.status != trade.ETradeStatus.StratConfirm)]
             for etrade in strat_trades:
                 strat.add_live_trades(etrade)
-            
+
         for gway in self.gateways:
             gateway = self.gateways[gway]
             for inst in gateway.positions:
@@ -674,6 +685,8 @@ class Agent(MktDataMixin):
             self.instruments[inst].price  = tick.price
             self.instruments[inst].volume = tick.volume
             self.instruments[inst].last_traded = curr_tick
+        for spd_key in self.inst2spread[inst]:
+            self.spread_data[spd_key].update()
         return True
 
     def run_tick(self, event):#行情处理主循环

@@ -125,9 +125,6 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         self.timer_period = time_period
         self.next_timer = None
 
-    def calc_price(self):
-        sum([p * v * cf for p, v, cf in zip(order_prices, self.xtrade.volumes, self.xtrade.conv_f)]) / self.xtrade.price_unit
-
     def process(self):
         if self.xtrade.status == TradeStatus.Pending:
             pass

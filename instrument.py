@@ -108,7 +108,7 @@ class Instrument(object):
         my_marginrate = self.marginrate[0] if direction == ORDER_BUY else self.marginrate[1]
         return self.price * self.multiple * my_marginrate
 
-class SpreadData(object):
+class SpreadInst(object):
     def __init__(self, inst_data, instIDs, weights, price_unit = 1):
         self.instIDs = instIDs
         self.inst_objs = [inst_data[inst] for inst in instIDs]
@@ -124,10 +124,21 @@ class SpreadData(object):
         self.mid_price = 0
         
     def update(self):
-        pass
+        self.bid_price1 = self.price('bid')
+        self.ask_price1 = self.price('ask')
+        self.mid_price = (self.ask_price1 + self.bid_price1)/2.0
+        self.bid_vol1 = min([inst_obj.bid_vol1 if w > 0 else inst_obj.ask_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
+        self.ask_vol1 = min([inst_obj.ask_vol1 if w > 0 else inst_obj.bid_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
         
-    def price(self, 'mid_price'):
-        return sum([ ins_obj.mid_price * w * cf for (ins_obj,w,cf) in zip(self.inst_objs, self.weights, self.conv_factor])/self.price_unit     
+    def price(self, direction = 'mid'):
+        if direction == 'bid':
+            fields = ['bid_price1', 'ask_price1']
+        elif direction == 'ask':
+            fields = ['ask_price1', 'bid_price1']
+        else:
+            fields = ['mid_price', 'mid_price']
+        curr_prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
+        return sum([ p * w * cf for (p, w, cf) in zip(curr_prices, self.weights, self.conv_factor)])/self.price_unit
         
 class Stock(Instrument):
     def __init__(self,name):
