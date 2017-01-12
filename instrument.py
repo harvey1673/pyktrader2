@@ -108,6 +108,27 @@ class Instrument(object):
         my_marginrate = self.marginrate[0] if direction == ORDER_BUY else self.marginrate[1]
         return self.price * self.multiple * my_marginrate
 
+class SpreadData(object):
+    def __init__(self, inst_data, instIDs, weights, price_unit = 1):
+        self.instIDs = instIDs
+        self.inst_objs = [inst_data[inst] for inst in instIDs]
+        self.weights = weights
+        self.conv_factor = [ inst_obj.multiple for inst_obj in self.inst_objs ]
+        self.tick_size = [inst_obj.tick_base for inst_obj in self.inst_objs]
+        self.price_unit = price_unit
+        self.last_update = [inst_obj.last_update for inst_obj in self.inst_objs]
+        self.ask_price1 = 0.0
+        self.ask_vol1 = 0
+        self.bid_price1 = 0.0
+        self.bid_vol1 = 0
+        self.mid_price = 0
+        
+    def update(self):
+        pass
+        
+    def price(self, 'mid_price'):
+        return sum([ ins_obj.mid_price * w * cf for (ins_obj,w,cf) in zip(self.inst_objs, self.weights, self.conv_factor])/self.price_unit     
+        
 class Stock(Instrument):
     def __init__(self,name):
         Instrument.__init__(self, name)
