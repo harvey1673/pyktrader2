@@ -130,14 +130,15 @@ class SpreadInst(object):
         self.bid_vol1 = min([inst_obj.bid_vol1 if w > 0 else inst_obj.ask_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
         self.ask_vol1 = min([inst_obj.ask_vol1 if w > 0 else inst_obj.bid_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
         
-    def price(self, direction = 'mid'):
-        if direction == 'bid':
-            fields = ['bid_price1', 'ask_price1']
-        elif direction == 'ask':
-            fields = ['ask_price1', 'bid_price1']
-        else:
-            fields = ['mid_price', 'mid_price']
-        curr_prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
+    def price(self, direction = 'mid', prices = None):
+        if prices == None:
+            if direction == 'bid':
+                fields = ['bid_price1', 'ask_price1']
+            elif direction == 'ask':
+                fields = ['ask_price1', 'bid_price1']
+            else:
+                fields = ['mid_price', 'mid_price']
+            curr_prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
         return sum([ p * w * cf for (p, w, cf) in zip(curr_prices, self.weights, self.conv_factor)])/self.price_unit
         
 class Stock(Instrument):
