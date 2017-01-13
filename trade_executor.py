@@ -18,22 +18,33 @@ class XTrade(object):
         self.id = next(self.id_generator)
         self.instIDs = instIDs
         self.units = units
-        self.vol = vol
+        self.vol = vol        
         self.filled_vol = [0] * len(instIDs)
         self.filled_price = [0] * len(units)
         self.limit_price = limit_price
         self.price_unit = price_unit
+        self.undelying = None
+        self.book = "dummy"
+        self.agent = agent
         if agent != None:
-            self.book = agent.name
-        else:
-            self.book = "dummy"
+            self.set_agent(agent)                
         self.status = TradeStatus.Pending
         self.order_dict = {}
-        self.algo = ExecAlgoBase(self, agent)
+        self.exec_algo = ExecAlgoBase(self, agent)
+        
+    def set_agent(self, agent):
+        self.agent = agent
+        self.book = agent.name
+        self.undelying = agent.get_underlying(instIDs, units, price_unit)
+    
+    def set_exec_algo(self, exec_algo):
+        self.exec_algo = exec_algo
 
     def final_price(self):
-        return sum(
-            [v * p * cf for (v, p, cf) in zip(self.filled_vol, self.filled_price, self.conv_f)]) / self.price_unit
+        if len(self.instIDs) == 1:
+            return self.filled_price[0]
+        else:
+            return 
 
     def update(self):
         pending_orders = []
@@ -129,8 +140,4 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         if self.xtrade.status == TradeStatus.Pending:
             pass
         pass
-
-
-
-
 
