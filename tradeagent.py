@@ -365,15 +365,23 @@ class Agent(MktDataMixin):
                     self.logger.warning("No Gateway is assigned to instID = %s" % name)
             super(Agent, self).add_instrument(name)
 
-    def add_spread(self, instIDs, weights, price_unit):
-        key = (tuple(instIDs), tuple(weights))
-        if key not in self.spread_data:
-            self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
-            self.spread_data[key].update()
-            for inst in instIDs:
-                if inst not in self.inst2spread:
-                    self.inst2spread[inst] = []
-                self.inst2spread[inst].append(key)
+    def add_spread(self, instIDs, weights, price_unit = 1):        
+        self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
+        self.spread_data[key].update()
+        for inst in instIDs:
+            if inst not in self.inst2spread:
+                self.inst2spread[inst] = []
+            self.inst2spread[inst].append(key)
+                
+    def get_underlying(self, instIDs, weights, price_unit = 1):
+        if len(instIDs) == 1:
+            key = instIDs[0]
+            return self.instruments[key]
+        else:
+            key = (tuple(instIDs), tuple(weights))            
+            if key not in self.spread_data:
+                self.add_spread(instIDs, weights, price_unit)
+            return self.spread_data[key]
 
     def add_strategy(self, strat):
         if strat.name not in self.strat_list:
@@ -705,157 +713,6 @@ class Agent(MktDataMixin):
             for m in self.inst2strat[inst][strat_name]:
                 if bar_id % m == 0:
                     self.strategies[strat_name].run_min(inst, m)
-
-    def process_trade(self, exec_trade):
-        all_orders = {}
-        pending_orders = []
-        order_prices = []
-        trade_ref = exec_trade.id
-        for inst, v, tick in zip(exec_trade.instIDs, exec_trade.volumes, exec_trade.slip_ticks):
-            tick_base = self.instruments[inst].tick_base
-            if v>0:
-                order_prices.append(min(self.instruments[inst].bid_price1+tick_base*tick, self.instruments[inst].up_limit - tick_base))
-            else:
-                order_prices.append(max(self.instruments[inst].ask_price1-tick_base*tick, self.instruments[inst].down_limit + tick_base))
-        curr_price = sum([p*v*cf for p, v, cf in zip(order_prices, exec_trade.volumes, exec_trade.conv_f)])/exec_trade.price_unit
-        if curr_price <= exec_trade.limit_price: 
-            required_margin = 0
-            for idx, (inst, v, otype) in enumerate(zip(exec_trade.instIDs, exec_trade.volumes, exec_trade.order_types)):
-                orders = []
-                gateway = self.inst2gateway[inst]
-                pos = gateway.positions[inst]
-                pos.re_calc()
-                gateway.calc_margin()
-                if ((v>0) and (v > pos.can_close.long + pos.can_yclose.long + pos.can_open.long)) or \
-                        ((v<0) and (-v > pos.can_close.short + pos.can_yclose.short + pos.can_open.short)):
-                    self.logger.warning("ETrade %s is cancelled due to position limit on leg %s: %s" % (exec_trade.id, idx, inst))
-                    exec_trade.status = trade.ETradeStatus.Cancelled
-                    strat = self.strategies[exec_trade.strategy]
-                    strat.on_trade(exec_trade)
-                    return False
-
-                if v>0:
-                    direction = ORDER_BUY
-                    vol = max(min(v, pos.can_close.long),0)
-                    remained = v - vol
-                else:
-                    direction = ORDER_SELL
-                    vol = max(min(-v,pos.can_close.short),0)
-                    remained = v + vol
-                    
-                if vol > 0:
-                    cond = {}
-                    if (idx>0) and (exec_trade.order_types[idx-1] == OPT_LIMIT_ORDER):
-                        cond = { o:order.OrderStatus.Done for o in all_orders[exec_trade.instIDs[idx-1]]}
-                    order_type = OF_CLOSE
-                    if (self.instruments[inst].exchange == "SHFE"):
-                        order_type = OF_CLOSE_TDAY                        
-                    iorder = order.Order(pos, order_prices[idx], vol, self.tick_id, order_type, direction, otype, cond, trade_ref, gateway = gateway.gatewayName )
-                    orders.append(iorder)
-                  
-                if (self.instruments[inst].exchange == "SHFE") and (abs(remained)>0) and (pos.can_yclose.short+pos.can_yclose.long>0):
-                    if remained>0:
-                        direction = ORDER_BUY
-                        vol = max(min(remained, pos.can_yclose.long),0)
-                        remained -= vol
-                    else:
-                        direction = ORDER_SELL
-                        vol = max(min(-remained,pos.can_yclose.short),0)
-                        remained += vol
-                        
-                    if vol > 0:
-                        cond = {}
-                        if (idx>0) and (exec_trade.order_types[idx-1] == OPT_LIMIT_ORDER):
-                            cond = { o:order.OrderStatus.Done for o in all_orders[exec_trade.instIDs[idx-1]]}
-                        iorder = order.Order(pos, order_prices[idx], vol, self.tick_id, OF_CLOSE_YDAY, direction, otype, cond, trade_ref, gateway = gateway.gatewayName )
-                        orders.append(iorder)
-                
-                vol = abs(remained)
-                if vol > 0:                   
-                    if remained >0:
-                        direction = ORDER_BUY
-                    else:
-                        direction = ORDER_SELL
-                    under_price = 0.0
-                    if (self.instruments[inst].ptype == instrument.ProductType.Option):
-                        under_price = self.instruments[self.instruments[inst].underlying].price
-                    required_margin += vol * self.instruments[inst].calc_margin_amount(direction, under_price)
-                    cond = {}
-                    if (idx>0) and (exec_trade.order_types[idx-1] == OPT_LIMIT_ORDER):
-                        cond = { o:order.OrderStatus.Done for o in all_orders[exec_trade.instIDs[idx-1]]}
-                    iorder = order.Order(pos, order_prices[idx], vol, self.tick_id, OF_OPEN, direction, otype, cond, trade_ref, gateway = gateway.gatewayName )
-                    orders.append(iorder)
-                all_orders[inst] = orders
-            exec_trade.order_dict = all_orders
-            for inst in exec_trade.instIDs:
-                for iorder in all_orders[inst]:
-                    pos = self.gateways[iorder.gateway].positions[inst]
-                    pos.add_order(iorder)
-                    self.ref2order[iorder.order_ref] = iorder
-                    if iorder.status == order.OrderStatus.Ready:
-                        pending_orders.append(iorder.order_ref)
-            exec_trade.status = trade.ETradeStatus.Processed
-            return pending_orders
-        else:
-            return pending_orders
-        
-    def check_trade(self, exec_trade):
-        pending_orders = []
-        trade_ref = exec_trade.id
-        if exec_trade.id not in self.ref2trade:
-            self.ref2trade[exec_trade.id] = exec_trade
-        if exec_trade.status == trade.ETradeStatus.Pending:
-            if exec_trade.valid_time < self.tick_id:
-                exec_trade.status = trade.ETradeStatus.Cancelled
-                strat = self.strategies[exec_trade.strategy]
-                strat.on_trade(exec_trade)
-            else:
-                pending_orders = self.process_trade(exec_trade)
-        elif (exec_trade.status == trade.ETradeStatus.Processed) or (exec_trade.status == trade.ETradeStatus.PFilled):
-            #exec_trade.update()
-            if exec_trade.valid_time < self.tick_id:
-                if exec_trade.status != trade.ETradeStatus.Done:
-                    exec_trade.valid_time = self.tick_id + self.cancel_protect_period
-                    new_orders = {}
-                    for inst in exec_trade.instIDs:
-                        orders = []
-                        for iorder in exec_trade.order_dict[inst]:
-                            if (iorder.volume > iorder.filled_volume):
-                                if ( iorder.status == order.OrderStatus.Waiting) \
-                                        or (iorder.status == order.OrderStatus.Ready):
-                                    iorder.on_cancel()
-                                    event = Event(type=EVENT_ETRADEUPDATE)
-                                    event.dict['trade_ref'] = iorder.trade_ref
-                                    self.trade_update(event)
-                                else:
-                                    self.cancel_order(iorder)
-                                if exec_trade.status == trade.ETradeStatus.PFilled:
-                                    cond = {iorder:order.OrderStatus.Cancelled}
-                                    norder = order.Order(iorder.position,
-                                                0,
-                                                0, # fill in the volume when the dependent order is cancelled
-                                                self.tick_id,
-                                                iorder.action_type,
-                                                iorder.direction,
-                                                OPT_MARKET_ORDER,
-                                                cond,
-                                                trade_ref, gateway = iorder.gateway)
-                                    orders.append(norder)
-                        if len(orders)>0:
-                            new_orders[inst] = orders
-                    for inst in new_orders:
-                        gateway = self.inst2gateway[inst]
-                        pos = gateway.positions[inst]
-                        for iorder in new_orders[inst]:
-                            exec_trade.order_dict[inst].append(iorder)
-                            pos.add_order(iorder)
-                            self.ref2order[iorder.order_ref] = iorder
-                            if iorder.status == order.OrderStatus.Ready:
-                                pending_orders.append(iorder.order_ref)
-        if (len(pending_orders) > 0):
-            for order_ref in pending_orders:
-                self.send_order(self.ref2order[order_ref])
-            self.save_state()
 
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
