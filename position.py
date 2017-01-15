@@ -12,14 +12,6 @@ class Position(object):
     def re_calc(self):
         pass
 
-    def add_orders(self, orders):
-        for iorder in orders:
-            self.add_order(iorder)
-    
-    def add_order(self, order):
-        self.orders.append(order)
-        self.gateway.id2order[order.local_id] = order
-
     def __str__(self):
         return unicode(self).encode('utf-8')
     

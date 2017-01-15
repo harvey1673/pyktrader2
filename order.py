@@ -32,45 +32,16 @@ def save_order_list(curr_date, order_dict, file_prefix):
                                   order.limit_price, order.start_tick, order.status, cond_str, order.trade_ref])  
     pass
 
-def load_order_list(curr_date, file_prefix, positions):
-    logfile = file_prefix + 'order_' + curr_date.strftime('%y%m%d')+'.csv'
-    if not os.path.isfile(logfile):
-        return {}
-    ref2order = {}
-    with open(logfile, 'rb') as f:
-        reader = csv.reader(f)
-        for idx, row in enumerate(reader):
-            if idx > 0:
-                inst = row[3]
-                pos = positions[inst]
-                if ':' in row[13]:
-                    cond = dict([ tuple([int(k) for k in n.split(':')]) for n in row[13].split(' ')])
-                else:
-                    cond = {}
-                iorder = Order(pos, float(row[10]), int(row[4]), int(row[11]),
-                               row[7], row[8], row[9], cond)
-                iorder.sys_id = row[1]
-                iorder.local_id = row[2]
-                iorder.filled_volume = int(row[5])
-                iorder.filled_price = float(row[6])
-                iorder.order_ref = int(row[0])
-                iorder.trade_ref = int(row[14])
-                iorder.status = int(row[12])
-                ref2order[iorder.order_ref] = iorder
-                pos.add_order(iorder)                
-    return ref2order
-
 ####下单
 class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
-    def __init__(self,position,limit_price,vol,order_time,action_type,direction, price_type, conditionals={}, trade_ref = 0, gateway = 'CTP'):
-        self.position = position
+    def __init__(self, instID, limit_price,vol,order_time,action_type,direction, price_type, conditionals={}, trade_ref = 0, gateway = None):
+        self.instrument = instID
         self.limit_price = limit_price        #开仓基准价
         self.start_tick  = order_time
         self.order_ref = next(self.id_generator)
         self.local_id  = self.order_ref
         ##衍生
-        self.instrument = position.instrument
         self.sys_id = ''
         self.trade_ref = trade_ref
         self.direction = direction # ORDER_BUY, ORDER_SELL
@@ -85,6 +56,9 @@ class Order(object):
         self.filled_orders = []
         self.conditionals = conditionals
         self.gateway = gateway
+        self.position = None
+        if gateway != None:
+            self.position = self.gateway.positions[instID]
         if len(self.conditionals) == 0:
             self.status = OrderStatus.Ready
         else:

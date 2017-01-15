@@ -183,11 +183,63 @@ class Gateway(object):
         event1.dict['data'] = contract
         self.eventEngine.put(event1)        
     
-    def save_order_list(self, tday):
-        order.save_order_list(tday, self.id2order, self.file_prefix)
-
     def load_order_list(self, tday):
-        self.id2order = order.load_order_list(tday, self.file_prefix, self.positions)
+        logfile = self.file_prefix + 'order_' + tday.strftime('%y%m%d') + '.csv'
+        if not os.path.isfile(logfile):
+            return {}
+        self.id2order = {}
+        with open(logfile, 'rb') as f:
+            reader = csv.reader(f)
+            for idx, row in enumerate(reader):
+                if idx > 0:
+                    inst = row[3]
+                    pos = self.positions[inst]
+                    if ':' in row[13]:
+                        cond = dict([tuple([int(k) for k in n.split(':')]) for n in row[13].split(' ')])
+                    else:
+                        cond = {}
+                    iorder = order.Order(inst, float(row[10]), int(row[4]), int(row[11]),
+                                   row[7], row[8], row[9], cond, self)
+                    iorder.sys_id = row[1]
+                    iorder.local_id = row[2]
+                    iorder.filled_volume = int(row[5])
+                    iorder.filled_price = float(row[6])
+                    iorder.order_ref = int(row[0])
+                    iorder.trade_ref = int(row[14])
+                    iorder.status = int(row[12])
+                    self.id2order[iorder.order_ref] = iorder
+                    self.add_order(iorder)
+
+    def save_order_list(self, tday):
+        orders = self.id2order.keys()
+        if len(self.id2order) > 1:
+            orders.sort()
+        order_list = [self.id2order[key] for key in orders]
+        filename = self.file_prefix + 'order_' + tday.strftime('%y%m%d') + '.csv'
+        with open(filename, 'wb') as log_file:
+            file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
+            file_writer.writerow(
+                ['order_ref', 'local_id', 'sysID', 'inst', 'volume', 'filledvolume', 'filledprice', 'action_type',
+                 'direction',
+                 'price_type', 'limitprice', 'order_time', 'status', 'conditionals', 'trade_ref'])
+            for iorder in order_list:
+                inst = iorder.instrument
+                cond = [str(o.order_ref) + ':' + str(iorder.conditionals[o]) for o in iorder.conditionals]
+                cond_str = ' '.join(cond)
+                file_writer.writerow(
+                    [iorder.order_ref, iorder.local_id, iorder.sys_id, inst, iorder.volume, iorder.filled_volume,
+                     iorder.filled_price,
+                     iorder.action_type, iorder.direction, iorder.price_type,
+                     iorder.limit_price, iorder.start_tick, iorder.status, cond_str, iorder.trade_ref])
+
+    def add_orders(self, orders):
+        for iorder in orders:
+            self.add_order(iorder)
+
+    def add_order(self, iorder):
+        instID = iorder.instrument
+        self.positions[instID].orders.append(iorder)
+        self.id2order[order.local_id] = iorder
 
     def load_local_positions(self, tday):
         pos_date = tday

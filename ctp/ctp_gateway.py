@@ -147,7 +147,7 @@ class CtpGateway(Gateway):
         instID = subscribeReq.symbol
         self.add_instrument(instID)
         self.mdApi.subscribe(instID)
-        
+
     #----------------------------------------------------------------------
     def sendOrder(self, iorder):
         """发单"""

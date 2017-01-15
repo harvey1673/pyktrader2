@@ -23,19 +23,19 @@ class XTrade(object):
         self.filled_price = [0] * len(units)
         self.limit_price = limit_price
         self.price_unit = price_unit
-        self.undelying = None
+        self.underlying = None
         self.book = "dummy"
         self.agent = agent
         if agent != None:
             self.set_agent(agent)                
         self.status = TradeStatus.Pending
-        self.order_dict = {}
+        self.order_dict = dict([(inst, []) for inst in instIDs])
         self.exec_algo = ExecAlgoBase(self, agent)
         
     def set_agent(self, agent):
         self.agent = agent
         self.book = agent.name
-        self.undelying = agent.get_underlying(instIDs, units, price_unit)
+        self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
     
     def set_exec_algo(self, exec_algo):
         self.exec_algo = exec_algo
@@ -44,7 +44,7 @@ class XTrade(object):
         if len(self.instIDs) == 1:
             return self.filled_price[0]
         else:
-            return 
+            return self.underlying.price(prices = self.filled_price)
 
     def update(self):
         pending_orders = []

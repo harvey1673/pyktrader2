@@ -430,9 +430,8 @@ class Agent(MktDataMixin):
     def cancel_order(self, iorder):
         """对特定接口撤单"""
         gateway_name = iorder.gateway
-        if gateway_name in self.gateways:
-            gateway = self.gateways[gateway_name]
-            gateway.cancelOrder(iorder)
+        if iorder.gateway != None:
+            iorder.gateway.cancelOrder(iorder)
         else:
             self.logger.warning(u'接口不存在：%s' % gateway_name)
 
@@ -447,11 +446,12 @@ class Agent(MktDataMixin):
     def get_all_orders(self):
         self.ref2order = {}
         for name in self.gateways:
-            self.gateways[name].load_order_list(self.scur_day)
-            order_dict = self.gateways[name].id2order
+            gway = self.gateways[name]
+            gway.load_order_list(self.scur_day)
+            order_dict = gway.id2order
             for local_id in order_dict:
                 iorder = order_dict[local_id]
-                iorder.gateway = name
+                iorder.gateway = gway
                 self.ref2order[iorder.order_ref] = iorder
         keys = self.ref2order.keys()
         if len(keys) > 1:
@@ -601,7 +601,7 @@ class Agent(MktDataMixin):
                 for inst in etrade.order_dict:
                     for iorder in etrade.order_dict[inst]:
                         self.ref2order.pop(iorder.order_ref, None)
-                        self.gateways[iorder.gateway].id2order.pop(iorder.order_ref, None)
+                        iorder.gateway.id2order.pop(iorder.order_ref, None)
                 trade_refs.append(etrade.id)
         for trade_id in trade_refs:
             self.ref2trade.pop(trade_id, None)
