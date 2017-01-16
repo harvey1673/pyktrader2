@@ -35,7 +35,8 @@ def save_order_list(curr_date, order_dict, file_prefix):
 ####下单
 class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
-    def __init__(self, instID, limit_price,vol,order_time,action_type,direction, price_type, conditionals={}, trade_ref = 0, gateway = None):
+    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, \
+                 conditionals={}, trade_ref = 0, gateway = None):
         self.instrument = instID
         self.limit_price = limit_price        #开仓基准价
         self.start_tick  = order_time
@@ -63,7 +64,6 @@ class Order(object):
             self.status = OrderStatus.Ready
         else:
             self.status = OrderStatus.Waiting
-        #self.close_lock = False #平仓锁定，即已经发出平仓信号
 
     def on_trade(self, price, volume, trade_id):
         ''' 返回是否完全成交

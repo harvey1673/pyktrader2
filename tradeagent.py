@@ -42,7 +42,6 @@ def get_min_id(dt):
     return ((dt.hour+6)%24)*100+dt.minute
 
 class MktDataMixin(object):
-
     def __init__(self, config):
         self.tick_data  = {}
         self.day_data  = {}
@@ -366,6 +365,7 @@ class Agent(MktDataMixin):
             super(Agent, self).add_instrument(name)
 
     def add_spread(self, instIDs, weights, price_unit = 1):        
+        key = (tuple(instIDs), tuple(weights))
         self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
         self.spread_data[key].update()
         for inst in instIDs:
@@ -692,8 +692,9 @@ class Agent(MktDataMixin):
             self.instruments[inst].price  = tick.price
             self.instruments[inst].volume = tick.volume
             self.instruments[inst].last_traded = curr_tick
-        for spd_key in self.inst2spread[inst]:
-            self.spread_data[spd_key].update()
+        if inst in self.inst2spread:
+            for spd_key in self.inst2spread[inst]:
+                self.spread_data[spd_key].update()
         return True
 
     def run_tick(self, event):#行情处理主循环
