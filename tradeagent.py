@@ -53,6 +53,14 @@ class MktDataMixin(object):
         self.min_data_func = {}
         self.daily_data_days = config.get('daily_data_days', 25)
         self.min_data_days = config.get('min_data_days', 1)
+        if 'min_func' in config:
+            self.get_min_id = eval(config['min_func'])
+        else:
+            self.get_min_id = lambda x: int(x/1000)
+        if 'bar_func' in config:
+            self.conv_bar_id = eval(config['bar_func'])
+        else:
+            self.conv_bar_id = data_handler.bar_conv_func2            
         self.tick_db_table = config.get('tick_db_table', 'fut_tick')
         self.min_db_table  = config.get('min_db_table', 'fut_min')
         self.daily_db_table = config.get('daily_db_table', 'fut_daily')
@@ -92,14 +100,6 @@ class MktDataMixin(object):
                     return False            
             if fobj != None:
                 self.min_data_func[inst][mins].append(self.calc_func_dict[fobj.name])
-
-    def get_min_id(self, tick_id):
-        return int(tick_id/1000)
-
-    def conv_bar_id(self, min_id, inst):
-        #trading_hrs = trading_hours(self.instruments[inst].product, self.instruments[inst].exchange)
-        #if prod in night_session_markets:
-        return data_handler.bar_conv_func2(min_id)
             
     def update_min_bar(self, tick):
         inst = tick.instID
@@ -150,7 +150,7 @@ class MktDataMixin(object):
     
     def min_switch(self, inst, forced = False):
         prev_bar = self.cur_min[inst]['bar_id']
-        bar_id = self.conv_bar_id(self.cur_min[inst]['tick_min'], inst)
+        bar_id = self.conv_bar_id(self.cur_min[inst]['tick_min'])
         if self.cur_min[inst]['min_id'] == 0:
             return bar_id
         ra = self.min_data[inst][1]
@@ -506,7 +506,7 @@ class Agent(MktDataMixin):
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
             mdf = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
             mdf = backtest.cleanup_mindata(mdf, self.instruments[inst].product, index_col = None)
-            mdf['bar_id'] = self.conv_bar_id(mdf['min_id'], inst)
+            mdf['bar_id'] = self.conv_bar_id(mdf['min_id'])
             if len(mdf)>0:
                 min_date = mdf['date'].iloc[-1]
                 if (len(self.day_data[inst])==0) or (min_date > self.day_data[inst].data['date'][-1]):
@@ -526,7 +526,7 @@ class Agent(MktDataMixin):
                     self.cur_min[inst]['volume'] = self.cur_day[inst]['volume']
                     self.cur_min[inst]['openInterest'] = self.cur_day[inst]['openInterest']
                     self.cur_min[inst]['min_id'] = int(mdf['min_id'].iloc[-1])
-                    self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'], inst)
+                    self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'])
                     self.instruments[inst].price = float(mdf['close'].iloc[-1])
                     self.instruments[inst].last_update = 0
                     #self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
@@ -534,8 +534,7 @@ class Agent(MktDataMixin):
                     self.min_data[inst][1] = data_handler.DynamicRecArray(dataframe = mdf)
                 for m in sorted(self.min_data_func[inst]):
                     if m != 1:
-                        bar_func = lambda ts: self.conv_bar_id(ts, inst)
-                        mdf_m = data_handler.conv_ohlc_freq(mdf, str(m)+'min', index_col = None, bar_func = bar_func, extra_cols = ['bar_id'])
+                        mdf_m = data_handler.conv_ohlc_freq(mdf, str(m)+'min', index_col = None, bar_func = self.conv_bar_id, extra_cols = ['bar_id'])
                     else:
                         mdf_m = mdf
                     for fobj in self.min_data_func[inst][m]:
