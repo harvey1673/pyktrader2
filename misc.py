@@ -287,6 +287,12 @@ def trading_hours(product, exch):
             hrs = [night_trading_hrs[night_idx]] + hrs
     return hrs
 
+def spreadinst2underlying(inst_name):
+    spread_keys = inst_name.split(' ')
+    instIDs = spread_keys[1].split('&')
+    units = [1, -1]
+    return (instIDs, units)
+
 def inst2product(inst):
     if inst[1].isalpha():
         key = inst[:2]

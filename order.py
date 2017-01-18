@@ -11,59 +11,44 @@ from trade import *
 class OrderStatus:
     Waiting, Ready, Sent, Done, Cancelled = range(5)
 
-def save_order_list(curr_date, order_dict, file_prefix):
-    orders = order_dict.keys()
-    if len(order_dict)>1:
-        orders.sort()
-    order_list = [order_dict[key] for key in orders]
-    filename = file_prefix + 'order_' + curr_date.strftime('%y%m%d')+'.csv'
-    with open(filename,'wb') as log_file:
-        file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
-        
-        file_writer.writerow(['order_ref', 'local_id', 'sysID', 'inst', 'volume', 'filledvolume', 'filledprice', 'action_type', 'direction',
-                              'price_type','limitprice','order_time', 'status', 'conditionals', 'trade_ref'])
-
-        for order in order_list:
-            inst = order.position.instrument.name
-            cond = [ str(o.order_ref)+':'+str(order.conditionals[o]) for o in order.conditionals]
-            cond_str = ' '.join(cond)
-            file_writer.writerow([order.order_ref, order.local_id, order.sys_id, inst, order.volume, order.filled_volume, order.filled_price,
-                                  order.action_type, order.direction, order.price_type,
-                                  order.limit_price, order.start_tick, order.status, cond_str, order.trade_ref])  
-    pass
-
 ####下单
 class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
-    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, \
-                 conditionals={}, trade_ref = 0, gateway = None):
+    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref = 0, gateway = None):
         self.instrument = instID
+        self.instIDs = [instID]
+        self.units = [1]
         self.limit_price = limit_price        #开仓基准价
         self.start_tick  = order_time
         self.order_ref = next(self.id_generator)
         self.local_id  = self.order_ref
-        ##衍生
         self.sys_id = ''
         self.trade_ref = trade_ref
         self.direction = direction # ORDER_BUY, ORDER_SELL
-        ##操作类型
         self.action_type = action_type # OF_CLOSE_TDAY, OF_CLOSE, OF_OPEN
         self.price_type = price_type
-        ##
         self.volume = vol #目标成交手数,锁定总数
         self.filled_volume = 0  #实际成交手数
         self.filled_price  = 0
         self.cancelled_volume = 0
         self.filled_orders = []
-        self.conditionals = conditionals
         self.gateway = gateway
-        self.position = None
+        self.positions = []
+        self.status = OrderStatus.Ready
         if gateway != None:
-            self.position = self.gateway.positions[instID]
-        if len(self.conditionals) == 0:
-            self.status = OrderStatus.Ready
-        else:
-            self.status = OrderStatus.Waiting
+            self.set_gateway(gateway)
+
+    def set_gateway(self, gateway):
+        self.gateway = gateway
+        self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]
+        self.add_to_positions()
+
+    def add_to_position(self):
+        self.positions[0].orders.append(self)
+
+    def recalc_pos(self):
+        for pos in self.positions:
+            pos.re_calc()
 
     def on_trade(self, price, volume, trade_id):
         ''' 返回是否完全成交
@@ -83,7 +68,7 @@ class Order(object):
         elif (self.filled_volume == self.volume) and (self.volume>0):
             self.status = OrderStatus.Done
         logging.debug(u'成交纪录:price=%s,volume=%s,filled_vol=%s, is_closed=%s' % (price,volume,self.filled_volume,self.is_closed()))
-        self.position.re_calc()
+        self.recalc_pos()
         return self.filled_volume == self.volume
 
     def on_order(self, sys_id, price = 0, volume = 0):
@@ -93,7 +78,7 @@ class Order(object):
             self.filled_volume = volume
             if self.filled_volume == self.volume:
                 self.status = OrderStatus.Done
-                self.position.re_calc()
+                self.recalc_pos()
                 return True
         return False
 
@@ -104,14 +89,10 @@ class Order(object):
             self.volume = self.filled_volume    #不会再有成交回报
             logging.debug(u'撤单记录: OrderRef=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' \
                 % (self.order_ref, self.instrument.name, self.volume, self.filled_volume, self.cancelled_volume))
-        self.position.re_calc()
+        self.recalc_pos()
 
     def is_closed(self): #是否已经完全平仓
         return (self.status in [OrderStatus.Cancelled,OrderStatus.Done]) and (self.filled_volume == self.volume)
-
-    #def release_close_lock(self):
-    #    logging.info(u'释放平仓锁,order=%s' % self.__str__())
-    #    self.close_lock = False
 
     def __unicode__(self):
         return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
@@ -123,3 +104,17 @@ class Order(object):
 
     def __str__(self):
         return unicode(self).encode('utf-8')
+
+class SpreadOrder(Order):
+    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref=0, gateway=None):
+        super(SpreadOrder, self).__init__(instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref)
+        self.instIDs, self.units = spreadinst2underlying(instID)
+        if gateway != None:
+            self.set_gateway(gateway)
+
+    def recalc_pos(self):
+        super(SpreadOrder, self).recalc_pos()
+
+    def add_to_postions(self):
+        pass
+
