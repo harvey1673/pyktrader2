@@ -418,22 +418,17 @@ class Agent(MktDataMixin):
     #----------------------------------------------------------------------
     def send_order(self, iorder):
         """对特定接口发单"""
-        gateway_name = iorder.gateway
-        if gateway_name not in self.gateways:
-            self.logger.warning(u'接口不存在：%s' % gateway_name)
-            gateway = self.inst2gateway[iorder.instID]
-        else:
-            gateway = self.gateways[gateway_name]
+        gateway = self.inst2gateway[iorder.instrument]
+        iorder.set_gateway(gateway)
         gateway.sendOrder(iorder)
     
     #----------------------------------------------------------------------
     def cancel_order(self, iorder):
         """对特定接口撤单"""
-        gateway_name = iorder.gateway
         if iorder.gateway != None:
             iorder.gateway.cancelOrder(iorder)
         else:
-            self.logger.warning(u'接口不存在：%s' % gateway_name)
+            self.logger.warning(u'接口不存在')
 
     def log_handler(self, event):
         lvl = event.dict['level']
