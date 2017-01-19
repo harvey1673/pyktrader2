@@ -13,8 +13,7 @@ class TradeStatus:
 class XTrade(object):
     # instances = weakref.WeakSet()
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
-
-    def __init__(self, instIDs, units, vol, limit_price, price_unit = 1, strategy = "dummy", agent = None ):
+    def __init__(self, instIDs, units, vol, limit_price, price_unit = 1, strategy = "dummy", book = "0", agent = None ):
         self.id = next(self.id_generator)
         self.instIDs = instIDs
         self.units = units
@@ -24,14 +23,15 @@ class XTrade(object):
         self.limit_price = limit_price
         self.price_unit = price_unit
         self.underlying = None
-        self.book = "dummy"
+        self.strategy = strategy
+        self.book = book
         self.agent = agent
-        if agent != None:
-            self.set_agent(agent)                
         self.status = TradeStatus.Pending
         self.order_dict = dict([(inst, []) for inst in instIDs])
         self.exec_algo = ExecAlgoBase(self, agent)
-        
+        if agent != None:
+            self.set_agent(agent)
+
     def set_agent(self, agent):
         self.agent = agent
         self.book = agent.name

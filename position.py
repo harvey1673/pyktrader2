@@ -48,7 +48,7 @@ class GrossPosition(Position):
         tday_c_locked = BaseObject(long=0,short=0)
         yday_closed = BaseObject(long=0,short=0)
         yday_c_locked = BaseObject(long=0,short=0)
-        
+
         for mo in self.orders:
             logging.debug(str(mo))
             if mo.action_type == OF_OPEN:

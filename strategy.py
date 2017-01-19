@@ -179,7 +179,6 @@ class Strategy(object):
         self.folder = ''
         self.logger = None
         self.inst2idx = {}
-        self.under2idx = {}
         self.num_entries = [0] * num_assets
         self.num_exits   = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
@@ -217,8 +216,6 @@ class Strategy(object):
     def reset(self):
         self.inst2idx = {}
         for idx, under in enumerate(self.underliers):
-            under_key = '_'.join(sorted(under))
-            self.under2idx[under_key] = idx
             for inst in under:
                 if inst not in self.inst2idx:
                     self.inst2idx[inst] = []
@@ -241,8 +238,7 @@ class Strategy(object):
 
     def on_trade(self, etrade):
         save_status = False
-        under_key = '_'.join(sorted(etrade.instIDs))
-        idx = self.under2idx[under_key]
+        idx = int(etrade.book)
         entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
         exit_ids = [tp.exit_tradeid for tp in self.positions[idx]]
         i = 0
@@ -327,8 +323,7 @@ class Strategy(object):
             self.agent.check_trade(etrade)
 
     def add_live_trades(self, etrade):
-        trade_key = '_'.join(sorted(etrade.instIDs))
-        idx = self.under2idx[trade_key]
+        idx = int(etrade.book)
         for cur_trade in self.submitted_trades[idx]:
             if etrade.id == cur_trade.id:
                 self.logger.debug('trade_id = %s is already in the strategy= %s list' % (etrade.id, self.name))
@@ -400,7 +395,7 @@ class Strategy(object):
             order_type[-1] = OPT_MARKET_ORDER
         conv_f = [ self.agent.instruments[inst].multiple for inst in insts ]
         etrade = trade.ETrade( insts, trade_vol, order_type, price * direction, [self.num_tick] * nAsset,  \
-                                valid_time, self.name, self.agent.name, conv_f[-1]*tunit, conv_f)
+                                valid_time, self.name, str(idx), conv_f[-1]*tunit, conv_f)
         tradepos = eval(self.pos_class)(insts, self.volumes[idx], direction * tunit, \
                                 price, price, conv_f[-1]*tunit, **self.pos_args)
         tradepos.entry_tradeid = etrade.id
@@ -418,7 +413,7 @@ class Strategy(object):
             order_type[-1] = OPT_MARKET_ORDER
         conv_f = [ self.agent.instruments[inst].multiple for inst in insts ]
         etrade = trade.ETrade( insts, trade_vol, order_type, -price*tradepos.direction, [self.num_tick] * nAsset, \
-                                valid_time, self.name, self.agent.name, conv_f[-1]*abs(tradepos.pos), conv_f)
+                                valid_time, self.name, str(idx), conv_f[-1]*abs(tradepos.pos), conv_f)
         tradepos.exit_tradeid = etrade.id
         self.submitted_trades[idx].append(etrade)
         return

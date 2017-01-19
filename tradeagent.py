@@ -419,9 +419,9 @@ class Agent(MktDataMixin):
     def send_order(self, iorder):
         """对特定接口发单"""
         gateway = self.inst2gateway[iorder.instrument]
-        iorder.set_gateway(gateway)
+        gateway.add_order(iorder)
         gateway.sendOrder(iorder)
-    
+
     #----------------------------------------------------------------------
     def cancel_order(self, iorder):
         """对特定接口撤单"""
@@ -429,6 +429,12 @@ class Agent(MktDataMixin):
             iorder.gateway.cancelOrder(iorder)
         else:
             self.logger.warning(u'接口不存在')
+
+    def submit_trade(self, xtrade):
+        pass
+
+    def remove_trade(self, xtrade):
+        pass
 
     def log_handler(self, event):
         lvl = event.dict['level']

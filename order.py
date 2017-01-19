@@ -11,6 +11,8 @@ from trade import *
 class OrderStatus:
     Waiting, Ready, Sent, Done, Cancelled = range(5)
 
+Alive_Order_Status = [OrderStatus.Waiting, OrderStatus.Ready, OrderStatus.Sent]
+
 ####下单
 class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
@@ -32,7 +34,7 @@ class Order(object):
         self.filled_volume = 0  #实际成交手数
         self.filled_price  = 0
         self.cancelled_volume = 0
-        self.filled_orders = []
+        self.filled_orders = {}
         self.gateway = gateway
         self.positions = []
         self.status = OrderStatus.Ready
@@ -41,36 +43,38 @@ class Order(object):
 
     def set_gateway(self, gateway):
         self.gateway = gateway
-        self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]        
+        self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]
 
     def recalc_pos(self):
         for pos in self.positions:
             pos.re_calc()
+
+    def add2pos(self):
+        for pos in self.positions:
+            pos.orders.append(self)
 
     def on_trade(self, price, volume, trade_id):
         ''' 返回是否完全成交
         '''
         if self.status == OrderStatus.Done:
             return True
-        if trade_id in [o.trade_id for o in self.filled_orders]:
+        if trade_id in self.filled_orders:
             return False
-        self.filled_orders.append(BaseObject(price = price, volume = volume, trade_id = trade_id))
-        self.filled_volume = sum([o.volume for o in self.filled_orders])
-        self.filled_price = sum([o.volume*o.price for o in self.filled_orders])/self.filled_volume
-        if self.filled_volume > self.volume:
-            self.filled_volume = self.volume
+        self.filled_orders[trade_id] = [price, volume]
+        self.update()
+        if (self.filled_volume == self.volume):
             self.status = OrderStatus.Done
-            logging.warning(u'a new trade confirm exceeds the order volume price=%s, filled_vol=%s, order_vol =%s' % \
-                                (price, volume, self.volume))
-        elif (self.filled_volume == self.volume) and (self.volume>0):
-            self.status = OrderStatus.Done
-        logging.debug(u'成交纪录:price=%s,volume=%s,filled_vol=%s, is_closed=%s' % (price,volume,self.filled_volume,self.is_closed()))
+        logging.debug(u'成交纪录:price=%s,volume=%s,filled_vol=%s' % (price,volume,self.filled_volume))
         self.recalc_pos()
-        return self.filled_volume == self.volume
+        return self.is_closed()
+
+    def update(self):
+        self.filled_volume = sum([v for p, v in self.filled_orders.values()])
+        self.filled_price = sum([p * v for p, v in self.filled_orders.values()])/self.filled_volume
 
     def on_order(self, sys_id, price = 0, volume = 0):
         self.sys_id = sys_id
-        if volume > 0:
+        if volume > self.filled_volume:
             self.filled_price = price
             self.filled_volume = volume
             if self.filled_volume == self.volume:
@@ -80,16 +84,16 @@ class Order(object):
         return False
 
     def on_cancel(self):    #已经撤单
-        if self.status != OrderStatus.Cancelled:
+        if (self.status != OrderStatus.Cancelled) and (self.volume > self.filled_volume):
             self.status = OrderStatus.Cancelled
             self.cancelled_volume = max(self.volume - self.filled_volume, 0)
             self.volume = self.filled_volume    #不会再有成交回报
             logging.debug(u'撤单记录: OrderRef=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' \
                 % (self.order_ref, self.instrument.name, self.volume, self.filled_volume, self.cancelled_volume))
-        self.recalc_pos()
+            self.recalc_pos()
 
     def is_closed(self): #是否已经完全平仓
-        return (self.status in [OrderStatus.Cancelled,OrderStatus.Done]) and (self.filled_volume == self.volume)
+        return (self.filled_volume == self.volume)
 
     def __unicode__(self):
         return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
@@ -109,14 +113,18 @@ class SpreadOrder(Order):
         self.sub_orders = []
         for idx, (inst, unit) in enumerate(zip(self.instIDs, self.units)):
             sorder = BaseObject(action_type = action_type[idx], 
-                                   direction = direction if unit > 0 else rever_direction(direction),
+                                   direction = direction if unit > 0 else reverse_direction(direction),
                                    filled_volume = 0,
                                    volume = abs(unit * vol),
                                    filled_price = 0)
             self.sub_orders.append(sorder)        
         if gateway != None:
             self.set_gateway(gateway)
-    
+
+    def add2pos(self):
+        for pos, sorder in zip(self.positions, self.sub_orders):
+            pos.orders.append(sorder)
+
     def on_trade(self, price, volume, trade_id):
         pass
     
@@ -125,3 +133,14 @@ class SpreadOrder(Order):
         
     def on_cancel(self):
         pass
+
+    def update(self):
+        super(SpreadOrder, self).update()
+        curr_p = 0
+        for pos, sorder, unit in zip(self.positions, self.sub_orders, self.units):
+            p = pos.instrument.mid_price
+            sorder.filled_volume = self.filled_volume * abs(unit)
+            sorder.filled_price = p
+            curr_p += p * unit
+        self.sub_orders[0].filled_price -= (curr_p - self.filled_price)/self.units[0]
+

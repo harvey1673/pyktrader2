@@ -28,6 +28,7 @@ class Gateway(object):
         self.id2order = {}
         self.positions = {}
         self.instruments = []      # 已订阅合约代码
+        self.working_orders = []
         self.eod_flag = False
         self.eod_report = True
         self.account_info = {'available': 0,
@@ -193,17 +194,22 @@ class Gateway(object):
             for idx, row in enumerate(reader):
                 if idx > 0:
                     inst = row[3]
-                    order_class = eval('order.' + str(row[13]))
-                    iorder = order_class(inst, float(row[10]), int(row[4]), int(row[11]),
-                                   row[7], row[8], row[9])
+                    order_class = eval('order.' + str(row[14]))
+                    filled_str = row[7].split('|')
+                    filled_orders = {}
+                    for fstr in filled_str:
+                        forder = fstr.split(':')
+                        pair_str = forder[1].split('_')
+                        filled_orders[forder[0]] = [float(pair_str[0]), int(pair_str[1])]
+                    iorder = order_class(inst, float(row[11]), int(row[4]), int(row[12]),
+                                   row[8], row[9], row[10], int(row[15]))
                     iorder.sys_id = row[1]
                     iorder.local_id = row[2]
+                    iorder.filled_orders = filled_orders
                     iorder.filled_volume = int(row[5])
                     iorder.filled_price = float(row[6])
                     iorder.order_ref = int(row[0])
-                    iorder.trade_ref = int(row[14])
-                    iorder.status = int(row[12])
-                    iorder.set_gateway(self)
+                    iorder.status = int(row[13])
                     self.add_order(iorder)
 
     def save_order_list(self, tday):
@@ -215,29 +221,32 @@ class Gateway(object):
         with open(filename, 'wb') as log_file:
             file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
             file_writer.writerow(
-                ['order_ref', 'local_id', 'sysID', 'inst', 'volume', 'filledvolume', 'filledprice', 'action_type',
-                 'direction',
-                 'price_type', 'limitprice', 'order_time', 'status', 'order_class', 'trade_ref'])
+                ['order_ref', 'local_id', 'sysID', 'inst', 'volume',
+                 'filledvolume', 'filledprice', 'filledorders',
+                 'action_type', 'direction', 'price_type',
+                 'limitprice', 'order_time', 'status', 'order_class', 'trade_ref'])
             for iorder in order_list:
+                forders = [ str(key) + ':' + '_'.join([str(s) for s in iorder.filled_orders[key]]) for key in iorder.filled_orders ]
+                filled_str = '|'.join(forders)
                 file_writer.writerow(
-                    [iorder.order_ref, iorder.local_id, iorder.sys_id, inst, iorder.volume, iorder.filled_volume,
-                     iorder.filled_price,
+                    [iorder.order_ref, iorder.local_id, iorder.sys_id, iorder.instrument, iorder.volume,
+                     iorder.filled_volume, iorder.filled_price, filled_str,
                      iorder.action_type, iorder.direction, iorder.price_type,
                      iorder.limit_price, iorder.start_tick, iorder.status, iorder.type, iorder.trade_ref])
 
     def add_orders(self, orders):
         for iorder in orders:
-            iorder.set_gateway(self)
             self.add_order(iorder)
 
     def add_order(self, iorder):
-        if iorder.type = 'Order':        
-            instID = iorder.instrument
-            self.positions[instID].orders.append(iorder)
-        elif iorder.type = 'SpreadOrder':
-            for instID, sorder in zip(self.instIDs, self.sub_orders):
-                self.positions[instID].orders.append(sorder)            
+        iorder.set_gateway(self)
+        iorder.add2pos()
         self.id2order[order.local_id] = iorder
+        if (iorder.status in order.Alive_Order_Status) and (iorder.local_id not in self.working_orders):
+            self.working_orders.append(iorder.local_id)
+
+    def remove_order(self, iorder):
+        pass
 
     def load_local_positions(self, tday):
         pos_date = tday
