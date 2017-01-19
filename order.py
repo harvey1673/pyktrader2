@@ -16,6 +16,7 @@ class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
     def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref = 0, gateway = None):
         self.instrument = instID
+        self.type = self.__class__.__name__
         self.instIDs = [instID]
         self.units = [1]
         self.limit_price = limit_price        #开仓基准价
@@ -40,11 +41,7 @@ class Order(object):
 
     def set_gateway(self, gateway):
         self.gateway = gateway
-        self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]
-        self.add_to_positions()
-
-    def add_to_position(self):
-        self.positions[0].orders.append(self)
+        self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]        
 
     def recalc_pos(self):
         for pos in self.positions:
@@ -106,9 +103,17 @@ class Order(object):
         return unicode(self).encode('utf-8')
 
 class SpreadOrder(Order):
-    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref=0, gateway=None):
+    def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref=0, gateway=None):       
         super(SpreadOrder, self).__init__(instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref)
         self.instIDs, self.units = spreadinst2underlying(instID)
+        self.sub_orders = []
+        for idx, (inst, unit) in enumerate(zip(self.instIDs, self.units)):
+            sorder = BaseObject(action_type = action_type[idx], 
+                                   direction = direction if unit > 0 else rever_direction(direction),
+                                   filled_volume = 0,
+                                   volume = abs(unit * vol),
+                                   filled_price = 0)
+            self.sub_orders.append(sorder)        
         if gateway != None:
             self.set_gateway(gateway)
 
@@ -117,4 +122,3 @@ class SpreadOrder(Order):
 
     def add_to_postions(self):
         pass
-
