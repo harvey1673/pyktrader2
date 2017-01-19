@@ -116,9 +116,12 @@ class SpreadOrder(Order):
             self.sub_orders.append(sorder)        
         if gateway != None:
             self.set_gateway(gateway)
-
-    def recalc_pos(self):
-        super(SpreadOrder, self).recalc_pos()
-
-    def add_to_postions(self):
+    
+    def on_trade(self, price, volume, trade_id):
+        pass
+    
+    def on_order(self, sys_id, price = 0, volume = 0):
+        pass
+        
+    def on_cancel(self):
         pass
