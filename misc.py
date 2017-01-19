@@ -237,6 +237,12 @@ product_ticksize = {'zn': 5,
                    'IO': 0.1
                    }
 
+def reverse_direction(direction):
+    if direction == ORDER_BUY:
+        return ORDER_SELL
+    else:
+        return ORDER_BUY
+                    
 def date2xl(d):
     return (d-datetime.date(1970,1,1)).days + 25569.0
 
