@@ -240,13 +240,14 @@ class Gateway(object):
 
     def add_order(self, iorder):
         iorder.set_gateway(self)
-        iorder.add2pos()
+        iorder.add_pos()
         self.id2order[order.local_id] = iorder
         if (iorder.status in order.Alive_Order_Status) and (iorder.local_id not in self.working_orders):
             self.working_orders.append(iorder.local_id)
 
     def remove_order(self, iorder):
-        pass
+        iorder.remove_pos()
+        self.id2order.pop(iorder.local_id, None)        
 
     def load_local_positions(self, tday):
         pos_date = tday
@@ -649,4 +650,4 @@ class VtCancelOrderReq(object):
         # 以下字段主要和CTP、LTS类接口相关
         self.orderID = EMPTY_STRING             # 报单号
         self.frontID = EMPTY_STRING             # 前置机号
-        self.sessionID = EMPTY_STRING           # 会话号
+        self.sessionID = EMPTY_STRING           # 会话号        
