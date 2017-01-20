@@ -49,9 +49,13 @@ class Order(object):
         for pos in self.positions:
             pos.re_calc()
 
-    def add2pos(self):
+    def add_pos(self):
         for pos in self.positions:
             pos.orders.append(self)
+            
+    def remove_pos(self):
+        for pos in self.positions:
+            pos.orders.remove(self)
 
     def on_trade(self, price, volume, trade_id):
         ''' 返回是否完全成交
@@ -93,7 +97,7 @@ class Order(object):
             self.recalc_pos()
 
     def is_closed(self): #是否已经完全平仓
-        return (self.filled_volume == self.volume)
+        return (self.filled_volume == self.volume) 
 
     def __unicode__(self):
         return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
@@ -121,18 +125,13 @@ class SpreadOrder(Order):
         if gateway != None:
             self.set_gateway(gateway)
 
-    def add2pos(self):
+    def add_pos(self):
         for pos, sorder in zip(self.positions, self.sub_orders):
             pos.orders.append(sorder)
 
-    def on_trade(self, price, volume, trade_id):
-        pass
-    
-    def on_order(self, sys_id, price = 0, volume = 0):
-        pass
-        
-    def on_cancel(self):
-        pass
+    def remove_pos(self):
+        for pos, sorder in zip(self.positions, self.sub_orders):
+            pos.orders.remove(sorder)        
 
     def update(self):
         super(SpreadOrder, self).update()
@@ -143,4 +142,4 @@ class SpreadOrder(Order):
             sorder.filled_price = p
             curr_p += p * unit
         self.sub_orders[0].filled_price -= (curr_p - self.filled_price)/self.units[0]
-
+        
