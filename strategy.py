@@ -179,6 +179,7 @@ class Strategy(object):
         self.folder = ''
         self.logger = None
         self.inst2idx = {}
+        self.under2idx = {}
         self.num_entries = [0] * num_assets
         self.num_exits   = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
@@ -213,16 +214,20 @@ class Strategy(object):
     def dep_instIDs(self):
         return list(set().union(*self.underliers))
 
-    def reset(self):
+    def set_agent(self, agent):
+        self.agent = agent
+        self.folder = self.agent.folder + self.name + '_'
+        self.logger = self.agent.logger
         self.inst2idx = {}
-        for idx, under in enumerate(self.underliers):
+        for idx, under in enumerate(self.underliers): 
+            under_key = '_'.join(under)
+            self.under2idx[under_key] = idx
+            if len(under) > 1:
+                self.agent.add_spread(under, self.volumes[idx], self.trade_unit[idx])
             for inst in under:
                 if inst not in self.inst2idx:
                     self.inst2idx[inst] = []
-                self.inst2idx[inst].append(idx)
-        if self.agent != None:
-            self.folder = self.agent.folder + self.name + '_'
-            self.logger = self.agent.logger
+                self.inst2idx[inst].append(idx)            
         self.register_func_freq()
         self.register_bar_freq()
 
@@ -238,7 +243,8 @@ class Strategy(object):
 
     def on_trade(self, etrade):
         save_status = False
-        idx = int(etrade.book)
+        under_key = '_'.join(sorted(etrade.instIDs))
+        idx = self.under2idx[under_key]
         entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
         exit_ids = [tp.exit_tradeid for tp in self.positions[idx]]
         i = 0
@@ -323,7 +329,8 @@ class Strategy(object):
             self.agent.check_trade(etrade)
 
     def add_live_trades(self, etrade):
-        idx = int(etrade.book)
+        trade_key = '_'.join(etrade.instIDs)
+        idx = self.under2idx[trade_key]
         for cur_trade in self.submitted_trades[idx]:
             if etrade.id == cur_trade.id:
                 self.logger.debug('trade_id = %s is already in the strategy= %s list' % (etrade.id, self.name))
@@ -345,9 +352,12 @@ class Strategy(object):
         return
 
     def calc_curr_price(self, idx):
-        prices = [ self.agent.instruments[inst].mid_price for inst in self.underliers[idx] ]
-        conv_f = [ self.agent.instruments[inst].multiple for inst in self.underliers[idx] ]
-        self.curr_prices[idx] = sum([p*v*cf for p, v, cf in zip(prices, self.volumes[idx], conv_f)])/conv_f[-1]
+        if len(self.underliers[idx]) == 1:
+            inst = self.underliers[idx][0]
+            self.curr_prices[idx] = self.agent.instruments[inst].mid_price
+        else:
+            spd_key = (tuple(self.underliers[idx]), tuple(self.volumes[idx]))
+            self.curr_prices[idx] = self.agent.spread_data[spd_key].mid_price
 
     def run_tick(self, ctick):
         save_status = False
