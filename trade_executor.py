@@ -34,7 +34,6 @@ class XTrade(object):
 
     def set_agent(self, agent):
         self.agent = agent
-        self.book = agent.name
         self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
     
     def set_exec_algo(self, exec_algo):
@@ -140,4 +139,3 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         if self.xtrade.status == TradeStatus.Pending:
             pass
         pass
-
