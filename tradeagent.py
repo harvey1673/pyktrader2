@@ -273,6 +273,7 @@ class Agent(MktDataMixin):
         self.strategies = {}
         self.ref2order = {}
         self.ref2trade = {}
+        self.working_trades = {}        
         strat_files = config.get('strat_files', [])
         for sfile in strat_files:
             strat_conf = {}
