@@ -271,12 +271,10 @@ class Agent(MktDataMixin):
         self.inst2gateway = {}
         self.strat_list = []
         self.strategies = {}
+        self.trade_manager = trade.TradeManager(self)
         self.ref2order = {}
-        self.ref2trade = {}
-        self.working_trades = {}        
         strat_files = config.get('strat_files', [])
         for sfile in strat_files:
-            strat_conf = {}
             with open(sfile, 'r') as fp:
                 strat_conf = json.load(fp)
             class_str = strat_conf['class']
@@ -288,10 +286,6 @@ class Agent(MktDataMixin):
             strat_args  = strat_conf.get('config', {})
             strat = strat_class(strat_args, self)
             self.add_strategy(strat)
-
-        ###交易
-        self.ref2order = {}    #orderref==>order
-        self.ref2trade = {}
         self.cancel_protect_period = config.get('cancel_protect_period', 200)
         self.market_order_tick_multiple = config.get('market_order_tick_multiple', 5)
         self.init_init()    #init中的init,用于子类的处理
@@ -432,10 +426,11 @@ class Agent(MktDataMixin):
             self.logger.warning(u'接口不存在')
 
     def submit_trade(self, xtrade):
-        pass
+        self.trader_manager.add_trade(xtrade)
 
     def remove_trade(self, xtrade):
-        pass
+        key = xtrade.underlying.name
+        self.working_trades[key].remove(xtrade)
 
     def log_handler(self, event):
         lvl = event.dict['level']
@@ -455,14 +450,6 @@ class Agent(MktDataMixin):
                 iorder = order_dict[local_id]
                 iorder.gateway = gway
                 self.ref2order[iorder.order_ref] = iorder
-        keys = self.ref2order.keys()
-        if len(keys) > 1:
-            keys.sort()
-        for key in keys:
-            iorder =  self.ref2order[key]			
-            if len(iorder.conditionals)>0:
-                self.ref2order[key].conditionals = dict([(self.ref2order[o_id], iorder.conditionals[o_id]) 
-                                                         for o_id in iorder.conditionals])
 
     def risk_by_strats(self, risk_list = ['pos']):
         # position = lots, delta, gamma, vega, theta in price
@@ -559,22 +546,14 @@ class Agent(MktDataMixin):
             self.prepare_data_env(inst, mid_day = True)
         self.get_eod_positions()
         self.get_all_orders()
-        self.ref2trade = trade.load_trade_list(self.scur_day, self.folder)
-        for trade_id in self.ref2trade:
-            etrade = self.ref2trade[trade_id]
-            orderdict = etrade.order_dict
-            for inst in orderdict:
-                etrade.order_dict[inst] = [ self.ref2order[order_ref] for order_ref in orderdict[inst] ]
-            etrade.update()
-
+        self.trade_manager.initialize()
         for strat_name in self.strat_list:
             strat = self.strategies[strat_name]
             strat.initialize()
-            strat_trades = [etrade for etrade in self.ref2trade.values() if (etrade.strategy == strat.name) \
-                            and (etrade.status != trade.ETradeStatus.StratConfirm)]
+            strat_trades = self.trade_manager.get_trade_by_strat(strat.name)
             for etrade in strat_trades:
-                strat.add_live_trades(etrade)
-
+                if etrade.status != trade.TradeStatus.StratConfirm:
+                    strat.add_live_trades(etrade)
         for gway in self.gateways:
             gateway = self.gateways[gway]
             for inst in gateway.positions:
@@ -592,25 +571,11 @@ class Agent(MktDataMixin):
             return False
  
     def save_state(self):
-        '''
-            保存环境
-        '''
-        trade_refs = []
-        for trade_id in self.ref2trade:
-            etrade = self.ref2trade[trade_id]
-            if (etrade.status == trade.ETradeStatus.StratConfirm) and (sum([abs(v) for v in etrade.filled_vol]) == 0):
-                for inst in etrade.order_dict:
-                    for iorder in etrade.order_dict[inst]:
-                        self.ref2order.pop(iorder.order_ref, None)
-                        iorder.gateway.id2order.pop(iorder.order_ref, None)
-                trade_refs.append(etrade.id)
-        for trade_id in trade_refs:
-            self.ref2trade.pop(trade_id, None)
         if not self.eod_flag:
             self.logger.debug(u'保存执行状态.....................')
             for gway in self.gateways:
                 self.gateways[gway].save_order_list(self.scur_day)
-            trade.save_trade_list(self.scur_day, self.ref2trade, self.folder)
+            self.trade_manager.save_trade_list()
     
     def run_eod(self):
         if self.eod_flag:
@@ -620,21 +585,7 @@ class Agent(MktDataMixin):
         if len(self.strat_list) == 0:
             self.eod_flag = True
             return
-        pfilled_dict = {}
-        for trade_id in self.ref2trade:
-            etrade = self.ref2trade[trade_id]
-            etrade.update()
-            if etrade.status == trade.ETradeStatus.Pending or etrade.status == trade.ETradeStatus.Processed:
-                etrade.status = trade.ETradeStatus.Cancelled
-                strat = self.strategies[etrade.strategy]
-                strat.on_trade(etrade)
-            elif etrade.status == trade.ETradeStatus.PFilled:
-                etrade.status = trade.ETradeStatus.Cancelled
-                self.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
-                pfilled_dict[trade_id] = etrade
-        if len(pfilled_dict)>0:
-            file_prefix = self.folder + 'PFILLED_'
-            trade.save_trade_list(self.scur_day, pfilled_dict, file_prefix)
+        self.trade_manager.save_pfill_trades()
         for strat_name in self.strat_list:
             strat = self.strategies[strat_name]
             strat.day_finalize()
@@ -642,7 +593,6 @@ class Agent(MktDataMixin):
         self.eod_flag = True
         for name in self.gateways:
             self.gateways[name].day_finalize(self.scur_day)
-        self.ref2trade = {}
         self.ref2order = {}
         for inst in self.instruments:
             self.instruments[inst].prev_close = self.cur_day[inst]['close']
@@ -718,9 +668,9 @@ class Agent(MktDataMixin):
 
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
-        mytrade = self.ref2trade[trade_ref]
+        mytrade = self.trade_manager.get_trade(trade_ref)
         pending_orders = mytrade.update()
-        if (mytrade.status == trade.ETradeStatus.Done) or (mytrade.status == trade.ETradeStatus.Cancelled):
+        if (mytrade.status == trade.TradeStatus.Done) or (mytrade.status == trade.TradeStatus.Cancelled):
             strat = self.strategies[mytrade.strategy]
             strat.on_trade(mytrade)
             self.save_state()

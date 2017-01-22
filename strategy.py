@@ -295,24 +295,10 @@ class Strategy(object):
                     tradepos.entry_tradeid = new_trade.id
                 else:
                     tradepos.exit_tradeid = new_trade.id
-                self.submitted_trades[idx].append(new_trade)
+                    self.submit_trade(idx, new_trade)
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
         self.submitted_trades[idx] = [etrade for etrade in self.submitted_trades[idx] if etrade.status!= trade.ETradeStatus.StratConfirm]
         self.save_state()
-    # def check_tradepos(self, idx):
-    #     save_status = False
-    #     if self.trail_loss[idx] > 0:
-    #         for pos in self.positions[idx]:
-    #             if pos.trail_loss > 0:
-    #                 updated = pos.trail_update(self.curr_prices[idx])
-    #                 if pos.trail_check(self.curr_price[idx], pos.entry_price * pos.trail_loss):
-    #                     msg = 'Strat = %s to close position after hitting trail loss for underlier = %s, direction=%s, volume=%s, current tick_id = %s, current price = %s, exit_target = %s, trail_loss buffer = %s' \
-    #                                     % (self.name, '_'.join(sorted(pos.insts)), pos.direction, self.trade_unit[idx], self.agent.tick_id, self.curr_prices[idx], pos.exit_target, pos.entry_price * pos.trail_loss)
-    #                     self.close_tradepos(idx, pos, self.curr_prices[idx])
-    #                     self.status_notifier(msg)
-    #                     updated = True
-    #                 save_status = save_status or updated
-    #     return save_status
 
     def liquidate_tradepos(self, idx):
         save_status = False
@@ -324,10 +310,6 @@ class Strategy(object):
                     save_status = True
         return save_status
 
-    def check_submitted_trades(self, idx):
-        for etrade in self.submitted_trades[idx]:
-            self.agent.check_trade(etrade)
-
     def add_live_trades(self, etrade):
         trade_key = '_'.join(etrade.instIDs)
         idx = self.under2idx[trade_key]
@@ -336,15 +318,12 @@ class Strategy(object):
                 self.logger.debug('trade_id = %s is already in the strategy= %s list' % (etrade.id, self.name))
                 return False
         self.logger.info('trade_id = %s is added to the strategy= %s list' % (etrade.id, self.name))
-        self.submitted_trades[idx].append(etrade)
+        self.submit_trade(idx, etrade)
         return True
 
     def day_finalize(self):
-        self.update_trade_unit()
-        for idx in range(len(self.underliers)):
-            #self.check_tradepos(idx)
-            self.check_submitted_trades(idx)
         self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
+        self.update_trade_unit()
         self.num_entries = [0] * len(self.underliers)
         self.num_exits = [0] * len(self.underliers)
         self.save_state()
@@ -370,7 +349,6 @@ class Strategy(object):
                 save_status = save_status or self.on_tick(idx, ctick)
             elif self.run_flag[idx] == 2:
                 save_status = save_status or self.liquidate_tradepos(idx)
-            save_status = save_status or self.check_submitted_trades(idx)
         if save_status:
             self.save_state()
 
@@ -380,7 +358,6 @@ class Strategy(object):
         for idx in idx_list:
             if self.run_flag[idx] == 1:
                 save_status = save_status or self.on_bar(idx, freq)
-                save_status = save_status or self.check_submitted_trades(idx)
         if save_status:
             self.save_state()
 
@@ -409,9 +386,13 @@ class Strategy(object):
         tradepos = eval(self.pos_class)(insts, self.volumes[idx], direction * tunit, \
                                 price, price, conv_f[-1]*tunit, **self.pos_args)
         tradepos.entry_tradeid = etrade.id
-        self.submitted_trades[idx].append(etrade)
+        self.submit_trade(idx, etrade)
         self.positions[idx].append(tradepos)
         return
+
+    def submit_trade(self, idx, etrade):
+        self.submitted_trades[idx].append(etrade)
+        self.agent.submit_trade(etrade)
 
     def close_tradepos(self, idx, tradepos, price):
         valid_time = self.agent.tick_id + self.trade_valid_time
@@ -425,7 +406,7 @@ class Strategy(object):
         etrade = trade.ETrade( insts, trade_vol, order_type, -price*tradepos.direction, [self.num_tick] * nAsset, \
                                 valid_time, self.name, str(idx), conv_f[-1]*abs(tradepos.pos), conv_f)
         tradepos.exit_tradeid = etrade.id
-        self.submitted_trades[idx].append(etrade)
+        self.submit_trade(idx, etrade)
         return
 
     def update_trade_unit(self):

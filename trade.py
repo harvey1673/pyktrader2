@@ -7,158 +7,185 @@ import datetime
 import csv
 import os.path
 import order
-import trade_executor
+from trade_executor import *
 
 class ETradeStatus:
     Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
 
-def save_trade_list(curr_date, trade_list, file_prefix):
-    filename = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
-    with open(filename,'wb') as log_file:
-        file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);        
-        file_writer.writerow(['id', 'insts', 'volumes', 'filledvol', 'filledprice', 'otypes', 'slipticks',
-                              'order_dict','limitprice', 'validtime',
-                              'strategy','book','status', 'price_unit', 'conv_f'])
-        for trade in trade_list.values():
-            insts = ' '.join(trade.instIDs)
-            volumes = ' '.join([str(i) for i in trade.volumes])
-            filled_vol = ' '.join([str(i) for i in trade.filled_vol])
-            filled_price = ' '.join([str(i) for i in trade.filled_price])
-            otypes = ' '.join([str(i) for i in trade.order_types])
-            slip_ticks = ' '.join([str(i) for i in trade.slip_ticks])
-            cfactors = ' '.join([str(i) for i in trade.conv_f])
-            if len(trade.order_dict)>0:
-                order_dict = ' '.join([inst +':'+'_'.join([str(o.order_ref) for o in trade.order_dict[inst]]) 
-                                    for inst in trade.order_dict])
-            else:
-                order_dict = ''
-                                
-            file_writer.writerow([trade.id, insts, volumes, filled_vol, filled_price, otypes, slip_ticks,
-                                  order_dict, trade.limit_price, trade.valid_time,
-                                  trade.strategy, trade.book, trade.status, trade.price_unit, cfactors])
+class TradeStatus:
+    Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(7)
 
-def load_trade_list(curr_date, file_prefix):
-    logfile = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
-    if not os.path.isfile(logfile):
-        return {}
-    trade_dict = {} 
-    with open(logfile, 'rb') as f:
-        reader = csv.reader(f)
-        for idx, row in enumerate(reader):
-            if idx > 0:
-                instIDs = row[1].split(' ')
-                volumes = [ int(n) for n in row[2].split(' ')]
-                filled_vol = [ int(n) for n in row[3].split(' ')]
-                filled_price = [ float(n) for n in row[4].split(' ')]
-                otypes = [ int(n) for n in row[5].split(' ')]
-                ticks = [ int(n) for n in row[6].split(' ')]
-                if ':' in row[7]:
-                    order_dict =  dict([tuple(s.split(':')) for s in row[7].split(' ')])
-                    for inst in order_dict:
-                        if len(order_dict[inst])>0:
-                            order_dict[inst] = [int(o_id) for o_id in order_dict[inst].split('_')]
-                        else:
-                            order_dict[inst] = []
+Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled]
+
+class TradeManager(object):
+    def __init__(self, agent):
+        self.agent = agent
+        self.working_trades = {}
+        self.ref2trade = {}
+
+    def initialize(self):
+        self.ref2trade = self.load_trade_list(self.agent.scur_day, self.agent.folder)
+        for trade_id in self.ref2trade:
+            xtrade = self.ref2trade[trade_id]
+            orderdict = xtrade.order_dict
+            for inst in orderdict:
+                xtrade.order_dict[inst] = [ self.agent.ref2order[order_ref] for order_ref in orderdict[inst] ]
+            xtrade.update()
+
+    def get_trade(self, trade_id):
+        return self.ref2trade[trade_id]
+
+    def get_trades_by_strat(self, strat_name):
+        return [xtrade for xtrade in self.ref2trade.values() if xtrade.strategy == strat_name]
+
+    def save_pfill_trades(self):
+        pfilled_dict = {}
+        for trade_id in self.ref2trade:
+            xtrade = self.ref2trade[trade_id]
+            xtrade.update()
+            if xtrade.status == TradeStatus.Pending or xtrade.status == TradeStatus.OrderSent:
+                xtrade.status = TradeStatus.Cancelled
+                strat = self.agent.strategies[xtrade.strategy]
+                strat.on_trade(xtrade)
+            elif xtrade.status == TradeStatus.PFilled:
+                xtrade.status = TradeStatus.Cancelled
+                self.agent.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
+                pfilled_dict[trade_id] = xtrade
+        if len(pfilled_dict)>0:
+            file_prefix = self.agent.folder + 'PFILLED_'
+            self.save_trade_list(self.agent.scur_day, pfilled_dict, file_prefix)
+
+    def add_trade(self, xtrade):
+        if xtrade.id not in self.ref2trade:
+            self.ref2trade[xtrade.id] = xtrade
+        if xtrade.status in Alive_Trade_Status:
+            key = xtrade.underlying.name
+            self.working_trades[key].append(xtrade)
+
+    def process_trades(self, instID):
+        pass
+
+    def match_trade(self):
+        pass
+
+    def save_trade_list(self, curr_date, trade_list, file_prefix):
+        filename = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
+        with open(filename,'wb') as log_file:
+            file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
+            file_writer.writerow(['id', 'insts', 'units', 'price_unit', 'vol', 'limitprice',
+                                  'filledvol', 'filledprice', 'order_dict', 'aggressive',
+                                  'start_time', 'end_time', 'strategy','book', 'status'])
+            for xtrade in trade_list.values():
+                insts = ' '.join(xtrade.instIDs)
+                units = ' '.join([str(i) for i in xtrade.units])
+                if len(xtrade.order_dict)>0:
+                    order_dict = ' '.join([inst +':'+'_'.join([str(o.order_ref) for o in trade.order_dict[inst]])
+                                        for inst in trade.order_dict])
                 else:
-                    order_dict = {}
-                limit_price = float(row[8])
-                valid_time = int(row[9])
-                strategy = row[10]
-                book = row[11]
-                price_unit = float(row[13])
-                conv_factor = [ int(n) for n in row[14].split(' ')]
-                etrade = ETrade(instIDs, volumes, otypes, limit_price, ticks, valid_time, strategy, book, price_unit, conv_factor)
-                etrade.id = int(row[0])
-                etrade.status = int(row[12])
-                etrade.order_dict = order_dict
-                etrade.filled_vol = filled_vol 
-                etrade.filled_price = filled_price 
-                trade_dict[etrade.id] = etrade    
-    return trade_dict
-    
-class ETrade(object):
-    #instances = weakref.WeakSet()
-    id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
+                    order_dict = ''
+                file_writer.writerow([trade.id, insts, units, xtrade.price_unit, xtrade.vol, xtrade.limit_price,
+                                      xtrade.filled_vol, xtrade.filled_price, order_dict, xtrade.aggressive_level,
+                                      xtrade.start_time, xtrade.end_time, xtrade.strategy, xtrade.book, xtrade.status])
 
-    #@classmethod
-    #def get_instances(cls):
-    #    return list(ETrade.instances)
-            
-    def __init__(self, instIDs, volumes, otypes, limit_price, ticks, valid_time, strategy, book, price_unit = 1, conv_factor = []):
+    def load_trade_list(self, curr_date, file_prefix):
+        logfile = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
+        if not os.path.isfile(logfile):
+            return {}
+        trade_dict = {}
+        with open(logfile, 'rb') as f:
+            reader = csv.reader(f)
+            for idx, row in enumerate(reader):
+                if idx > 0:
+                    instIDs = row[1].split(' ')
+                    units = [ int(n) for n in row[2].split(' ')]
+                    price_unit = float(row[3])
+                    vol = int(row[4])
+                    limit_price = float(row[5])
+                    filled_vol = int(row[6])
+                    filled_price = float(row[7])
+                    aggressiveness = float(row[9])
+                    start_time = int(row[10])
+                    end_time = int(row[11])
+                    order_dict = {}
+                    if ':' in row[8]:
+                        str_dict =  dict([tuple(s.split(':')) for s in row[8].split(' ')])
+                        for inst in str_dict:
+                            if len(order_dict[inst])>0:
+                                order_dict[inst] = [int(o_id) for o_id in str_dict[inst].split('_')]
+                    strategy = row[10]
+                    book = row[11]
+                    xtrade = XTrade(instIDs, units, vol, limit_price, price_unit = price_unit, strategy = strategy, book = book, \
+                                    agent = self.agent, start_time = start_time, end_time = end_time, aggressiveness = aggressiveness)
+                    xtrade.id = int(row[0])
+                    xtrade.status = int(row[12])
+                    xtrade.order_dict = order_dict
+                    xtrade.filled_vol = filled_vol
+                    xtrade.filled_price = filled_price
+                    xtrade.refresh_status()
+                    trade_dict[xtrade.id] = xtrade
+        return trade_dict
+
+class XTrade(object):
+    # instances = weakref.WeakSet()
+    id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
+    def __init__(self, instIDs, units, vol, limit_price, price_unit=1, strategy="dummy", book="0", \
+                 agent=None, start_time = 300000, end_time = 2115000, aggressiveness = 1):
         self.id = next(self.id_generator)
         self.instIDs = instIDs
-        self.volumes = volumes
-        self.filled_vol = [0]*len(volumes)
-        self.filled_price = [0]*len(volumes)
-        self.order_types = otypes
-        self.slip_ticks  = ticks
+        self.units = units
+        self.vol = vol
+        self.filled_vol = 0
+        self.filled_price = 0
         self.limit_price = limit_price
         self.price_unit = price_unit
-        self.valid_time = valid_time
+        self.underlying = None
         self.strategy = strategy
         self.book = book
-        self.status = ETradeStatus.Pending
-        self.conv_f = [1] * len(instIDs)
-        if len(conv_factor) > 0:
-            self.conv_f = conv_factor
+        self.agent = agent
+        self.status = TradeStatus.Pending
         self.order_dict = {}
-        #ETrade.instances.add(self)
+        self.order_vol = []
+        self.working_vol = 0
+        self.aggressive_level = aggressiveness
+        self.start_time = start_time
+        self.end_time = end_time
+        self.exec_algo = ExecAlgoBase(self, agent)
+        if agent != None:
+            self.set_agent(agent)
+
+    def set_agent(self, agent):
+        self.agent = agent
+        self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
+
+    def set_exec_algo(self, exec_algo):
+        self.exec_algo = exec_algo
 
     def final_price(self):
-        return sum([ v*p*cf for (v,p,cf) in zip(self.filled_vol, self.filled_price, self.conv_f)])/self.price_unit
-    
-    def update(self):
-        pending_orders = []
-        if self.status in [ETradeStatus.Done, ETradeStatus.Cancelled, ETradeStatus.StratConfirm]:
-            return pending_orders
-        elif len(self.order_dict) == 0:
-            self.status = ETradeStatus.Pending
-            return pending_orders
-        Done_status = True
-        PFill_status = False
-        Zero_Volume = True
-        volumes = [0] * len(self.instIDs)
-        for idx, inst in enumerate(self.instIDs):
-            for iorder in self.order_dict[inst]:
-                if (iorder.status in [order.OrderStatus.Done, order.OrderStatus.Cancelled]) and (len(iorder.conditionals) == 0):
-                    continue
-                if len(iorder.conditionals) == 1 and (order.OrderStatus.Cancelled in iorder.conditionals.values()):
-                    sorder = iorder.conditionals.keys()[0]
-                    if sorder.status == order.OrderStatus.Cancelled and iorder.status == order.OrderStatus.Waiting:
-                        iorder.volume = sorder.cancelled_volume
-                        iorder.status = order.OrderStatus.Ready
-                        iorder.conditionals = {}
-                        pending_orders.append(iorder.order_ref)
-                        logging.debug('order %s is ready after %s is canceld, the remaining volume is %s' \
-                                        % (iorder.order_ref, sorder.order_ref, iorder.volume))
-                elif len(iorder.conditionals)> 0:
-                    for o in iorder.conditionals:
-                        if ((o.status == order.OrderStatus.Cancelled) and (iorder.conditionals[o] == order.OrderStatus.Done)) \
-                            or ((o.status == order.OrderStatus.Done) and (iorder.conditionals[o] == order.OrderStatus.Cancelled)):
-                            iorder.on_cancel()
-                            iorder.conditions = {}
-                            break
-                        elif (o.status != iorder.conditionals[o]):
-                            break    
-                    else:
-                        logging.debug('conditions for order %s are met, changing status to be ready' % iorder.order_ref)
-                        iorder.status = order.OrderStatus.Ready
-                        pending_orders.append(iorder.order_ref)
-                        iorder.conditionals = {}
-            self.filled_vol[idx] = sum([iorder.filled_volume for iorder in self.order_dict[inst]])
-            if self.filled_vol[idx] > 0:
-                self.filled_price[idx] = sum([iorder.filled_volume*iorder.filled_price for iorder in self.order_dict[inst]])/self.filled_vol[idx]
-            volumes[idx] = sum([iorder.volume for iorder in self.order_dict[inst]])                    
-            if volumes[idx] > 0:
-                Zero_Volume = False
-            if self.filled_vol[idx] < volumes[idx]:
-                Done_status = False
-            if self.filled_vol[idx] > 0:
-                PFill_status = True                            
-        if Zero_Volume:
-            self.status = ETradeStatus.Cancelled
-        elif Done_status:
-            self.status = ETradeStatus.Done
-        elif PFill_status:
-            self.status = ETradeStatus.PFilled
-        return pending_orders
+        if len(self.instIDs) == 1:
+            return self.filled_price[0]
+        else:
+            return self.underlying.price(prices=self.filled_price)
+
+    def refresh_status(self):
+        if self.status in [TradeStatus.StratConfirm, TradeStatus.Done, TradeStatus.Cancelled]:
+            return
+        if self.filled_vol == self.vol:
+            self.status = TradeStatus.Done
+            self.order_dict = {}
+            self.working_vol = 0
+        elif (self.filled_vol > 0) and len(self.order_dict) == 0:
+            self.status = TradeStatus.PFilled
+            self.order_vol = []
+        elif len(self.order_dict) > 0:
+            self.order_vol = [sum([self.agent.ref2order[oref].filled_volume for oref in self.order_dict[instID]]) \
+                                    if instID in self.order_dict else 0 for instID in self.instIDs]
+            remain_vol = sum([self.working_vol * abs(u) - v for u, v in zip(self.units, self.order_vol)])
+            if remain_vol > 0:
+                self.status = TradeStatus.OrderSent
+        else:
+            self.status = TradeStatus.Pending
+            self.order_vol = []
+            self.working_vol = 0
+
+    def execute(self):
+        self.exec_algo.process()
