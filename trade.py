@@ -13,14 +13,14 @@ class ETradeStatus:
     Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
 
 class TradeStatus:
-    Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(7)
+    Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(8)
 
 Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled]
 
 class TradeManager(object):
     def __init__(self, agent):
         self.agent = agent
-        self.working_trades = {}
+        self.tradebook = {}
         self.ref2trade = {}
 
     def initialize(self):
@@ -61,6 +61,10 @@ class TradeManager(object):
         if xtrade.status in Alive_Trade_Status:
             key = xtrade.underlying.name
             self.working_trades[key].append(xtrade)
+
+    def remove_trade(self, xtrade):
+        key = xtrade.name
+        self.working_trades[key].remove(xtrade, None)
 
     def process_trades(self, instID):
         pass

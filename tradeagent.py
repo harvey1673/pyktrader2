@@ -429,8 +429,7 @@ class Agent(MktDataMixin):
         self.trader_manager.add_trade(xtrade)
 
     def remove_trade(self, xtrade):
-        key = xtrade.underlying.name
-        self.working_trades[key].remove(xtrade)
+        self.trade_manager.remove_trade(xtrade)
 
     def log_handler(self, event):
         lvl = event.dict['level']
