@@ -37,7 +37,7 @@ class XTrade(object):
         self.status = TradeStatus.Pending
         self.order_dict = {}
         self.order_vol = []
-        self.working_vol = 0
+        self.remaining_vol = self.vol - self.filled_vol
         self.aggressive_level = aggressiveness
         self.start_time = start_time
         self.end_time = end_time

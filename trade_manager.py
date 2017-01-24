@@ -169,8 +169,66 @@ class TradeBook(object):
 
     def add_trade(self, xtrade):        
         pass
-        
-        
+
+    def process_trade(self, xtrade):
+        direction = 'bid' if xtrade.vol > 0 else 'ask'
+        if direction == 'bid':
+            while abs(xtrade.filled_vol - xtrade.vol)!= 0 and self.asks:
+                best_price_asks = self.asks.min_price_list()
+                self.process_trade_list('ask', best_price_asks, xtrade)
+        elif direction == 'ask':
+            while abs(xtrade.filled_vol - xtrade.vol)!= 0 and self.bids:
+                best_price_bids = self.bids.max_price_list()
+                self.process_trade_list('bid', best_price_bids, xtrade)
+        return
+
+    def process_trade_list(self, side, trade_list, xtrade):
+        quantity_to_trade = xtrade.remaining_vol
+        while len(trade_list) > 0 and abs(quantity_to_trade) > 0:
+            head_item = trade_list.get_head_item()
+            head_trade = head_item.data
+            traded_price = head_trade.limit_price
+            if quantity_to_trade < head_order.quantity:
+                traded_quantity = quantity_to_trade
+                # Do the transaction
+                new_book_quantity = head_order.quantity - quantity_to_trade
+                head_order.update_quantity(new_book_quantity, head_order.timestamp)
+                quantity_to_trade = 0
+            elif quantity_to_trade == head_order.quantity:
+                traded_quantity = quantity_to_trade
+                if side == 'bid':
+                    self.bids.remove_order_by_id(head_order.order_id)
+                else:
+                    self.asks.remove_order_by_id(head_order.order_id)
+                quantity_to_trade = 0
+            else: # quantity to trade is larger than the head order
+                traded_quantity = head_order.quantity
+                if side == 'bid':
+                    self.bids.remove_order_by_id(head_order.order_id)
+                else:
+                    self.asks.remove_order_by_id(head_order.order_id)
+                quantity_to_trade -= traded_quantity
+            if verbose:
+                print(("TRADE: Time - {}, Price - {}, Quantity - {}, TradeID - {}, Matching TradeID - {}".format(self.time, traded_price, traded_quantity, counter_party, quote['trade_id'])))
+
+            transaction_record = {
+                    'timestamp': self.time,
+                    'price': traded_price,
+                    'quantity': traded_quantity,
+                    'time': self.time
+                    }
+
+            if side == 'bid':
+                transaction_record['party1'] = [counter_party, 'bid', head_order.order_id, new_book_quantity]
+                transaction_record['party2'] = [quote['trade_id'], 'ask', None, None]
+            else:
+                transaction_record['party1'] = [counter_party, 'ask', head_order.order_id, new_book_quantity]
+                transaction_record['party2'] = [quote['trade_id'], 'bid', None, None]
+
+            self.tape.append(transaction_record)
+            trades.append(transaction_record)
+        return quantity_to_trade, trades
+
 class TradeManager(object):
     def __init__(self, agent):
         self.agent = agent
