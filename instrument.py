@@ -111,7 +111,7 @@ class Instrument(object):
 class SpreadInst(object):
     def __init__(self, inst_data, instIDs, weights, price_unit = 1):
         self.instIDs = instIDs
-        self.name = '_'.join(instIDs)
+        self.name = '_'.join([str(s) for s in instIDs + weights])
         self.inst_objs = [inst_data[inst] for inst in instIDs]
         self.weights = weights
         self.conv_factor = [ inst_obj.multiple for inst_obj in self.inst_objs ]
