@@ -8,6 +8,7 @@ import bisect
 import mysqlaccess
 import order
 import trade
+import trade_manager
 import os
 import instrument
 import ctp
@@ -271,7 +272,7 @@ class Agent(MktDataMixin):
         self.inst2gateway = {}
         self.strat_list = []
         self.strategies = {}
-        self.trade_manager = trade.TradeManager(self)
+        self.trade_manager = trade_manager.TradeManager(self)
         self.ref2order = {}
         strat_files = config.get('strat_files', [])
         for sfile in strat_files:
@@ -360,7 +361,7 @@ class Agent(MktDataMixin):
             super(Agent, self).add_instrument(name)
 
     def add_spread(self, instIDs, weights, price_unit = 1):        
-        key = (tuple(instIDs), tuple(weights))
+        key = '_'.join([str(s) for s in instIDs + weights])
         self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
         self.spread_data[key].update()
         for inst in instIDs:
@@ -373,7 +374,7 @@ class Agent(MktDataMixin):
             key = instIDs[0]
             return self.instruments[key]
         else:
-            key = (tuple(instIDs), tuple(weights))            
+            key = '_'.join([str(s) for s in instIDs + weights])           
             if key not in self.spread_data:
                 self.add_spread(instIDs, weights, price_unit)
             return self.spread_data[key]
