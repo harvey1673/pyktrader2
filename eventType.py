@@ -34,6 +34,7 @@ EVENT_MARGINRATE = 'eMarginRate.'
 EVENT_DAYSWITCH = 'eDaySwitch.'
 EVENT_DB_WRITE = 'eDatabaseWrite.'
 
+EVENT_XTRADESTATUS = 'eXtradeStatus'
 EVENT_ETRADEUPDATE = 'eTradeUpdate.'
 EVENT_ERRORDERINSERT = 'eErrOrderInsert.'
 EVENT_ERRORDERCANCEL = 'eErrOrderCancel.'

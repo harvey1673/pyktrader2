@@ -1,4 +1,6 @@
 from trade import *
+from eventType import *
+from eventEngine import *
 from bintrees import FastRBTree
 
 class LinkedList(object):
@@ -166,7 +168,7 @@ class FullTradeBook(object):
     def __init__(self, ee, inst_obj):
         self.bids = TradeTree()
         self.asks = TradeTree()
-        self.eventEngine = event_engine
+        self.eventEngine = ee
         self.instrument = inst_obj
         
     def remove_trade(self, xtrade):
@@ -179,11 +181,11 @@ class FullTradeBook(object):
         direction = 'bid' if xtrade.vol > 0 else 'ask'
         if xtrade.status != TradeStatus.Pending:
             if direction == 'bid':
-                while abs(xtrade.remaining_vol)!= 0 and self.asks:
+                while self.asks and (xtrade.limit_price >= self.asks.min_price()) and (abs(xtrade.remaining_vol)!= 0):
                     best_price_asks = self.asks.min_price_list()
-                    self.process_trade_list('ask', best_price_asks, xtrade)            
+                    self.process_trade_list('ask', best_price_asks, xtrade)
             elif direction == 'ask':
-                while abs(xtrade.filled_vol - xtrade.vol)!= 0 and self.bids:
+                while self.bids and (xtrade.limit_price <= self.bids.max_price()) and (abs(xtrade.filled_vol - xtrade.vol)!= 0):
                     best_price_bids = self.bids.max_price_list()
                     self.process_trade_list('bid', best_price_bids, xtrade)
         if xtrade.status == TradeStatus.Done:
@@ -212,7 +214,7 @@ class FullTradeBook(object):
                 else:
                     curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
                     xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)                                   
-                    if curr_xtrdade.status == TradeStatus.Done:
+                    if curr_xtrade.status == TradeStatus.Done:
                         event = Event(type=EVENT_XTRADESTATUS)
                         event.dict['trade_ref'] = xtrade.id
                         self.eventEngine.put(event)                    
@@ -226,7 +228,7 @@ class SimpleTradeBook(object):
     def __init__(self, ee, inst_obj):
         self.bids = []
         self.asks = []        
-        self.eventEngine = event_engine
+        self.eventEngine = ee
         self.instrument = inst_obj
         
     def remove_trade(self, xtrade):
@@ -236,9 +238,12 @@ class SimpleTradeBook(object):
             self.asks = [ x for x in self.asks if x.id != xtrade.id ]
     
     def add_trade(self, xtrade):
-        pass        
+        if xtrade.vol > 0:
+            self.bids.append(xtrade)
+        else:
+            self.asks.append(xtrade)
     
-    def process_trade_list(self, side, trade_list, xtrade)
+    def process_trade_list(self, side, trade_list, xtrade):
         for curr_xtrade in trade_list:
             if xtrade.remaining_vol == 0:
                 break
@@ -249,8 +254,7 @@ class SimpleTradeBook(object):
                     xtrade.on_trade(traded_price, xtrade.remaining_vol)
                 else:
                     curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
-                    xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)                         
-    
+                    xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)
         
             
 class TradeManager(object):
