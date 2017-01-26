@@ -252,6 +252,7 @@ class SimpleTradeBook(object):
         nask = len(self.asks)
         n = 0
         m = 0
+        traded_price = self.instrument.mid_price
         while (n < nbid) and (m < nask):
             bid_trade = self.bids[n]
             ask_trade = self.asks[m]
@@ -260,27 +261,14 @@ class SimpleTradeBook(object):
             elif ask_trade.remaining_vol == 0:
                 m += 1
             else:
-                if abs(bid_trade.remaining_vol) <= abs(ask_xtrade.remaining_vol): 
+                if abs(bid_trade.remaining_vol) <= abs(ask_trade.remaining_vol):
                     ask_trade.on_trade(traded_price, -bid_trade.remaining_vol)
                     bid_trade.on_trade(traded_price, bid_trade.remaining_vol)
                     n += 1
                 else:
                     ask_trade.on_trade(traded_price, ask_trade.remaining_vol)
-                    bid_trade.on_trade(traded_price, -ask_xtrade.remaining_vol)
-                    m += 1        
-        
-    def process_trade_list(self, trade_list, xtrade):
-        for curr_xtrade in trade_list:
-            if xtrade.remaining_vol == 0:
-                break
-            traded_price = self.instrument.mid_price
-            if abs(xtrade.remaining_vol) <= abs(curr_xtrade.remaining_vol): 
-                curr_xtrade.on_trade(traded_price, -xtrade.remaining_vol)
-                xtrade.on_trade(traded_price, xtrade.remaining_vol)
-            else:
-                curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
-                xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)
-        
+                    bid_trade.on_trade(traded_price, -ask_trade.remaining_vol)
+                    m += 1
             
 class TradeManager(object):
     def __init__(self, agent):
@@ -327,7 +315,7 @@ class TradeManager(object):
             self.ref2trade[xtrade.id] = xtrade
         key = xtrade.underlying.name
         if xtrade.status == TradeStatus.Pending:
-            if key not in self.pending_trades
+            if key not in self.pending_trades:
                 self.pending_trades[key] = []
             self.pending_trades[key].append(xtrade)
         elif xtrade.status in Alive_Trade_Status:
