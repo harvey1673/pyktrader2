@@ -170,6 +170,9 @@ class FullTradeBook(object):
         self.asks = TradeTree()
         self.eventEngine = ee
         self.instrument = inst_obj
+    
+    def get_all_trade(self):
+        return self.bids.trade_map.keys() + self.asks.trade_map.keys()
         
     def remove_trade(self, xtrade):
         if xtrade.vol > 0:
@@ -179,15 +182,14 @@ class FullTradeBook(object):
 
     def add_trade(self, xtrade):
         direction = 'bid' if xtrade.vol > 0 else 'ask'
-        if xtrade.status != TradeStatus.Pending:
-            if direction == 'bid':
-                while self.asks and (xtrade.limit_price >= self.asks.min_price()) and (abs(xtrade.remaining_vol)!= 0):
-                    best_price_asks = self.asks.min_price_list()
-                    self.process_trade_list('ask', best_price_asks, xtrade)
-            elif direction == 'ask':
-                while self.bids and (xtrade.limit_price <= self.bids.max_price()) and (abs(xtrade.filled_vol - xtrade.vol)!= 0):
-                    best_price_bids = self.bids.max_price_list()
-                    self.process_trade_list('bid', best_price_bids, xtrade)
+        if direction == 'bid':
+            while self.asks and (xtrade.limit_price >= self.asks.min_price()) and (abs(xtrade.remaining_vol)!= 0):
+                best_price_asks = self.asks.min_price_list()
+                self.process_trade_list('ask', best_price_asks, xtrade)
+        elif direction == 'ask':
+            while self.bids and (xtrade.limit_price <= self.bids.max_price()) and (abs(xtrade.filled_vol - xtrade.vol)!= 0):
+                best_price_bids = self.bids.max_price_list()
+                self.process_trade_list('bid', best_price_bids, xtrade)
         if xtrade.status == TradeStatus.Done:
             event = Event(type=EVENT_XTRADESTATUS)
             event.dict['trade_ref'] = xtrade.id
@@ -205,31 +207,33 @@ class FullTradeBook(object):
         while (curr_item != None) and (abs(xtrade.remaining_vol) > 0):
             next_item = curr_item.next_item
             curr_xtrade = curr_item.data
-            if curr_xtrade.status != TradeStatus.Pending:
-                traded_price = self.instrument.mid_price
-                diff = abs(xtrade.remaining_vol) - abs(curr_xtrade.remaining_vol)
-                if abs(xtrade.remaining_vol) - abs(curr_xtrade.remaining_vol) <= 0: 
-                    curr_xtrade.on_trade(traded_price, -xtrade.remaining_vol)
-                    xtrade.on_trade(traded_price, xtrade.remaining_vol)
-                else:
-                    curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
-                    xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)                                   
-                    if curr_xtrade.status == TradeStatus.Done:
-                        event = Event(type=EVENT_XTRADESTATUS)
-                        event.dict['trade_ref'] = xtrade.id
-                        self.eventEngine.put(event)                    
-                        if side == 'bid':
-                            self.bids.remove_trade(curr_xtrade)
-                        else:
-                            self.asks.remove_trade(curr_xtrade)                            
+            traded_price = self.instrument.mid_price
+            diff = abs(xtrade.remaining_vol) - abs(curr_xtrade.remaining_vol)
+            if abs(xtrade.remaining_vol) - abs(curr_xtrade.remaining_vol) <= 0: 
+                curr_xtrade.on_trade(traded_price, -xtrade.remaining_vol)
+                xtrade.on_trade(traded_price, xtrade.remaining_vol)
+            else:
+                curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
+                xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)                                   
+                if curr_xtrade.status == TradeStatus.Done:
+                    event = Event(type=EVENT_XTRADESTATUS)
+                    event.dict['trade_ref'] = xtrade.id
+                    self.eventEngine.put(event)                    
+                    if side == 'bid':
+                        self.bids.remove_trade(curr_xtrade)
+                    else:
+                        self.asks.remove_trade(curr_xtrade)                            
             curr_item = next_item
 
 class SimpleTradeBook(object):
-    def __init__(self, ee, inst_obj):
+    def __init__(self, ee, inst_obj, matching_tick = 3):
         self.bids = []
         self.asks = []        
         self.eventEngine = ee
         self.instrument = inst_obj
+    
+    def get_all_trades(self):
+        return [xtrade.id for xtrade in self.bids + self.asks]
         
     def remove_trade(self, xtrade):
         if xtrade.vol > 0:
@@ -243,24 +247,46 @@ class SimpleTradeBook(object):
         else:
             self.asks.append(xtrade)
     
-    def process_trade_list(self, side, trade_list, xtrade):
+    def match_trades(self):
+        nbid = len(self.bids)
+        nask = len(self.asks)
+        n = 0
+        m = 0
+        while (n < nbid) and (m < nask):
+            bid_trade = self.bids[n]
+            ask_trade = self.asks[m]
+            if bid_trade.remaining_vol == 0:
+                n += 1
+            elif ask_trade.remaining_vol == 0:
+                m += 1
+            else:
+                if abs(bid_trade.remaining_vol) <= abs(ask_xtrade.remaining_vol): 
+                    ask_trade.on_trade(traded_price, -bid_trade.remaining_vol)
+                    bid_trade.on_trade(traded_price, bid_trade.remaining_vol)
+                    n += 1
+                else:
+                    ask_trade.on_trade(traded_price, ask_trade.remaining_vol)
+                    bid_trade.on_trade(traded_price, -ask_xtrade.remaining_vol)
+                    m += 1        
+        
+    def process_trade_list(self, trade_list, xtrade):
         for curr_xtrade in trade_list:
             if xtrade.remaining_vol == 0:
                 break
-            if curr_xtrade.status != TradeStatus.Pending:
-                traded_price = self.instrument.mid_price
-                if abs(xtrade.remaining_vol) <= abs(curr_xtrade.remaining_vol): 
-                    curr_xtrade.on_trade(traded_price, -xtrade.remaining_vol)
-                    xtrade.on_trade(traded_price, xtrade.remaining_vol)
-                else:
-                    curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
-                    xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)
+            traded_price = self.instrument.mid_price
+            if abs(xtrade.remaining_vol) <= abs(curr_xtrade.remaining_vol): 
+                curr_xtrade.on_trade(traded_price, -xtrade.remaining_vol)
+                xtrade.on_trade(traded_price, xtrade.remaining_vol)
+            else:
+                curr_xtrade.on_trade(traded_price, curr_xtrade.remaining_vol)
+                xtrade.on_trade(traded_price, -curr_xtrade.remaining_vol)
         
             
 class TradeManager(object):
     def __init__(self, agent):
         self.agent = agent        
         self.tradebooks = {}
+        self.pending_trades = {}
         self.ref2trade = {}
 
     def initialize(self):
@@ -299,7 +325,12 @@ class TradeManager(object):
     def add_trade(self, xtrade):
         if xtrade.id not in self.ref2trade:
             self.ref2trade[xtrade.id] = xtrade
-        if xtrade.status in Alive_Trade_Status:
+        key = xtrade.underlying.name
+        if xtrade.status == TradeStatus.Pending:
+            if key not in self.pending_trades
+                self.pending_trades[key] = []
+            self.pending_trades[key].append(xtrade)
+        elif xtrade.status in Alive_Trade_Status:
             key = xtrade.underlying.name
             if key in self.agent.instruments:
                 inst_obj = self.agent.instruments[key]
@@ -311,10 +342,24 @@ class TradeManager(object):
 
     def remove_trade(self, xtrade):
         key = xtrade.name
-        self.tradebooks[key].remove_trade(xtrade)
+        if xtrade.status == TradeStatus.Pending:
+            self.pending_trades[key].remove(xtrade, None)
+        elif xtrade.status in Alive_Trade_Status:
+            self.tradebooks[key].remove_trade(xtrade)
 
-    def process_(self):
-        pass
+    def process_trades(self, key):
+        alive_trades = []
+        for xtrade in self.pending_trades[key]:
+            curr_price = xtrade.underlying.ask_price1 if xtrade.vol > 0 else xtrade.underlying.ask_price1 
+            if (curr_price - xtrade.limit_price) * xtrade.vol >= 0:
+                xtrade.status = TradeStatus.Ready
+                alive_trades.append(xtrade)
+        self.pending_trades = [xtrade for xtrade in self.pending_trades[key] if xtrade.Status == TradeStatus.Pending]
+        [self.add_trade(xtrade) for xtrade in alive_trades]
+        self.tradebooks[key].match_trades()
+        for trade_id in self.tradebooks[key].get_all_trade():
+            xtrade = self.ref2trade[trade_id]
+            xtrade.exec_algo.process()            
 
     def save_trade_list(self, curr_date, trade_list, file_prefix):
         filename = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
