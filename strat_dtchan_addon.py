@@ -7,7 +7,8 @@ from strategy import *
  
 class DTSplitChanAddon(Strategy):
     common_params =  dict({'open_period': [300, 1500, 2100], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'price_limit_buffer': 5}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, 'vol_ratio': [1.0, 1.0], 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, \
+                         'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -18,6 +19,7 @@ class DTSplitChanAddon(Strategy):
         self.ma_level = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
         self.open_idx = [0] * numAssets
+        self.max_pos = [1] * numAssets
         self.daily_close_buffer = 3
         self.num_tick = 1
 
@@ -50,6 +52,7 @@ class DTSplitChanAddon(Strategy):
         self.load_state()
         for idx, underlier in enumerate(self.underliers):
             inst = underlier[0]
+            self.max_pos[idx] = sum(v > 0.0 for v in self.vol_ratio[idx])
             self.tick_base[idx] = self.agent.instruments[inst].tick_base
             min_id = self.agent.instruments[inst].last_tick_id/1000
             min_id = int(min_id/100)*60 + min_id % 100 - self.daily_close_buffer
@@ -128,8 +131,17 @@ class DTSplitChanAddon(Strategy):
         if (self.freq[idx]>0) and (freq == self.freq[idx]):
             inst = self.underliers[idx][0]
             min_data = self.agent.min_data[inst][freq].data
-            buy_p = min_data['high'][-1]
-            sell_p = min_data['low'][-1]
+            if self.price_mode[idx] == 'HL':
+                buy_p = min_data['high'][-1]
+                sell_p = min_data['low'][-1]
+            elif self.price_mode[idx] == 'C':
+                buy_p = min_data['close'][-1]
+                sell_p = buy_p
+            elif self.price_mode[idx] == 'TP':
+                buy_p = (min_data['high'][-1] + min_data['low'][-1] + min_data['close'][-1])/3.0
+                sell_p = buy_p
+            else:
+                self.logger.warning('Unsupported price type for strat=%s inst=%s' % (self.name, inst))
             save_status = self.check_trigger(idx, buy_p, sell_p)
             return save_status
 
@@ -145,12 +157,11 @@ class DTSplitChanAddon(Strategy):
         if (self.tday_open[idx] <= 0.0) or (self.cur_rng[idx] <= 0) or (self.curr_prices[idx] <= 0.001):
             self.logger.warning("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name))
             return save_status
-        min_id = int(self.agent.tick_id/1000.0)
-        max_pos = sum(v > 0.0 for v in self.vol_ratio[idx])
+        min_id = int(self.agent.instruments[inst].last_update/1000.0)
         num_pos = len(self.positions[idx])
         buysell = 0
-        if num_pos > max_pos:
-            self.logger.warning('something wrong - number of tradepos is more than 2')
+        if num_pos > self.max_pos[idx]:
+            self.logger.warning('something wrong - number of tradepos is more than max_pos=%s' % self.max_pos[idx])
             return save_status
         elif num_pos >= 1:
             buysell = self.positions[idx][0].direction
@@ -199,7 +210,7 @@ class DTSplitChanAddon(Strategy):
             self.status_notifier(msg)
             save_status = True
             num_pos = 1
-        if (num_pos < max_pos) and (self.vol_ratio[idx][1]>0) and (((buysell > 0) and (buy_price >= self.chan_high[idx])) or ((buysell < 0) and (sell_price <= self.chan_low[idx]))):
+        if (num_pos < self.max_pos[idx]) and (self.vol_ratio[idx][1]>0) and (((buysell > 0) and (buy_price >= self.chan_high[idx])) or ((buysell < 0) and (sell_price <= self.chan_low[idx]))):
             addon_vol = int(self.vol_ratio[idx][1]*self.trade_unit[idx])
             msg = 'DT to add position for inst = %s, high=%s, low=%s, buy= %s, sell= %s, direction=%s, volume=%s' \
                                     % (inst, self.chan_high[idx], self.chan_low[idx], buy_price, sell_price, buysell, addon_vol)

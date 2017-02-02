@@ -383,11 +383,10 @@ class Agent(MktDataMixin):
         if strat.name not in self.strat_list:
             self.strat_list.append(strat.name)
             self.strategies[strat.name] = strat
-            strat.agent = self
-        for instID in strat.dep_instIDs():
-            self.add_instrument(instID)
-            self.inst2strat[instID][strat.name] = []
-        strat.reset()
+            for instID in strat.dep_instIDs():
+                self.add_instrument(instID)
+                self.inst2strat[instID][strat.name] = []
+            strat.set_agent(self)
 
     def add_gateway(self, gateway, gateway_name=None):
         """创建接口"""
@@ -550,7 +549,7 @@ class Agent(MktDataMixin):
         for strat_name in self.strat_list:
             strat = self.strategies[strat_name]
             strat.initialize()
-            strat_trades = self.trade_manager.get_trade_by_strat(strat.name)
+            strat_trades = self.trade_manager.get_trades_by_strat(strat.name)
             for etrade in strat_trades:
                 if etrade.status != trade.TradeStatus.StratConfirm:
                     strat.add_live_trades(etrade)
@@ -669,7 +668,7 @@ class Agent(MktDataMixin):
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
         mytrade = self.trade_manager.get_trade(trade_ref)
-        pending_orders = mytrade.update()
+        pending_orders = mytrade.refresh_status()
         if (mytrade.status == trade.TradeStatus.Done) or (mytrade.status == trade.TradeStatus.Cancelled):
             strat = self.strategies[mytrade.strategy]
             strat.on_trade(mytrade)
