@@ -295,6 +295,52 @@ class Gateway(object):
                         file_writer.writerow(['pos', inst, pos.curr_pos.long, pos.curr_pos.short])
             return True
 
+    def book_single_order(self, instID, volume, price_type, limit_price, trade_ref = 0):
+        direction = ORDER_BUY if volume > 0 else ORDER_SELL
+        vol = abs(volume)
+        pos = self.positions[instID]
+        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
+        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
+        if can_close >= vol:
+            action_type = OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE
+        elif can_yclose >= vol:
+            action_type = OF_CLOSE_YDAY
+        else:
+            action_type = OF_OPEN
+        new_order = order.Order(instID, limit_price, vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
+        self.add_order(new_order)
+        return new_order
+
+    def book_multi_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
+        direction = ORDER_BUY if volume > 0 else ORDER_SELL
+        vol = abs(volume)
+        pos = self.positions[instID]
+        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
+        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
+        all_orders = []
+        if can_close > 0 and vol > 0:
+            action_type = OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE
+            trade_vol = min(can_close, vol)
+            norder = order.Order(instID, limit_price, trade_vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
+            all_orders.append(norder)
+            vol -= trade_vol
+        if can_yclose > 0 and vol > 0:
+            action_type = OF_CLOSE_YDAY
+            trade_vol = min(can_yclose, vol)
+            norder = order.Order(instID, limit_price, trade_vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
+            all_orders.append(norder)
+            vol -= trade_vol
+        if vol > 0:
+            norder = order.Order(instID, limit_price, vol, self.agent.tick_id, OF_OPEN, direction, price_type, trade_ref=trade_ref)
+            all_orders.append(norder)
+        self.add_orders(all_orders)
+        return all_orders
+
+    def book_spd_order(self, spd_inst, volume, price_type, limit_price, trade_ref = 0):
+        spd_name = spd_inst[0]
+        instIDs = spd_inst[1]
+        pass
+
     def calc_margin(self):
         locked_margin = 0
         used_margin = 0

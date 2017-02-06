@@ -6,9 +6,11 @@ import copy
 from strategy import *
  
 class DTSplitChanAddon(Strategy):
-    common_params =  dict({'open_period': [300, 1500, 2100], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'price_limit_buffer': 5}, **Strategy.common_params)
+    common_params =  dict({'open_period': [300, 2115], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], \
+                           'num_tick': 1, 'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
+                          **Strategy.common_params)
     asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, \
-                         'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004, 'daily_close': False, }, **Strategy.asset_params)
+                         'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004, 'daily_close': False}, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -20,8 +22,6 @@ class DTSplitChanAddon(Strategy):
         self.tick_base = [0.0] * numAssets
         self.open_idx = [0] * numAssets
         self.max_pos = [1] * numAssets
-        self.daily_close_buffer = 3
-        self.num_tick = 1
 
     def register_func_freq(self):
         for under, chan, machan in zip(self.underliers, self.channels, self.ma_chan):

@@ -14,6 +14,7 @@ class ETradeStatus:
 
 class TradeStatus:
     Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(8)
+# Pending: trigger trade, Ready: ok to start process with zero vol, OrderSent: wait for order update
 
 Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled]
 
