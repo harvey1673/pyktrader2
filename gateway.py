@@ -307,10 +307,6 @@ class Gateway(object):
         return new_orders
 
     def calc_margin(self):
-        locked_margin = 0
-        used_margin = 0
-        yday_pnl = 0
-        tday_pnl = 0
         for instID in self.positions:
             inst = self.agent.instruments[instID]
             pos = self.positions[instID]
@@ -379,7 +375,7 @@ class Gateway(object):
 
 class GrossGateway(Gateway):
     def __init__(self, agent, gatewayName = 'Gateway'):
-        super(GrossGateway, self).__init(agent, gatewayName)
+        super(GrossGateway, self).__init__(agent, gatewayName)
     
     def get_order_offset(self, instID, volume, order_num = 1):
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
@@ -388,7 +384,7 @@ class GrossGateway(Gateway):
         can_close = pos.can_close.long if volume > 0 else pos.can_close.short
         can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
         n_orders = order_num        
-        results = []
+        res = []
         if can_close > 0 and vol > 0:
             if (n_orders > 1) or (can_close >= vol):
                 trade_vol = min(vol, can_close)

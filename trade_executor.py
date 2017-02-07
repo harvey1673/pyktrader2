@@ -39,5 +39,6 @@ class ExecAlgoFixTimer(ExecAlgoBase):
             pass
         if self.xtrade.status in [trade.TradeStatus.PFilled, trade.TradeStatus.Ready]:
             next_vol = min(self.max_vol, self.remaining_vol)
+            self.agent.gateway_map()
 
 

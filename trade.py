@@ -38,7 +38,8 @@ class XTrade(object):
         self.status = TradeStatus.Pending
         self.order_dict = {}
         self.order_vol = []
-        self.remaining_vol = self.vol - self.filled_vol
+        self.working_vol = 0
+        self.remaining_vol = self.vol - self.filled_vol - self.working_vol
         self.aggressive_level = aggressiveness
         self.start_time = start_time
         self.end_time = end_time
@@ -66,14 +67,23 @@ class XTrade(object):
             self.status = TradeStatus.Done
             self.order_dict = {}
             self.working_vol = 0
-        elif (self.filled_vol > 0) and len(self.order_dict) == 0:
-            self.status = TradeStatus.PFilled
+        elif len(self.order_dict) == 0:
+            self.status = TradeStatus.Ready
             self.order_vol = []
+            self.working_vol = 0
         elif len(self.order_dict) > 0:
-            self.order_vol = [sum([self.agent.ref2order[oref].filled_volume for oref in self.order_dict[instID]]) \
+            self.order_vol = [sum([o.filled_volume for o in self.order_dict[instID]]) \
                                     if instID in self.order_dict else 0 for instID in self.instIDs]
-            remain_vol = sum([self.working_vol * abs(u) - v for u, v in zip(self.units, self.order_vol)])
-            if remain_vol > 0:
+            remain_vol = [self.working_vol * abs(u) - v for u, v in zip(self.units, self.order_vol)]
+            if sum(remain_vol) == 0:
+                new_vol = self.filled_vol + self.working_vol
+                weighted_price = [sum([o.filled_price * o.filled_volume  for o in self.order_dict[instID]]) \
+                     if instID in self.order_dict else 0 for instID in self.instIDs]
+                self.filled_price = self.filled_price * self.filled_vol + weighted_price
+                self.order_dict = {}
+                self.working_vol = 0
+                self.status = TradeStatus.PFilled
+            elif (0 in remain_vol):
                 self.status = TradeStatus.OrderSent
         else:
             self.status = TradeStatus.Pending
