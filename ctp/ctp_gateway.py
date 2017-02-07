@@ -60,7 +60,7 @@ TERT_RESTART = 0 #从本交易日开始重传
 TERT_RESUME = 1 #从上次收到的续传
 TERT_QUICK = 2 #只传送登录后的流内容
 
-class CtpGateway(Gateway):
+class CtpGateway(GrossGateway):
     """CTP接口"""
 
     #----------------------------------------------------------------------
