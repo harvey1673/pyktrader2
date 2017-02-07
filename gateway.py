@@ -294,52 +294,17 @@ class Gateway(object):
                     if abs(pos.curr_pos.long) + abs(pos.curr_pos.short) > 0:
                         file_writer.writerow(['pos', inst, pos.curr_pos.long, pos.curr_pos.short])
             return True
-
-    def book_single_order(self, instID, volume, price_type, limit_price, trade_ref = 0):
+    
+    def get_order_offset(self, instID, volume, order_num = 1):
+        return [(OF_OPEN, volume)]            
+        
+    def book_order(self, instID, volume, price_type, limit_price, trade_ref = 0, order_num = 1):        
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
-        vol = abs(volume)
-        pos = self.positions[instID]
-        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
-        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
-        if can_close >= vol:
-            action_type = OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE
-        elif can_yclose >= vol:
-            action_type = OF_CLOSE_YDAY
-        else:
-            action_type = OF_OPEN
-        new_order = order.Order(instID, limit_price, vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
-        self.add_order(new_order)
-        return new_order
-
-    def book_multi_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
-        direction = ORDER_BUY if volume > 0 else ORDER_SELL
-        vol = abs(volume)
-        pos = self.positions[instID]
-        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
-        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
-        all_orders = []
-        if can_close > 0 and vol > 0:
-            action_type = OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE
-            trade_vol = min(can_close, vol)
-            norder = order.Order(instID, limit_price, trade_vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
-            all_orders.append(norder)
-            vol -= trade_vol
-        if can_yclose > 0 and vol > 0:
-            action_type = OF_CLOSE_YDAY
-            trade_vol = min(can_yclose, vol)
-            norder = order.Order(instID, limit_price, trade_vol, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref)
-            all_orders.append(norder)
-            vol -= trade_vol
-        if vol > 0:
-            norder = order.Order(instID, limit_price, vol, self.agent.tick_id, OF_OPEN, direction, price_type, trade_ref=trade_ref)
-            all_orders.append(norder)
-        self.add_orders(all_orders)
-        return all_orders
-
-    def book_spd_order(self, spd_inst, volume, price_type, limit_price, trade_ref = 0):
-        spd_name = spd_inst[0]
-        instIDs = spd_inst[1]
-        pass
+        order_offsets = self.get_order_offset(instID, volume, order_num)
+        new_orders = [order.Order(instID, limit_price, v, self.agent.tick_id, action_type, direction, \ 
+                      price_type, trade_ref = trade_ref) for (action_type, v) in order_offsets]
+        self.add_orders(new_orders)
+        return new_orders
 
     def calc_margin(self):
         locked_margin = 0
@@ -411,6 +376,45 @@ class Gateway(object):
     def register_event_handler(self):
         pass
 
+
+class GrossGateway(Gateway):
+    def __init__(self, agent, gatewayName = 'Gateway'):
+        super(GrossGateway, self).__init(agent, gatewayName)
+    
+    def get_order_offset(self, instID, volume, order_num = 1):
+        direction = ORDER_BUY if volume > 0 else ORDER_SELL
+        vol = abs(volume)
+        pos = self.positions[instID]
+        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
+        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
+        n_orders = order_num        
+        results = []
+        if can_close > 0 and vol > 0:
+            if (n_orders > 1) or (can_close >= vol):
+                trade_vol = min(vol, can_close)
+                res.append((OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE, trade_vol))
+                vol -= trade_vol
+                n_orders -= 1
+        if can_yclose > 0 and vol > 0:
+            if (n_orders > 1) or (can_yclose >= vol):
+                trade_vol = min(vol, can_yclose)
+                res.append((OF_CLOSE_YDAY, trade_vol))
+                vol -= trade_vol
+                n_orders -= 1
+        if vol > 0:
+            res.append((OF_OPEN, vol))
+        return res    
+
+    def book_spd_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
+        direction = ORDER_BUY if volume > 0 else ORDER_SELL
+        vol = abs(volume)
+        instIDs, units = spreadinst2underlying(instID)
+        res = [self.get_order_offset(inst, u * volume, 1) for inst, u in zip(instIDs, units)]
+        action_type = ''.join([offset[0][0] for offset in res])
+        new_order = order.SpreadOrder(instID, limit_price, vol, self.agent.tick_id, action_type, direction, price_type, trade_ref)
+        self.add_order(new_order)
+        return [new_order]
+        
 ########################################################################
 class VtBaseData(object):
     """回调函数推送数据的基础类，其他数据类继承于此"""
