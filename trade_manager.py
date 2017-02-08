@@ -226,7 +226,7 @@ class FullTradeBook(object):
             curr_item = next_item
 
 class SimpleTradeBook(object):
-    def __init__(self, ee, inst_obj, matching_tick = 3):
+    def __init__(self, ee, inst_obj):
         self.bids = []
         self.asks = []        
         self.eventEngine = ee
@@ -240,7 +240,11 @@ class SimpleTradeBook(object):
             self.bids = [ x for x in self.bids if x.id != xtrade.id ]
         else:
             self.asks = [ x for x in self.asks if x.id != xtrade.id ]
-    
+
+    def filter_alive_trades(self):
+        self.bids = [ xtrade for xtrade in self.bids if xtrade.status in Alive_Trade_Status]
+        self.asks = [xtrade for xtrade in self.asks if xtrade.status in Alive_Trade_Status]
+
     def add_trade(self, xtrade):
         if xtrade.vol > 0:
             self.bids.append(xtrade)
@@ -284,7 +288,7 @@ class TradeManager(object):
             orderdict = xtrade.order_dict
             for inst in orderdict:
                 xtrade.order_dict[inst] = [ self.agent.ref2order[order_ref] for order_ref in orderdict[inst] ]
-            xtrade.refresh_status()
+            xtrade.refresh()
             self.add_trade(xtrade)
 
     def get_trade(self, trade_id):
@@ -297,7 +301,7 @@ class TradeManager(object):
         pfilled_dict = {}
         for trade_id in self.ref2trade:
             xtrade = self.ref2trade[trade_id]
-            xtrade.refresh_status()
+            xtrade.refresh()
             if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent]:
                 xtrade.status = TradeStatus.Cancelled
                 xtrade.order_dict = {}
@@ -349,7 +353,8 @@ class TradeManager(object):
         self.tradebooks[key].match_trades()
         for trade_id in self.tradebooks[key].get_all_trade():
             xtrade = self.ref2trade[trade_id]
-            xtrade.exec_algo.process()            
+            xtrade.execute()
+        self.tradebooks[key].filter_alive_trades()
 
     def save_trade_list(self, curr_date, trade_list, file_prefix):
         filename = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
@@ -404,6 +409,6 @@ class TradeManager(object):
                     xtrade.order_dict = order_dict
                     xtrade.filled_vol = filled_vol
                     xtrade.filled_price = filled_price
-                    xtrade.refresh_status()
+                    xtrade.refresh()
                     trade_dict[xtrade.id] = xtrade
         return trade_dict

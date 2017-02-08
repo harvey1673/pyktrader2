@@ -668,16 +668,10 @@ class Agent(MktDataMixin):
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
         mytrade = self.trade_manager.get_trade(trade_ref)
-        pending_orders = mytrade.refresh_status()
-        if (mytrade.status == trade.TradeStatus.Done) or (mytrade.status == trade.TradeStatus.Cancelled):
-            strat = self.strategies[mytrade.strategy]
-            strat.on_trade(mytrade)
-            self.save_state()
-        else:
-            if len(pending_orders) > 0:
-                for order_ref in pending_orders:
-                    self.send_order(self.ref2order[order_ref])
-                self.save_state()
+        status = mytrade.refresh()
+        if status not in [trade.TradeStatus.Done, trade.TradeStatus.Cancelled]:
+            mytrade.execute()
+        self.save_state()
             
     def exit(self):
         """退出"""

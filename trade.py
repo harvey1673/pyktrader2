@@ -65,7 +65,7 @@ class XTrade(object):
         else:
             return self.underlying.price(prices=filled_prices)
 
-    def update_status(self):
+    def refresh(self):
         if len(self.order_dict) == 0:
             return self.status
         fill_status = []
@@ -85,12 +85,11 @@ class XTrade(object):
             self.status = TradeStatus.OrderSent
         elif OrderFillStatus.Empty not in fill_status:
             working_price = self.calc_filled_price(self.order_dict)
-            new_vol = self.filled_vol + self.working_vol
-            self.filled_price = (self.filled_price * self.filled_vol + working_price * self.working_vol)/new_vol
-            self.filled_vol = new_vol
+            working_vol = self.working_vol
             self.working_vol = 0
             self.order_dict = {}
-            fill_status = []
+            self.fill_status = []
+            self.on_trade(working_price, working_vol)
             self.status = TradeStatus.Ready
         else:
             self.status = TradeStatus.PFilled
@@ -99,8 +98,30 @@ class XTrade(object):
             self.status = TradeStatus.Done
             self.order_dict = {}
             self.order_status = []
-            self.working_vol = 0            
+            self.working_vol = 0
+            self.remaining_vol = 0
+            self.update_strat()
         return self.status
+
+    def on_trade(self, price, volume):
+        new_vol = self.filled_vol + volume
+        self.filled_price = (self.filled_prie * self.filled_vol + price * volume)/new_vol
+        self.filled_vol = new_vol
+        self.remaining_vol = self.vol - self.working_vol - self.filled_vol
+        if self.filled_vol == self.vol:
+            self.status = TradeStatus.Done
+            self.update_strat()
+
+    def cancel(self):
+        self.status = TradeStatus.Cancelled
+        self.remaining_vol = 0
+        self.working_vol = 0
+        self.order_dict = {}
+        self.update_strat()
+
+    def update_strat(self):
+        strat = self.agent.strategies[self.strategy]
+        strat.on_trade(self)
 
     def execute(self):
         self.exec_algo.process()
