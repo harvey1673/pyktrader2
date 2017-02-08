@@ -14,6 +14,9 @@ class ETradeStatus:
 
 class TradeStatus:
     Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(8)
+
+class OrderFillStatus:
+    Empty, Partial, Full = range(3)
 # Pending: trigger trade, Ready: ok to start process with zero vol, OrderSent: wait for order update
 
 Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled]
@@ -37,7 +40,7 @@ class XTrade(object):
         self.agent = agent
         self.status = TradeStatus.Pending
         self.order_dict = {}
-        self.order_vol = []
+        self.order_status = []
         self.working_vol = 0
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol
         self.aggressive_level = aggressiveness
@@ -54,41 +57,50 @@ class XTrade(object):
     def set_exec_algo(self, exec_algo):
         self.exec_algo = exec_algo
 
-    def final_price(self):
+    def calc_filled_price(self, order_dict):
+        filled_prices = [sum([o.filled_price * o.filled_volume for o in order_dict[instID]])/sum([o.filled_volume \
+                                    for o in order_dict[instID]]) for instID in self.instIDs]
         if len(self.instIDs) == 1:
             return self.filled_price[0]
         else:
-            return self.underlying.price(prices=self.filled_price)
+            return self.underlying.price(prices=filled_prices)
 
-    def refresh_status(self):
-        if self.status in [TradeStatus.StratConfirm, TradeStatus.Done, TradeStatus.Cancelled]:
-            return
+    def update_status(self):
+        if len(self.order_dict) == 0:
+            return self.status
+        fill_status = []
+        for instID, unit in zip(self.instIDs, self.units):                
+            if instID in self.order_dict:
+                fill_vol = sum([o.filled_volume for o in self.order_dict[instID]])
+            else:
+                fill_vol = 0
+            if fill_vol == abs(unit * self.working_vol):
+                curr_status = OrderFillStatus.Full
+            elif fill_vol == 0:
+                curr_status = OrderFillStatus.Empty
+            else:
+                curr_status = OrderFillStatus.Partial
+            fill_status.append(curr_status)            
+        if (OrderFillStatus.Partial in fill_status) or (OrderFillStatus.Full not in fill_status):
+            self.status = TradeStatus.OrderSent
+        elif OrderFillStatus.Empty not in fill_status:
+            working_price = self.calc_filled_price(self.order_dict)
+            new_vol = self.filled_vol + self.working_vol
+            self.filled_price = (self.filled_price * self.filled_vol + working_price * self.working_vol)/new_vol
+            self.filled_vol = new_vol
+            self.working_vol = 0
+            self.order_dict = {}
+            fill_status = []
+            self.status = TradeStatus.Ready
+        else:
+            self.status = TradeStatus.PFilled
+        self.order_status = fill_status
         if self.filled_vol == self.vol:
             self.status = TradeStatus.Done
             self.order_dict = {}
-            self.working_vol = 0
-        elif len(self.order_dict) == 0:
-            self.status = TradeStatus.Ready
-            self.order_vol = []
-            self.working_vol = 0
-        elif len(self.order_dict) > 0:
-            self.order_vol = [sum([o.filled_volume for o in self.order_dict[instID]]) \
-                                    if instID in self.order_dict else 0 for instID in self.instIDs]
-            remain_vol = [self.working_vol * abs(u) - v for u, v in zip(self.units, self.order_vol)]
-            if sum(remain_vol) == 0:
-                new_vol = self.filled_vol + self.working_vol
-                weighted_price = [sum([o.filled_price * o.filled_volume  for o in self.order_dict[instID]]) \
-                     if instID in self.order_dict else 0 for instID in self.instIDs]
-                self.filled_price = self.filled_price * self.filled_vol + weighted_price
-                self.order_dict = {}
-                self.working_vol = 0
-                self.status = TradeStatus.PFilled
-            elif (0 in remain_vol):
-                self.status = TradeStatus.OrderSent
-        else:
-            self.status = TradeStatus.Pending
-            self.order_vol = []
-            self.working_vol = 0
+            self.order_status = []
+            self.working_vol = 0            
+        return self.status
 
     def execute(self):
         self.exec_algo.process()
