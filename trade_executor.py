@@ -59,4 +59,5 @@ class ExecAlgoFixTimer(ExecAlgoBase):
                 limit_price = self.xtrade.underlying.ask_price1 if unfilled > 0 else self.xtrade.underlying.bid_price1
                 new_orders = gway.book_order(self.instIDs[0], unfilled, self.price_type, limit_price, trade_ref = self.xtrade.id, order_num = self.order_num)
                 self.xtrade.order_dict[self.instIDs[0]] += new_orders
+                self.next_timer += self.timer_period
          return
