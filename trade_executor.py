@@ -61,6 +61,7 @@ class ExecAlgoFixTimer(ExecAlgoBase):
             gway = self.agent.gateway_map(self.instIDs[0])
             new_orders = gway.book_order(self.instIDs[0], trade_vol, self.price_type, limit_price, trade_ref = self.xtrade.id, order_num = self.order_num)
             self.xtrade.order_dict[self.instIDs[0]] += new_orders
+            self.xtrade.status = trade.TradeStatus.OrderSent
             self.next_timer += self.timer_period
         elif cancel_flag and (self.xtrade.status != trade.TradeStatus.OrderSent):
             self.xtrade.cancel()

@@ -658,6 +658,11 @@ class Agent(MktDataMixin):
         if not self.update_instrument(tick):
             return
         self.update_min_bar(tick)
+        inst = tick.instID
+        for key in self.inst2spread[inst]:
+            self.trade_manager.check_pending_trades(key)
+        self.trade_manager.check_pending_trades(inst)
+        self.trade_manager.process_trades()
 
     def run_min(self, inst, bar_id):
         for strat_name in self.inst2strat[inst]:
