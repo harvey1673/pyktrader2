@@ -29,6 +29,7 @@ class Gateway(object):
         self.positions = {}
         self.instruments = []      # 已订阅合约代码
         self.working_orders = []
+        self.prcess_flag = False
         self.eod_flag = False
         self.eod_report = True
         self.account_info = {'available': 0,
@@ -244,7 +245,14 @@ class Gateway(object):
         self.id2order[order.local_id] = iorder
         if (iorder.status in order.Alive_Order_Status) and (iorder.local_id not in self.working_orders):
             self.working_orders.append(iorder.local_id)
+            self.process_flag = True
 
+    def send_queued_orders(self):
+        for iorder in self.working_orders:
+            if iorder.status == order.OrderStatus.Ready:
+                self.sendOrder(iorder)
+        self.process_flag = False
+        
     def remove_order(self, iorder):
         iorder.remove_pos()
         self.id2order.pop(iorder.local_id, None)        
@@ -696,4 +704,4 @@ class VtCancelOrderReq(object):
         # 以下字段主要和CTP、LTS类接口相关
         self.orderID = EMPTY_STRING             # 报单号
         self.frontID = EMPTY_STRING             # 前置机号
-        self.sessionID = EMPTY_STRING           # 会话号        
+        self.sessionID = EMPTY_STRING           # 会话号
