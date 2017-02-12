@@ -40,13 +40,13 @@ class XTrade(object):
         self.agent = agent
         self.status = TradeStatus.Pending
         self.order_dict = {}
-        self.order_status = []
+        self.order_filled = []
         self.working_vol = 0
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol
         self.aggressive_level = aggressiveness
         self.start_time = start_time
         self.end_time = end_time
-        self.exec_algo = ExecAlgoBase(self, agent)
+        self.algo = None
         if agent != None:
             self.set_agent(agent)
 
@@ -54,8 +54,8 @@ class XTrade(object):
         self.agent = agent
         self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
 
-    def set_exec_algo(self, exec_algo):
-        self.exec_algo = exec_algo
+    def set_algo(self, algo):
+        self.algo = algo
 
     def calc_filled_price(self, order_dict):
         filled_prices = [sum([o.filled_price * o.filled_volume for o in order_dict[instID]])/sum([o.filled_volume \
@@ -66,38 +66,39 @@ class XTrade(object):
             return self.underlying.price(prices=filled_prices)
 
     def refresh(self):
-        if len(self.order_dict) == 0:
-            return self.status
         fill_status = []
-        for instID, unit in zip(self.instIDs, self.units):                
+        filled_vol = []
+        open_vol = 0
+        total_vol = 0
+        for instID, unit in zip(self.instIDs, self.units):
             if instID in self.order_dict:
                 fill_vol = sum([o.filled_volume for o in self.order_dict[instID]])
+                full_vol = sum([o.volume for o in self.order_dict[instID]])
             else:
                 fill_vol = 0
-            if fill_vol == abs(unit * self.working_vol):
-                curr_status = OrderFillStatus.Full
-            elif fill_vol == 0:
-                curr_status = OrderFillStatus.Empty
-            else:
-                curr_status = OrderFillStatus.Partial
-            fill_status.append(curr_status)            
-        if (OrderFillStatus.Partial in fill_status) or (OrderFillStatus.Full not in fill_status):
+                full_vol = 0
+            open_vol += full_vol - fill_vol
+            total_vol += abs(unit * self.working_vol)
+            filled_vol.append(fill_vol)
+        self.order_filled = filled_vol
+        if open_vol > 0:
             self.status = TradeStatus.OrderSent
-        elif OrderFillStatus.Empty not in fill_status:
+        elif sum(fill_vol) >= total_vol:
             working_price = self.calc_filled_price(self.order_dict)
             working_vol = self.working_vol
             self.working_vol = 0
             self.order_dict = {}
-            self.fill_status = []
+            self.order_filled = []
             self.on_trade(working_price, working_vol)
             self.status = TradeStatus.Ready
+        elif self.status == TradeStatus.Cancelled:
+            self.algo.on_partial_cancel()
         else:
             self.status = TradeStatus.PFilled
-        self.order_status = fill_status
-        if self.filled_vol == self.vol:
+        if (self.filled_vol == self.vol) or ((self.status == TradeStatus.Cancelled) and len(self.order_dict)==0):
             self.status = TradeStatus.Done
             self.order_dict = {}
-            self.order_status = []
+            self.order_filled = []
             self.working_vol = 0
             self.remaining_vol = 0
             self.update_strat()
@@ -110,6 +111,7 @@ class XTrade(object):
         self.remaining_vol = self.vol - self.working_vol - self.filled_vol
         if self.filled_vol == self.vol:
             self.status = TradeStatus.Done
+            self.algo = None
             self.update_strat()
 
     def cancel(self):
@@ -117,6 +119,7 @@ class XTrade(object):
         self.remaining_vol = 0
         self.working_vol = 0
         self.order_dict = {}
+        self.order_filled = []
         self.update_strat()
 
     def update_strat(self):
@@ -124,4 +127,5 @@ class XTrade(object):
         strat.on_trade(self)
 
     def execute(self):
-        self.exec_algo.process()
+        if self.algo:
+            self.algo.execute()

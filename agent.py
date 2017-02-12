@@ -3,10 +3,8 @@ import workdays
 import json
 import datetime
 import logging
-import copy
 import bisect
 import mysqlaccess
-import order
 import trade
 import trade_manager
 import os
@@ -666,7 +664,7 @@ class Agent(MktDataMixin):
         self.trade_manager.process_trades()
         gway = self.inst2gateway[inst]
         if gway.process_flag:
-            self.send_queues_orders()
+            gway.send_queued_orders()
 
     def run_min(self, inst, bar_id):
         for strat_name in self.inst2strat[inst]:

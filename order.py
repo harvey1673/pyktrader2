@@ -142,4 +142,3 @@ class SpreadOrder(Order):
             sorder.filled_price = p
             curr_p += p * unit
         self.sub_orders[0].filled_price -= (curr_p - self.filled_price)/self.units[0]
-        
