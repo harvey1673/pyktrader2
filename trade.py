@@ -66,7 +66,6 @@ class XTrade(object):
             return self.underlying.price(prices=filled_prices)
 
     def refresh(self):
-        fill_status = []
         filled_vol = []
         open_vol = 0
         total_vol = 0
