@@ -84,13 +84,7 @@ class XTrade(object):
         if open_vol > 0:
             self.status = TradeStatus.OrderSent
         elif sum(fill_vol) >= total_vol:
-            working_price = self.calc_filled_price(self.order_dict)
-            working_vol = self.working_vol
-            self.working_vol = 0
-            self.order_dict = {}
-            self.order_filled = []
-            self.on_trade(working_price, working_vol)
-            self.status = TradeStatus.Ready
+            self.working_filled()
         elif self.status == TradeStatus.Cancelled:
             self.algo.on_partial_cancel()
         else:
@@ -114,6 +108,15 @@ class XTrade(object):
             self.algo = None
             self.update_strat()
 
+    def working_filled(self):
+        working_price = self.calc_filled_price(self.order_dict)
+        working_vol = self.working_vol
+        self.working_vol = 0
+        self.order_dict = {}
+        self.order_filled = []
+        self.on_trade(working_price, working_vol)
+        self.status = TradeStatus.Ready    
+    
     def cancel(self):
         self.status = TradeStatus.Cancelled
         self.remaining_vol = 0
