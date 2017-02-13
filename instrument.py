@@ -94,6 +94,14 @@ class Instrument(object):
         self.expiry = datetime.date(2050,12,31)
         self.day_finalized = False
     
+    def shift_price(self, direction, tick_num = 0, price_level = '1'):
+        price_str = 'bid_price' + str(price_level) if direction > 0 else 'ask_price' + str(price_level)
+        base_price = getattr(self, price_str)
+        if direction > 0:
+            return min(base_price + tick_num * self.tick_base, self.up_limit)
+        else:
+            return max(base_price - tick_num * self.tick_base, self.down_limit)
+            
     def fair_price(self):
         self.mid_price = (self.ask_price1 + self.bid_price1)/2.0
         return self.mid_price
