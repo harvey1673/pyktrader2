@@ -102,7 +102,7 @@ class XTrade(object):
         self.filled_price = (self.filled_prie * self.filled_vol + price * volume)/new_vol
         self.filled_vol = new_vol
         self.remaining_vol = self.vol - self.working_vol - self.filled_vol
-        if self.filled_vol == self.vol:
+        if (self.filled_vol == self.vol) or (self.status == TradeStatus.Done):
             self.status = TradeStatus.Done
             self.algo = None
             self.update_strat()
@@ -113,8 +113,8 @@ class XTrade(object):
         self.working_vol = 0
         self.order_dict = {}
         self.order_filled = []
-        self.on_trade(working_price, working_vol)
         self.status = TradeStatus.Ready    
+        self.on_trade(working_price, working_vol)        
     
     def cancel(self):
         self.status = TradeStatus.Cancelled
