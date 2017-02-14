@@ -18,8 +18,9 @@ class ExecAlgoBase(object):
         self.stop_price = stop_price
         self.agent = agent
 
-    def unwind(self, pair, strat):
-        strat.unwind(pair)
+    def unwind(self, pair):
+        strat = self.agent.strategies[self.xtrade.strategy]
+        strat.add_unwind(pair, book = self.xtrade.book)
 
     def on_partial_cancel(self):
         pass
@@ -109,15 +110,16 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         leftvol = self.xtrade.order_filled
         if fillvol != 0:
             leftvol = [ (filled - abs(unit * fillvol))*sign(unit*direction) for (filled, unit) in zip(leftvol, self.xtrade.units)]
-            self.working_vol = 0
-            self.order_dict = {}
-            self.order_filled = []
+            self.xtrade.working_vol = 0
+            self.xtrade.order_dict = {}
+            self.xtrade.order_filled = []
+            self.xtrade.status = trade.TradeStatus.Done
             working_price = self.xtrade.underlying.price(prices=price_filled)
-            self.on_trade(working_price, fillvol)
+            self.xtrade.on_trade(working_price, fillvol)            
         for instID, vol in zip(self.xtrade.instIDs, leftvol):
             if vol != 0:
                 pair = (instID, vol)
-                self.unwind(pair, self.agent.strategies[self.xtrade.strategy])
+                self.unwind(pair)
 
 class ExecAlgoSpdOrder(ExecAlgoBase): 
     def __init__(self, xtrade, agent, stop_price = None, max_vol = 20, time_period = 100, price_type = OPT_LIMIT_ORDER, tick_num = 1):
