@@ -116,9 +116,9 @@ class ExecAlgoFixTimer(ExecAlgoBase):
             self.xtrade.status = trade.TradeStatus.Done
             working_price = self.xtrade.underlying.price(prices=price_filled)
             self.xtrade.on_trade(working_price, fillvol)            
-        for instID, vol in zip(self.xtrade.instIDs, leftvol):
+        for instID, vol, p in zip(self.xtrade.instIDs, leftvol, price_filled):
             if vol != 0:
-                pair = (instID, vol)
+                pair = (instID, vol, p)
                 self.unwind(pair)
 
 class ExecAlgoSpdOrder(ExecAlgoBase): 

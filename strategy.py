@@ -84,7 +84,7 @@ class TradePos(object):
         return self
 
     def partial_close(self, price, vol, end_time):
-        if vol != 0
+        if vol != 0:
             close_pos = copy.copy(self)
             close_pos.pos = vol
             close_pos.close(price, end_time)
@@ -93,7 +93,6 @@ class TradePos(object):
             return close_pos
         else:
             return None
-
             
 class ParSARTradePos(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
@@ -187,8 +186,7 @@ class Strategy(object):
         self.instIDs = self.dep_instIDs()
         self.tradables = self.underliers
         self.underlying = [None] * num_assets
-        self.positions  = [[] for _ in self.underliers]
-        self.unwinds = []
+        self.positions  = dict([(idx, []) for idx in range(num_assets)])
         self.submitted_trades = [[] for _ in self.underliers]
         self.agent = agent
         self.folder = ''
@@ -199,6 +197,7 @@ class Strategy(object):
         self.num_exits   = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
         self.run_flag = [1] * num_assets
+        self.unwind_key = (10000, 'unwind')
         self.update_trade_unit()
 
     def save_config(self):
@@ -255,8 +254,14 @@ class Strategy(object):
         self.load_state()
         self.update_trade_unit()
 
-    def add_unwind(self, pair, idx):
-        
+    def add_unwind(self, pair, book = '10000'):
+        instID = pair[0]
+        vol = pair[1]
+        price = pair[2]
+        idx = int(book)
+        multiple = self.agent.instruments[instID].multiple
+        tradepos = eval(self.pos_class)([instID], [1], vol, price, price, multiple, **self.pos_args)
+        tradepos.open(price, vol, datetime.datetime.now())
         pass
         
     def on_trade(self, xtrade):
@@ -273,7 +278,7 @@ class Strategy(object):
             is_entry = False
         else:
             self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (etrade.id, etrade.status, self.name))
-            etrade.status = trade.TradeStatus.StratConfirm
+            xtrade.status = trade.TradeStatus.StratConfirm
             return
         tradepos = self.positions[idx][i]        
         traded_price = xtrade.filled_price
@@ -422,17 +427,21 @@ class Strategy(object):
         self.logger.debug('save state for strat = %s' % self.name)
         with open(filename,'wb') as log_file:
             file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            for tplist in self.positions:
-                for tradepos in tplist:
+            for key in sorted(self.positions.keys()):
+                if key == self.unwind_key[0]:
+                    header = self.unwind_key[1]
+                else:
+                    header = 'tradepos'
+                for tradepos in self.positions[key]:
                     tradedict = tradepos2dict(tradepos)
-                    row = ['tradepos'] + [tradedict[itm] for itm in tradepos_header]
+                    row = [header] + [tradedict[itm] for itm in tradepos_header]
                     file_writer.writerow(row)
             self.save_local_variables(file_writer)
         return
 
     def load_state(self):
         logfile = self.folder + 'strat_status.csv'
-        positions  = [[] for under in self.underliers]
+        positions  = dict([(idx, []) for idx in range(len(self.underliers))])
         if not os.path.isfile(logfile):
             self.positions  = positions
             return
@@ -440,7 +449,7 @@ class Strategy(object):
         with open(logfile, 'rb') as f:
             reader = csv.reader(f)
             for row in reader:
-                if row[0] == 'tradepos':
+                if row[0] in ['tradepos', 'unwind']:
                     insts = row[1].split(' ')
                     vols = [ int(n) for n in row[2].split(' ')]
                     pos = int(row[3])
@@ -455,7 +464,7 @@ class Strategy(object):
                     else:
                         entry_time = datetime.datetime.strptime(row[6], '%Y%m%d %H:%M:%S %f')
                         entry_price = float(row[5])
-                        tradepos.open(entry_price,entry_time)
+                    tradepos.open(entry_price,entry_time)
                     tradepos.entry_tradeid = int(row[8])
                     tradepos.exit_tradeid = int(row[12])
                     if row[10] in ['', '19700101 00:00:00 000000']:
@@ -464,15 +473,20 @@ class Strategy(object):
                     else:
                         exit_time = datetime.datetime.strptime(row[10], '%Y%m%d %H:%M:%S %f')
                         exit_price = float(row[9])
-                        tradepos.close(exit_price, exit_time)
+                    tradepos.close(exit_price, exit_time)
                     is_added = False
-                    for under, tplist in zip(self.underliers, positions):
-                        if set(under) == set(insts):
-                            tplist.append(tradepos)
-                            is_added = True
-                            break
-                    if not is_added:
-                        self.logger.info('underlying = %s is missing in strategy=%s. It is added now' % (insts, self.name))
+                    if row[0] == 'unwind':
+                        idx = self.unwind_key[0]
+                    else:
+                        for i, under in enumerate(self.underliers):
+                            if set(under) == set(insts):
+                                idx = i
+                                is_added = True
+                                break
+                        if not is_added:
+                            self.logger.info('underlying = %s is missing in strategy=%s' % (insts, self.name))
+                            idx = self.unwind_key[0]
+                    positions[idx].append(tradepos)
                 else:
                     self.load_local_variables(row)
         self.positions = positions
