@@ -3,6 +3,7 @@ from base import *
 from misc import *
 import data_handler
 import trade
+import copy
 import datetime
 import csv
 import json
@@ -65,24 +66,35 @@ class TradePos(object):
         else:
             return False
 
-    def open(self, price, start_time):
+    def open(self, price, vol, start_time):
         self.entry_price = price
+        self.pos = vol
         self.entry_time = start_time
         self.is_closed = False
 
     def cancel_open(self):
+        self.entry_tradeid = 0
         self.is_closed = True
 
     def close(self, price, end_time):
         self.exit_time = end_time
         self.exit_price = price
-        self.profit = (self.exit_price - self.entry_price) * self.direction * self.price_unit
+        self.profit = (self.exit_price - self.entry_price) * self.direction * self.pos * self.price_unit
         self.is_closed = True
+        return self
 
-    def cancel_close(self):
-        self.exit_tradeid = 0
+    def partial_close(self, price, vol, end_time):
+        if vol != 0
+            close_pos = copy.copy(self)
+            close_pos.pos = vol
+            close_pos.close(price, end_time)
+            self.pos -= vol
+            self.exit_tradeid = 0
+            return close_pos
+        else:
+            return None
 
-
+            
 class ParSARTradePos(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
         TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, price_unit)
@@ -165,14 +177,16 @@ def tradepos2dict(tradepos):
 
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
-                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, 'pos_exec_flag': STRAT_POS_CANCEL, \
+                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
                      'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
-    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, \
+    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': 1, \
                     'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0}
     def __init__(self, config, agent = None):
         self.load_config(config)
         num_assets = len(self.underliers)
         self.instIDs = self.dep_instIDs()
+        self.tradables = self.underliers
+        self.underlying = [None] * num_assets
         self.positions  = [[] for _ in self.underliers]
         self.unwinds = []
         self.submitted_trades = [[] for _ in self.underliers]
@@ -220,15 +234,14 @@ class Strategy(object):
         self.folder = self.agent.folder + self.name + '_'
         self.logger = self.agent.logger
         self.inst2idx = {}
-        for idx, under in enumerate(self.underliers): 
-            under_key = '_'.join(under)
-            self.under2idx[under_key] = idx
+        for idx, under in enumerate(self.tradables):             
             if len(under) > 1:
-                self.agent.add_spread(under, self.volumes[idx], self.trade_unit[idx])
+                self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
+            self.underlying[idx] = self.agent.get_underlying(under, self.volumes[idx], self.price_unit[idx])                              
             for inst in under:
                 if inst not in self.inst2idx:
                     self.inst2idx[inst] = []
-                self.inst2idx[inst].append(idx)            
+                self.inst2idx[inst].append(idx)
         self.register_func_freq()
         self.register_bar_freq()
 
@@ -242,63 +255,52 @@ class Strategy(object):
         self.load_state()
         self.update_trade_unit()
 
-    def on_trade(self, etrade):
-        save_status = False
-        under_key = '_'.join(sorted(etrade.instIDs))
-        idx = self.under2idx[under_key]
+    def add_unwind(self, pair, idx):
+        
+        pass
+        
+    def on_trade(self, xtrade):
+        save_status = False        
+        idx = int(xtrade.book)
         entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
         exit_ids = [tp.exit_tradeid for tp in self.positions[idx]]
         i = 0
-        if etrade.id in entry_ids:
-            i = entry_ids.index(etrade.id)
+        if xtrade.id in entry_ids:
+            i = entry_ids.index(xtrade.id)
             is_entry = True
-        elif etrade.id in exit_ids:
-            i = exit_ids.index(etrade.id)
+        elif xtrade.id in exit_ids:
+            i = exit_ids.index(xtrade.id)
             is_entry = False
         else:
             self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (etrade.id, etrade.status, self.name))
             etrade.status = trade.TradeStatus.StratConfirm
             return
-        tradepos = self.positions[idx][i]
-        if etrade.status == trade.TradeStatus.Done:
-            traded_price = etrade.final_price()
-            if is_entry:
-                tradepos.open( traded_price, datetime.datetime.now())
+        tradepos = self.positions[idx][i]        
+        traded_price = xtrade.filled_price
+        if is_entry:
+            if xtrade.filled_vol != 0:
+                tradepos.open( traded_price, xtrade.filled_vol, datetime.datetime.now())
                 self.logger.info('strat %s successfully opened a position on %s after tradeid=%s is done, trade status is changed to confirmed' %
-                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                etrade.status = trade.TradeStatus.StratConfirm
+                            (self.name, '_'.join(tradepos.insts), xtrade.id))
                 self.num_entries[idx] += 1
             else:
-                tradepos.close( traded_price, datetime.datetime.now())
-                self.save_closed_pos(tradepos)
-                self.logger.info('strat %s successfully closed a position on %s after tradeid=%s is done, the closed trade position is saved' %
-                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                etrade.status = trade.TradeStatus.StratConfirm
-                self.num_exits[idx] += 1
-        elif etrade.status == trade.TradeStatus.Cancelled:
-            if self.pos_exec_flag == STRAT_POS_CANCEL:
-                if is_entry:
-                    tradepos.cancel_open()
-                    self.logger.info('strat %s cancelled an open position on %s after tradeid=%s is cancelled. Both the trade and the position will be removed.' %
-                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                    etrade.status = trade.ETradeStatus.StratConfirm
-                else:
-                    tradepos.cancel_close()
-                    self.logger.info('strat %s cancelled closing a position on %s after tradeid=%s is cancelled. The position is still open.' %
-                                (self.name, '_'.join(sorted(tradepos.insts)), etrade.id))
-                    etrade.status = trade.ETradeStatus.StratConfirm
-            if self.pos_exec_flag == STRAT_POS_MUST_EXEC:
-                etrade.status = trade.TradeStatus.StratConfirm
-                valid_time = self.agent.tick_id + self.trade_valid_time
-                new_trade = trade.XTrade( etrade.instIDs, etrade.volumes, etrade.order_types, etrade.limit_price, etrade.slip_ticks,  \
-                                valid_time, self.name, self.agent.name, etrade.price_unit, etrade.conv_f)
-                if is_entry:
-                    tradepos.entry_tradeid = new_trade.id
-                else:
-                    tradepos.exit_tradeid = new_trade.id
-                    self.submit_trade(idx, new_trade)
+                tradepos.cancel_open()
+                self.logger.info('strat %s cancelled an open position on %s after tradeid=%s is cancelled. Both trade and position will be removed.' %
+                                (self.name, '_'.join(tradepos.insts), xtrade.id))
+            xtrade.status = trade.TradeStatus.StratConfirm    
+        else:
+            if xtrade.filled_vol == xtrade.vol:
+                save_pos = tradepos.close( traded_price, datetime.datetime.now())
+            else:
+                save_pos = tradepos.partial_close( traded_price, xtrade.filled_vol, datetime.datetime.now())
+            if save_pos != None:
+                self.save_closed_pos(save_pos)
+                self.logger.info('strat %s closed a position on %s after tradeid=%s (filled = %s, full = %s) is done, the closed trade position is saved' %
+                            (self.name, '_'.join(tradepos.insts), xtrade.id, xtrade.filled_vol, xtrade.vol))
+            xtrade.status = trade.TradeStatus.StratConfirm
+            self.num_exits[idx] += 1
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
-        self.submitted_trades[idx] = [etrade for etrade in self.submitted_trades[idx] if etrade.status!= trade.ETradeStatus.StratConfirm]
+        self.submitted_trades[idx] = [xtrade for xtrade in self.submitted_trades[idx] if xtrade.status!= trade.TradeStatus.StratConfirm]
         self.save_state()
 
     def liquidate_tradepos(self, idx):
@@ -306,7 +308,7 @@ class Strategy(object):
         if len(self.positions[idx]) > 0:
             for pos in self.positions[idx]:
                 if (pos.entry_time > NO_ENTRY_TIME) and (pos.exit_tradeid == 0):
-                    self.logger.info( 'strat=%s is liquidating underliers = %s' % ( self.name,   '_'.join(sorted(pos.insts))))
+                    self.logger.info( 'strat=%s is liquidating underliers = %s' % ( self.name,   '_'.join(pos.insts)))
                     self.close_tradepos(idx, pos, self.curr_prices[idx])
                     save_status = True
         return save_status
@@ -377,10 +379,10 @@ class Strategy(object):
         start_time = self.agent.tick_id
         end_time = start_time + self.trade_valid_time
         conv_f = [self.agent.instruments[inst].multiple for inst in self.underliers[idx]]
-        xtrade = trade.XTrade( self.underliers[idx], self.volumes[idx], direction * tunit, price, price_unit = conv_f[-1], strategy=self.name,
+        xtrade = trade.XTrade( self.underliers[idx], self.volumes[idx], direction * tunit, price, price_unit = self.price_unit[idx], strategy=self.name,
                                 book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
         tradepos = eval(self.pos_class)(self.underliers[idx], self.volumes[idx], direction * tunit, \
-                                price, price, conv_f[-1]*tunit, **self.pos_args)
+                                price, price, conv_f[-1], **self.pos_args)
         tradepos.entry_tradeid = xtrade.id
         self.submit_trade(xtrade)
         self.positions[idx].append(tradepos)
@@ -394,8 +396,7 @@ class Strategy(object):
     def close_tradepos(self, idx, tradepos, price):
         start_time = self.agent.tick_id
         end_time = start_time + self.trade_valid_time
-        conv_f = [ self.agent.instruments[inst].multiple for inst in self.underliers[idx]]
-        xtrade = trade.XTrade( tradepos.insts, tradepos.volumes, -tradepos.pos, price, price_unit = conv_f[-1], strategy=self.name,
+        xtrade = trade.XTrade( tradepos.insts, tradepos.volumes, -tradepos.pos, price, price_unit = self.price_unit[idx], strategy=self.name,
                                 book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
         tradepos.exit_tradeid = xtrade.id
         self.submit_trade(xtrade)
