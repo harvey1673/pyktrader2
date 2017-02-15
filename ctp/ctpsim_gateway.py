@@ -71,7 +71,7 @@ class SimctpTdApi(object):
         self.reqID += 1
         self.orderRef = max(self.orderRef, iorder.local_id)
         req = {}
-        req['InstrumentID'] = iorder.instrument.name
+        req['InstrumentID'] = iorder.instrument
         req['LimitPrice'] = iorder.limit_price
         req['VolumeTotalOriginal'] = iorder.volume
         try:
@@ -111,7 +111,7 @@ class SimctpTdApi(object):
 
     def cancelOrder(self, iorder):
         """撤单"""
-        inst = iorder.instrument
+        inst = self.agent.instruments[iorder.instrument]
         self.reqID += 1
         req = {}
         req['InstrumentID'] = inst.name

@@ -7,7 +7,7 @@ from strategy import *
  
 class BbandPChanTrader(Strategy):
     common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'band_keys': ['MA_C', 'STDEV_C'], \
-                                                      'price_limit_buffer': 5, 'num_tick': 1, 'daily_close_buffer': 2, \
+                                                      'price_limit_buffer': 5, 'daily_close_buffer': 2, \
                                                       'data_func': [["DONCH_HC", "dh.DONCH_H", "dh.donch_h", {'field':'close'}], ["DONCH_LC", "dh.DONCH_L", "dh.donch_l", {'field':'close'}], \
                                                                       ['MA_C', 'dh.MA', 'dh.ma'], ['STDEV_C', 'dh.STDEV', 'dh.stdev']]})
     asset_params = dict({'band_win': 40, 'ratios': 1.0, 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
@@ -97,14 +97,14 @@ class BbandPChanTrader(Strategy):
             if (buysell!=0) and (self.close_tday[idx]):
                 msg = 'BbandPchanTrader to close position before EOD for inst = %s, direction=%s, volume=%s, current tick_id = %s' \
                         % (inst, buysell, self.trade_unit[idx], min_id)
-                self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
+                self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * tick_base)
                 self.status_notifier(msg)
                 save_status = True
             return save_status
         if (buysell != 0) and (self.positions[idx][0].check_exit(curr_p, 0)):
             msg = 'BbandPchanTrader to close position after hitting MA line for inst = %s, direction=%s, current price = %s, exit target = %s' \
                     % (inst, buysell, curr_p, self.positions[idx][0].exit_target)
-            self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
+            self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * tick_base)
             self.status_notifier(msg)
             save_status = True
             buysell = 0
@@ -116,7 +116,7 @@ class BbandPChanTrader(Strategy):
             if buysell != 0:
                 msg = 'BbandPchTrader to open position for inst = %s, chan_high=%s, chan_low=%s, upper_band=%s, lower_band=%s, curr_price= %s, direction=%s, volume=%s' \
                                         % (inst, self.chan_high[idx], self.chan_low[idx], self.upper_band[idx], self.lower_band[idx], self.curr_prices[idx], buysell, self.trade_unit[idx])
-                self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
+                self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * tick_base)
                 self.status_notifier(msg)
                 save_status = True
         return save_status

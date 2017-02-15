@@ -93,14 +93,14 @@ class Order(object):
             self.cancelled_volume = max(self.volume - self.filled_volume, 0)
             self.volume = self.filled_volume    #不会再有成交回报
             logging.debug(u'撤单记录: OrderRef=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' \
-                % (self.order_ref, self.instrument.name, self.volume, self.filled_volume, self.cancelled_volume))
+                % (self.order_ref, self.instrument, self.volume, self.filled_volume, self.cancelled_volume))
             self.recalc_pos()
 
     def is_closed(self): #是否已经完全平仓
         return (self.filled_volume == self.volume) 
 
     def __unicode__(self):
-        return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
+        return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument,
                 u'多' if self.direction==ORDER_BUY else u'空',
                 self.volume,
                 self.filled_volume,

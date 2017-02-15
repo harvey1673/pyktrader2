@@ -9,11 +9,8 @@ import os.path
 import order
 from trade_executor import *
 
-class ETradeStatus:
-    Pending, Processed, PFilled, Done, Cancelled, StratConfirm = range(6)
-
 class TradeStatus:
-    Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm, Suspended = range(8)
+    Pending, Ready, OrderSent, PFilled, Done, Cancelled, StratConfirm = range(7)
 
 class OrderFillStatus:
     Empty, Partial, Full = range(3)
@@ -59,10 +56,15 @@ class XTrade(object):
         self.algo = algo        
 
     def calc_filled_price(self, order_dict):
-        filled_prices = [sum([o.filled_price * o.filled_volume for o in order_dict[instID]])/sum([o.filled_volume \
-                                    for o in order_dict[instID]]) for instID in self.instIDs]
+        filled_prices = []
+        for instID in self.instIDs:
+            if instID in order_dict:
+                filled_prices.append(sum([o.filled_price * o.filled_volume for o in order_dict[instID]]) \
+                                     /sum([o.filled_volume for o in order_dict[instID]]))
+            else:
+                filled_prices.append(0.0)
         if len(self.instIDs) == 1:
-            return self.filled_price[0]
+            return filled_prices[0]
         else:
             return self.underlying.price(prices=filled_prices)
 
@@ -83,7 +85,7 @@ class XTrade(object):
         self.order_filled = filled_vol
         if open_vol > 0:
             self.status = TradeStatus.OrderSent
-        elif sum(fill_vol) >= total_vol:
+        elif sum(filled_vol) >= total_vol:
             self.working_filled()
         elif self.status == TradeStatus.Cancelled:
             self.algo.on_partial_cancel()
@@ -100,7 +102,7 @@ class XTrade(object):
 
     def on_trade(self, price, volume):
         new_vol = self.filled_vol + volume
-        self.filled_price = (self.filled_prie * self.filled_vol + price * volume)/new_vol
+        self.filled_price = (self.filled_price * self.filled_vol + price * volume)/new_vol
         self.filled_vol = new_vol
         self.remaining_vol = self.vol - self.working_vol - self.filled_vol
         if (self.filled_vol == self.vol) or (self.status == TradeStatus.Done):

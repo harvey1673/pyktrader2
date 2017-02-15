@@ -171,7 +171,7 @@ class FullTradeBook(object):
         self.eventEngine = ee
         self.instrument = inst_obj
     
-    def get_all_trade(self):
+    def get_all_trades(self):
         return self.bids.trade_map.keys() + self.asks.trade_map.keys()
         
     def remove_trade(self, xtrade):
@@ -324,20 +324,24 @@ class TradeManager(object):
 
     def check_pending_trades(self, key):
         alive_trades = []
+        if key not in self.pending_trades:
+            return
         for xtrade in self.pending_trades[key]:
             curr_price = xtrade.underlying.ask_price1 if xtrade.vol > 0 else xtrade.underlying.ask_price1 
             if (curr_price - xtrade.limit_price) * xtrade.vol >= 0:
                 xtrade.status = TradeStatus.Ready
                 alive_trades.append(xtrade)
-        self.pending_trades = [xtrade for xtrade in self.pending_trades[key] if xtrade.Status == TradeStatus.Pending]
+        self.pending_trades[key] = [xtrade for xtrade in self.pending_trades[key] if xtrade.status == TradeStatus.Pending]
         [self.add_trade(xtrade) for xtrade in alive_trades]
-        self.tradebooks[key].match_trades()
+        if key in self.tradebooks:
+            self.tradebooks[key].match_trades()
 
-    def process_trades(self):
-        for key in self.tradebooks:
-            for trade_id in self.tradebooks[key].get_all_trade():
-                xtrade = self.ref2trade[trade_id]
-                xtrade.execute()
+    def process_trades(self, key):
+        if key not in self.tradebooks:
+            return
+        for trade_id in self.tradebooks[key].get_all_trades():
+            xtrade = self.ref2trade[trade_id]
+            xtrade.execute()
         self.tradebooks[key].filter_alive_trades()
 
     def save_trade_list(self, curr_date, trade_list, file_prefix):
@@ -351,11 +355,11 @@ class TradeManager(object):
                 insts = ' '.join(xtrade.instIDs)
                 units = ' '.join([str(i) for i in xtrade.units])
                 if len(xtrade.order_dict)>0:
-                    order_dict = ' '.join([inst +':'+'_'.join([str(o.order_ref) for o in trade.order_dict[inst]])
-                                        for inst in trade.order_dict])
+                    order_dict = ' '.join([inst +':'+'_'.join([str(o.order_ref) for o in xtrade.order_dict[inst]])
+                                        for inst in xtrade.order_dict])
                 else:
                     order_dict = ''
-                file_writer.writerow([trade.id, insts, units, xtrade.price_unit, xtrade.vol, xtrade.limit_price,
+                file_writer.writerow([xtrade.id, insts, units, xtrade.price_unit, xtrade.vol, xtrade.limit_price,
                                       xtrade.filled_vol, xtrade.filled_price, order_dict, xtrade.aggressive_level,
                                       xtrade.start_time, xtrade.end_time, xtrade.strategy, xtrade.book, xtrade.status])
 

@@ -7,7 +7,7 @@ from strategy import *
  
 class DTSplitChanAddon(Strategy):
     common_params =  dict({'open_period': [300, 2115], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], \
-                           'num_tick': 1, 'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
+                           'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
                           **Strategy.common_params)
     asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, \
                          'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004, 'daily_close': False}, **Strategy.asset_params)
@@ -182,7 +182,7 @@ class DTSplitChanAddon(Strategy):
                 msg = 'DT to close position before EOD for inst = %s, direction=%s, num_pos=%s, current min_id = %s' \
                         % (inst, buysell, num_pos, min_id)
                 for tp in self.positions[idx]:
-                    self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * self.num_tick * tick_base)
+                    self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * tick_base)
                 self.status_notifier(msg)
                 save_status = True
             return save_status
@@ -190,7 +190,7 @@ class DTSplitChanAddon(Strategy):
             msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, num_pos=%s' \
                                     % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, num_pos)
             for tp in self.positions[idx]:
-                self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * self.num_tick * tick_base)
+                self.close_tradepos(idx, tp, self.curr_prices[idx] - buysell * tick_base)
             self.status_notifier(msg)
             save_status = True
             num_pos = 0
@@ -206,7 +206,7 @@ class DTSplitChanAddon(Strategy):
             new_vol = int(self.trade_unit[idx] * self.vol_ratio[idx][0])
             msg = 'DT to open position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, buy_price= %s, sell_price= %s, direction=%s, volume=%s' \
                                         % (inst, t_open, buy_trig, sell_trig, buy_price, sell_price, buysell, new_vol)
-            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base, new_vol)
+            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * tick_base, new_vol)
             self.status_notifier(msg)
             save_status = True
             num_pos = 1
@@ -214,7 +214,7 @@ class DTSplitChanAddon(Strategy):
             addon_vol = int(self.vol_ratio[idx][1]*self.trade_unit[idx])
             msg = 'DT to add position for inst = %s, high=%s, low=%s, buy= %s, sell= %s, direction=%s, volume=%s' \
                                     % (inst, self.chan_high[idx], self.chan_low[idx], buy_price, sell_price, buysell, addon_vol)
-            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base, addon_vol)
+            self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * tick_base, addon_vol)
             self.status_notifier(msg)
             save_status = True
         return save_status

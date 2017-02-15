@@ -285,8 +285,6 @@ class Agent(MktDataMixin):
             strat_args  = strat_conf.get('config', {})
             strat = strat_class(strat_args, self)
             self.add_strategy(strat)
-        self.cancel_protect_period = config.get('cancel_protect_period', 200)
-        self.market_order_tick_multiple = config.get('market_order_tick_multiple', 5)
         self.init_init()    #init中的init,用于子类的处理
 
     def register_event_handler(self):
@@ -426,7 +424,7 @@ class Agent(MktDataMixin):
             self.logger.warning(u'接口不存在')
 
     def submit_trade(self, xtrade):
-        self.trader_manager.add_trade(xtrade)
+        self.trade_manager.add_trade(xtrade)
 
     def remove_trade(self, xtrade):
         self.trade_manager.remove_trade(xtrade)
@@ -566,7 +564,7 @@ class Agent(MktDataMixin):
             self.logger.debug(u'保存执行状态.....................')
             for gway in self.gateways:
                 self.gateways[gway].save_order_list(self.scur_day)
-            self.trade_manager.save_trade_list()
+            self.trade_manager.save_trade_list(self.scur_day, self.trade_manager.ref2trade, self.folder)
     
     def run_eod(self):
         if self.eod_flag:
@@ -651,10 +649,14 @@ class Agent(MktDataMixin):
             return
         self.update_min_bar(tick)
         inst = tick.instID
-        for key in self.inst2spread[inst]:
-            self.trade_manager.check_pending_trades(key)
+        if inst in self.inst2spread:
+            for key in self.inst2spread[inst]:
+                self.trade_manager.check_pending_trades(key)
         self.trade_manager.check_pending_trades(inst)
-        self.trade_manager.process_trades()
+        if inst in self.inst2spread:
+            for key in self.inst2spread[inst]:
+                self.trade_manager.process_trades(key)
+        self.trade_manager.process_trades(inst)
         gway = self.inst2gateway[inst]
         if gway.process_flag:
             gway.send_queued_orders()
@@ -669,7 +671,7 @@ class Agent(MktDataMixin):
         trade_ref = event.dict['trade_ref']
         mytrade = self.trade_manager.get_trade(trade_ref)
         status = mytrade.refresh()
-        if status not in [trade.TradeStatus.Done, trade.TradeStatus.Cancelled]:
+        if status != trade.TradeStatus.Done:
             mytrade.execute()
         self.save_state()
             

@@ -29,7 +29,7 @@ class Gateway(object):
         self.positions = {}
         self.instruments = []      # 已订阅合约代码
         self.working_orders = []
-        self.prcess_flag = False
+        self.process_flag = False
         self.eod_flag = False
         self.eod_report = True
         self.account_info = {'available': 0,
@@ -242,15 +242,21 @@ class Gateway(object):
     def add_order(self, iorder):
         iorder.set_gateway(self)
         iorder.add_pos()
-        self.id2order[order.local_id] = iorder
+        self.id2order[iorder.local_id] = iorder
         if (iorder.status in order.Alive_Order_Status) and (iorder.local_id not in self.working_orders):
             self.working_orders.append(iorder.local_id)
             self.process_flag = True
 
     def send_queued_orders(self):
-        for iorder in self.working_orders:
+        alive_orders = []
+        for local_id in self.working_orders:
+            iorder = self.id2order[local_id]
             if iorder.status == order.OrderStatus.Ready:
                 self.sendOrder(iorder)
+                alive_orders.append(local_id)
+            elif iorder.status in [order.OrderStatus.Sent, order.OrderStatus.Waiting]:
+                alive_orders.append(local_id)
+        self.working_orders = alive_orders
         self.process_flag = False
         
     def remove_order(self, iorder):
@@ -309,8 +315,8 @@ class Gateway(object):
     def book_order(self, instID, volume, price_type, limit_price, trade_ref = 0, order_num = 1):        
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
         order_offsets = self.get_order_offset(instID, volume, order_num)
-        new_orders = [order.Order(instID, limit_price, v, self.agent.tick_id, action_type, direction, \ 
-                      price_type, trade_ref = trade_ref) for (action_type, v) in order_offsets]
+        new_orders = [order.Order(instID, limit_price, v, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref) \
+                                                            for (action_type, v) in order_offsets]
         self.add_orders(new_orders)
         return new_orders
 

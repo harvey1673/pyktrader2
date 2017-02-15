@@ -8,7 +8,7 @@ import instrument
 import math
 import json
 import pandas as pd
-import tradeagent as agent
+import agent
 
 vtype_func_map = {'int':int, 'float':float, 'str': str, 'bool':bool }
 
@@ -225,9 +225,9 @@ class StratGui(object):
 class DTStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday']
         self.status_fields = ['TradeUnit', 'TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int', 
@@ -238,9 +238,7 @@ class DTStratGui(StratGui):
                             'CurrPrices': 'float',
                             'CurRng':'float',
                             'CurMa': 'float',
-                            'NumTick': 'int', 
                             'MaWin': 'int',
-                            'OrderType': 'str',
                             'MinRng': 'float',
                             'AllocW': 'float',
                             'PosScaler': 'float',
@@ -249,9 +247,9 @@ class DTStratGui(StratGui):
 class DTSplitDChanStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday']
         self.status_fields = ['TdayOpen', 'OpenIdx', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int',
@@ -263,9 +261,7 @@ class DTSplitDChanStratGui(StratGui):
                             'CurRng':'float',
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
-                            'NumTick': 'int',
                             'Channels': 'int',
-                            'OrderType': 'str',
                             'MinRng': 'float',
                             'AllocW': 'float',
                             'PosScaler': 'float',
@@ -275,9 +271,9 @@ class DTSplitDChanStratGui(StratGui):
 class DTSplitChanAddonStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday']
         self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int',
@@ -291,9 +287,7 @@ class DTSplitChanAddonStratGui(StratGui):
                             'CurRng':'float',
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
-                            'NumTick': 'int',
                             'Channels': 'int',
-                            'OrderType': 'str',
                             'MinRng': 'float',
                             'AllocW': 'float',
                             'PosScaler': 'float',
@@ -303,9 +297,9 @@ class DTSplitChanAddonStratGui(StratGui):
 class BBandPChanStratGui(StratGui):   
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'BandWin', 'UpperBand', 'MidBand', 'LowerBand', 'Channels', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Ratios': 'float',
@@ -317,9 +311,7 @@ class BBandPChanStratGui(StratGui):
                             'BandWin': 'int',
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
-                            'NumTick': 'int',
                             'Channels': 'int',
-                            'OrderType': 'str',
                             'AllocW': 'float',
                             'PosScaler': 'float',
                             'Freq': 'int',
@@ -328,9 +320,9 @@ class BBandPChanStratGui(StratGui):
 class MASystemStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaFast', 'MaMedm', 'MaSlow', 'Channels', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Ratios': 'float',
@@ -342,9 +334,7 @@ class MASystemStratGui(StratGui):
                             'MaSlow': 'float',
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
-                            'NumTick': 'int',
                             'Channels': 'int',
-                            'OrderType': 'str',
                             'AllocW': 'float',
                             'PosScaler': 'float',
                             'Freq': 'int',
@@ -353,10 +343,10 @@ class MASystemStratGui(StratGui):
 class AsctrendStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['NumTick', 'OrderType', 'PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiWin', 'RsiLevel', 'WprWin', 'WprLevel', \
                               'SarParam', ]
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Ratios': 'float',
@@ -367,8 +357,6 @@ class AsctrendStratGui(StratGui):
                             'WprWin': 'int',
                             'WprLevel': 'intlist',
                             'SarParam': 'floatlist',
-                            'NumTick': 'int',
-                            'OrderType': 'str',
                             'AllocW': 'float',
                             'PosScaler': 'float',
                             'Freq': 'int',
@@ -378,9 +366,9 @@ class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['PosScaler', 'RunFlag','NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId']
         self.status_fields = ['TradeUnit', 'CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
-        self.shared_fields = ['PosScaler','NumTick', 'OrderType', 'EntryLimit', 'DailyCloseBuffer']
+        self.shared_fields = ['PosScaler', 'EntryLimit', 'DailyCloseBuffer']
         self.field_types = {'RunFlag':'int',
                             'AllocW': 'float',
                             'PosScaler': 'float',
@@ -396,18 +384,16 @@ class RBStratGui(StratGui):
                             'Senter':'float', 
                             'Ssetup':'float',
                             'TrailLoss':'float',
-                            'NumTick': 'int',
                             'EntryLimit': 'int',
-                            'DailyCloseBuffer': 'int',
-                            'OrderType': 'str' }        
+                            'DailyCloseBuffer': 'int'}
 
 class TLStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['PosScaler', 'RunFlag', 'NumTick', 'OrderType', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss']
         self.status_fields = ['TradingFreq', 'TradeUnit', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow']
-        self.shared_fields = ['NumTick', 'OrderType', 'PosScaler']
+        self.shared_fields = ['PosScaler']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'TradingFreq': 'str',
@@ -420,8 +406,6 @@ class TLStratGui(StratGui):
                             'EntryLow': 'float',
                             'ExitHigh': 'float',
                             'ExitLow':  'float',
-                            'NumTick': 'int',
-                            'OrderType': 'str',
                             'AllocW': 'float',
                             'PosScaler': 'float'}
 
@@ -429,17 +413,15 @@ class OptionArbStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['RunFlag', 'NumTick', 'OrderType', 'ProfitRatio', 'ExitRatio']
+        self.entry_fields = ['RunFlag', 'ProfitRatio', 'ExitRatio']
         self.status_fields = ['TradeUnit', 'BidPrices', 'AskPrices', 'DaysToExpiry', 'TradeMargin'] 
-        self.shared_fields = ['NumTick', 'OrderType', 'ProfitRatio', 'ExitRatio']
+        self.shared_fields = ['ProfitRatio', 'ExitRatio']
         self.field_types = {'RunFlag':'int',
                            'TradeUnit':'int',
                             'BidPrices': 'float',
                             'AskPrices': 'float',
                             'DaysToExpiry':'int',
                             'TradeMargin':'floatlist',
-                            'NumTick': 'int',
-                            'OrderType': 'str',
                             'ProfitRatio': 'float',
                             'ExitRatio': 'float'}
 
@@ -884,7 +866,7 @@ class Gui(tk.Tk):
         self.app.run_agent_func('run_eod', params)
             
     def config_settings(self):
-        entry_fields = ['MarketOrderTickMultiple', 'CancelProtectPeriod']
+        entry_fields = []
         label_fields = ['ScurDay', 'TickId', 'EodFlag'] 
         lbl_frame = ttk.Labelframe(self.settings_win)
         row_idx = 0

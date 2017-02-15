@@ -12,7 +12,7 @@ import os
 import sec_bits
 
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
-                   'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'price_unit']
+                   'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'multiple']
 
 STRAT_POS_CANCEL = 0
 STRAT_POS_MUST_EXEC = 1
@@ -177,12 +177,12 @@ def tradepos2dict(tradepos):
 
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
-                     'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
-                     'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, \
+                     'daily_close_buffer': 3, 'pos_class': 'TradePos', 'pos_args': {},\
                      'exec_class': 'ExecAlgoFixTimer'}
-    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': 1, \
-                    'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0, \
-                    'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, 'order_offset': True, inst_rank = None, tick_num = 1}}
+    asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': None, \
+                    'close_tday': False, 'last_min_id': 2057, 'trail_loss': 0, \
+                    'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
+                                  'order_offset': True, 'tick_num': 1} }
     def __init__(self, config, agent = None):
         self.load_config(config)
         num_assets = len(self.underliers)
@@ -243,7 +243,7 @@ class Strategy(object):
             if len(under) > 1:
                 self.underlying[idx] = self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
             else:
-                self.underlying[idx] = self.agent.instruments(under[0])            
+                self.underlying[idx] = self.agent.instruments[under[0]]
             for inst in under:
                 if inst not in self.inst2idx:
                     self.inst2idx[inst] = []
@@ -276,7 +276,7 @@ class Strategy(object):
         
     def on_trade(self, xtrade):
         save_status = False        
-        if xtrade.book == self.unwind_key[1]:
+        if xtrade.book == str(self.unwind_key[0]):
             idx = self.unwind_key[0]
         else:
             under_key = '_'.join(xtrade.instIDs)
@@ -291,7 +291,7 @@ class Strategy(object):
             i = exit_ids.index(xtrade.id)
             is_entry = False
         else:
-            self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (etrade.id, etrade.status, self.name))
+            self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (xtrade.id, xtrade.status, self.name))
             xtrade.status = trade.TradeStatus.StratConfirm
             return
         tradepos = self.positions[idx][i]        
@@ -356,12 +356,7 @@ class Strategy(object):
         return
 
     def calc_curr_price(self, idx):
-        if len(self.underliers[idx]) == 1:
-            inst = self.underliers[idx][0]
-            self.curr_prices[idx] = self.agent.instruments[inst].mid_price
-        else:
-            spd_key = (tuple(self.underliers[idx]), tuple(self.volumes[idx]))
-            self.curr_prices[idx] = self.agent.spread_data[spd_key].mid_price
+        self.curr_prices[idx] = self.underlying[idx].mid_price
 
     def run_tick(self, ctick):
         save_status = False
@@ -395,9 +390,8 @@ class Strategy(object):
     def open_tradepos(self, idx, direction, price, volume = 0):
         tunit = self.trade_unit[idx] if volume == 0 else volume
         start_time = self.agent.tick_id
-        end_time = start_time + self.trade_valid_time        
         xtrade = trade.XTrade( self.tradables[idx], self.volumes[idx], direction * tunit, price, price_unit = self.price_unit[idx], strategy=self.name,
-                                book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
+                                book= str(idx), agent = self.agent, start_time = start_time)
         exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
         xtrade.set_algo(exec_algo)
         tradepos = eval(self.pos_class)(self.tradables[idx], self.volumes[idx], direction * tunit, \
@@ -413,9 +407,8 @@ class Strategy(object):
 
     def close_tradepos(self, idx, tradepos, price):
         start_time = self.agent.tick_id
-        end_time = start_time + self.trade_valid_time
         xtrade = trade.XTrade( tradepos.insts, tradepos.volumes, -tradepos.pos, price, price_unit = self.price_unit[idx], strategy=self.name,
-                                book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
+                                book= str(idx), agent = self.agent, start_time = start_time)
         exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
         xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
@@ -479,7 +472,7 @@ class Strategy(object):
                     else:
                         entry_time = datetime.datetime.strptime(row[6], '%Y%m%d %H:%M:%S %f')
                         entry_price = float(row[5])
-                    tradepos.open(entry_price,entry_time)
+                    tradepos.open(entry_price, pos, entry_time)
                     tradepos.entry_tradeid = int(row[8])
                     tradepos.exit_tradeid = int(row[12])
                     if row[10] in ['', '19700101 00:00:00 000000']:
@@ -499,7 +492,7 @@ class Strategy(object):
                                 is_added = True
                                 break
                         if not is_added:
-                            self.logger.info('underlying = %s is missing in strategy=%s' % (insts, self.name))
+                            self.logger.info('underlying = %s is missing in strategy=%s, put it in undwind' % (insts, self.name))
                             idx = self.unwind_key[0]
                     positions[idx].append(tradepos)
                 else:

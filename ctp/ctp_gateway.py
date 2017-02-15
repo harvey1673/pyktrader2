@@ -151,7 +151,7 @@ class CtpGateway(GrossGateway):
     #----------------------------------------------------------------------
     def sendOrder(self, iorder):
         """发单"""
-        inst = iorder.instrument
+        inst = self.agent.instruments[iorder.instrument]
         if not self.order_stats[inst.name]['status']:
             iorder.on_cancel()
             if iorder.trade_ref > 0:
@@ -174,10 +174,8 @@ class CtpGateway(GrossGateway):
                 iorder.limit_price = 0.0
         iorder.status = order.OrderStatus.Sent
         self.tdApi.sendOrder(iorder)
-        
         self.order_stats[inst.name]['submit'] += 1
         self.order_stats['total_submit'] += 1
-
         if self.order_stats[inst.name]['submit'] >= self.order_constraints['submit_limit']:
             self.order_stats[inst.name]['status'] = False
         if self.order_stats['total_submit'] >= self.order_constraints['total_submit']:

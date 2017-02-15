@@ -8,7 +8,7 @@ import trade
 import order
 
 class ExecAlgoBase(object):
-    def __init__(self, xtrade, agent, stop_price = None, max_vol = 20, inst_rank = None):
+    def __init__(self, xtrade, stop_price = None, max_vol = 20, inst_rank = None):
         self.xtrade = xtrade
         if inst_rank == None:
             inst_rank = range(len(self.xtrade.instIDs))
@@ -16,7 +16,7 @@ class ExecAlgoBase(object):
         self.instIDs = [xtrade.instIDs[i] for i in inst_rank]
         self.max_vol = max_vol
         self.stop_price = stop_price
-        self.agent = agent
+        self.agent = xtrade.agent
 
     def unwind(self, pair):
         strat = self.agent.strategies[self.xtrade.strategy]
@@ -30,9 +30,9 @@ class ExecAlgoBase(object):
 
 class ExecAlgoFixTimer(ExecAlgoBase):
     '''send out order by fixed period, cancel the trade when hit the stop price '''
-    def __init__(self, xtrade, agent, stop_price = None, max_vol = 20, time_period = 600, price_type = OPT_LIMIT_ORDER, \
+    def __init__(self, xtrade, stop_price = None, max_vol = 20, time_period = 600, price_type = OPT_LIMIT_ORDER, \
                        order_offset = True, inst_rank = None, tick_num = 1):
-        super(ExecAlgoFixTimer, self).__init__(xtrade, agent, stop_price = stop_price, max_vol = max_vol, inst_rank = inst_rank)
+        super(ExecAlgoFixTimer, self).__init__(xtrade, stop_price = stop_price, max_vol = max_vol, inst_rank = inst_rank)
         self.timer_period = time_period
         self.next_timer = self.agent.tick_id
         self.price_type = price_type
@@ -44,6 +44,7 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         if (status in [trade.TradeStatus.Pending, trade.TradeStatus.Done, trade.TradeStatus.StratConfirm]):
             return status
         direction = 1 if self.xtrade.vol > 0 else -1
+        cancel_flag = False
         if self.stop_price and (self.xtrade.underlying.mid_price - self.stop_price) * direction >= 0:
             stop_flag = True
             self.next_timer = self.agent.tick_id - 1
@@ -122,8 +123,8 @@ class ExecAlgoFixTimer(ExecAlgoBase):
                 self.unwind(pair)
 
 class ExecAlgoSpdOrder(ExecAlgoBase): 
-    def __init__(self, xtrade, agent, stop_price = None, max_vol = 20, time_period = 100, price_type = OPT_LIMIT_ORDER, tick_num = 1):
-        super(ExecAlgoFixTimer, self).__init__(xtrade, agent, stop_price = stop_price, max_vol = max_vol)
+    def __init__(self, xtrade, stop_price = None, max_vol = 20, time_period = 100, price_type = OPT_LIMIT_ORDER, tick_num = 1):
+        super(ExecAlgoFixTimer, self).__init__(xtrade, stop_price = stop_price, max_vol = max_vol)
         self.timer_period = time_period
         self.next_timer = self.agent.tick_id
         self.price_type = price_type        
