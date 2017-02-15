@@ -358,9 +358,9 @@ class Agent(MktDataMixin):
                     self.logger.warning("No Gateway is assigned to instID = %s" % name)
             super(Agent, self).add_instrument(name)
 
-    def add_spread(self, instIDs, weights, price_unit = 1):        
+    def add_spread(self, instIDs, weights, multiple = None):        
         key = '_'.join([str(s) for s in instIDs + weights])
-        self.spread_data[key] = instrument.SpreadInst(instIDs, weights, price_unit)
+        self.spread_data[key] = instrument.SpreadInst(instIDs, weights, multiple)
         self.spread_data[key].update()
         for inst in instIDs:
             if inst not in self.inst2spread:
@@ -368,14 +368,14 @@ class Agent(MktDataMixin):
             self.inst2spread[inst].append(key)
         return self.spread_data[key]
                 
-    def get_underlying(self, instIDs, weights, price_unit = 1):
+    def get_underlying(self, instIDs, weights, multiple = None):
         if len(instIDs) == 1:
             key = instIDs[0]
             return self.instruments[key]
         else:
             key = '_'.join([str(s) for s in instIDs + weights])           
             if key not in self.spread_data:
-                self.add_spread(instIDs, weights, price_unit)
+                self.add_spread(instIDs, weights, multiple)
             return self.spread_data[key]
 
     def add_strategy(self, strat):
