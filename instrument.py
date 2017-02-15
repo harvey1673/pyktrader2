@@ -124,14 +124,14 @@ class Instrument(object):
         return self.price * self.multiple * my_marginrate
 
 class SpreadInst(object):
-    def __init__(self, inst_data, instIDs, weights, price_unit = None):
+    def __init__(self, inst_data, instIDs, weights, multiple = None):
         self.instIDs = instIDs
         self.name = '_'.join([str(s) for s in instIDs + weights])
         self.inst_objs = [inst_data[inst] for inst in instIDs]
         self.weights = weights
         self.conv_factor = [ inst_obj.multiple for inst_obj in self.inst_objs ]
         self.tick_size = [inst_obj.tick_base for inst_obj in self.inst_objs]
-        self.price_unit = price_unit if price_unit != None else self.conv_factor[-1]
+        self.multiple = multiple if multiple != None else self.conv_factor[-1]
         self.last_update = [inst_obj.last_update for inst_obj in self.inst_objs]
         self.ask_price1 = 0.0
         self.ask_vol1 = 0
@@ -155,7 +155,7 @@ class SpreadInst(object):
             else:
                 fields = ['mid_price', 'mid_price']
             curr_prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
-        return sum([ p * w * cf for (p, w, cf) in zip(curr_prices, self.weights, self.conv_factor)])/self.price_unit
+        return sum([ p * w * cf for (p, w, cf) in zip(curr_prices, self.weights, self.conv_factor)])/self.multiple
         
 class Stock(Instrument):
     def __init__(self,name):
