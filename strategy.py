@@ -3,6 +3,7 @@ from base import *
 from misc import *
 import data_handler
 import trade
+from trade_executor import *
 import copy
 import datetime
 import csv
@@ -20,10 +21,10 @@ class TrailLossType:
     Ratio, Level = range(2)
 
 class TradePos(object):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1):
+    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1):
         self.insts = insts
         self.volumes = vols
-        self.price_unit = price_unit
+        self.multiple = multiple
         self.pos = pos
         self.direction = 1 if pos > 0 else -1
         self.entry_target = entry_target
@@ -79,7 +80,7 @@ class TradePos(object):
     def close(self, price, end_time):
         self.exit_time = end_time
         self.exit_price = price
-        self.profit = (self.exit_price - self.entry_price) * self.direction * self.pos * self.price_unit
+        self.profit = (self.exit_price - self.entry_price) * self.direction * self.pos * self.multiple
         self.is_closed = True
         return self
 
@@ -95,8 +96,8 @@ class TradePos(object):
             return None
             
 class ParSARTradePos(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, price_unit)
+    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, multiple)
         self.af = af
         self.af_incr = incr
         self.af_cap = cap
@@ -109,8 +110,8 @@ class ParSARTradePos(TradePos):
             self.ep = curr_ep
 
 class ParSARProfitTrig(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, price_unit)
+    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple)
         self.af = af
         self.af_incr = incr
         self.af_cap = cap
@@ -136,8 +137,8 @@ class ParSARProfitTrig(TradePos):
                 self.exit_target = curr_ep
 
 class TargetTrailTradePos(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, price_unit = 1, reset_margin = 10):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, price_unit)
+    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10):
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple)
         self.reset_margin = reset_margin
         self.trailing = False
 
@@ -170,16 +171,18 @@ def tradepos2dict(tradepos):
     else:
         trade['exit_time'] = ''
     trade['profit'] = tradepos.profit
-    trade['price_unit'] = tradepos.price_unit
+    trade['multiple'] = tradepos.multiple
     trade['is_closed'] = 1 if tradepos.is_closed else 0
     return trade
 
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
                      'trade_valid_time': 600, 'num_tick': 0, 'daily_close_buffer':5, \
-                     'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, }
+                     'order_type': OPT_LIMIT_ORDER, 'pos_class': 'TradePos', 'pos_args': {}, \
+                     'exec_class': 'ExecAlgoFixTimer'}
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': 1, \
-                    'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0}
+                    'close_tday': False, 'last_min_id': 2055, 'trail_loss': 0, \
+                    'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, 'order_offset': True, inst_rank = None, tick_num = 1}}
     def __init__(self, config, agent = None):
         self.load_config(config)
         num_assets = len(self.underliers)
@@ -187,7 +190,7 @@ class Strategy(object):
         self.tradables = self.underliers
         self.underlying = [None] * num_assets
         self.positions  = dict([(idx, []) for idx in range(num_assets)])
-        self.submitted_trades = [[] for _ in self.underliers]
+        self.submitted_trades = dict([(idx, []) for idx in range(num_assets)])
         self.agent = agent
         self.folder = ''
         self.logger = None
@@ -197,7 +200,8 @@ class Strategy(object):
         self.num_exits   = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
         self.run_flag = [1] * num_assets
-        self.unwind_key = (10000, 'unwind')
+        self.conv_f = {}
+        self.unwind_key = (10000, 'unwind')        
         self.update_trade_unit()
 
     def save_config(self):
@@ -234,13 +238,17 @@ class Strategy(object):
         self.logger = self.agent.logger
         self.inst2idx = {}
         for idx, under in enumerate(self.tradables):             
+            under_key = '_'.join(under)
+            self.under2idx[under_key] = idx
             if len(under) > 1:
-                self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
-            self.underlying[idx] = self.agent.get_underlying(under, self.volumes[idx], self.price_unit[idx])                              
+                self.underlying[idx] = self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
+            else:
+                self.underlying[idx] = self.agent.instruments(under[0])            
             for inst in under:
                 if inst not in self.inst2idx:
                     self.inst2idx[inst] = []
                 self.inst2idx[inst].append(idx)
+        self.conv_f = dict([(inst, self.agent.instruments[inst].multiple) for inst in self.instIDs])
         self.register_func_freq()
         self.register_bar_freq()
 
@@ -254,19 +262,25 @@ class Strategy(object):
         self.load_state()
         self.update_trade_unit()
 
-    def add_unwind(self, pair, book = '10000'):
+    def add_unwind(self, pair):
         instID = pair[0]
         vol = pair[1]
         price = pair[2]
-        idx = int(book)
+        idx = self.unwind_key[0]
         multiple = self.agent.instruments[instID].multiple
         tradepos = eval(self.pos_class)([instID], [1], vol, price, price, multiple, **self.pos_args)
-        tradepos.open(price, vol, datetime.datetime.now())
-        pass
+        tradepos.entry_tradeid = idx
+        self.positions[idx].append(tradepos)
+        tradepos.open(price, vol, datetime.datetime.now())               
+        self.close_tradepos(idx, tradepos, price)        
         
     def on_trade(self, xtrade):
         save_status = False        
-        idx = int(xtrade.book)
+        if xtrade.book == self.unwind_key[1]:
+            idx = self.unwind_key[0]
+        else:
+            under_key = '_'.join(xtrade.instIDs)
+            idx = self.under2idx[under_key]
         entry_ids = [ tp.entry_tradeid for tp in self.positions[idx]]
         exit_ids = [tp.exit_tradeid for tp in self.positions[idx]]
         i = 0
@@ -318,15 +332,18 @@ class Strategy(object):
                     save_status = True
         return save_status
 
-    def add_live_trades(self, etrade):
-        trade_key = '_'.join(etrade.instIDs)
-        idx = self.under2idx[trade_key]
+    def add_live_trades(self, xtrade):
+        if xtrade.book == str(self.unwind_key[0]):
+            idx = int(xtrade.book)
+        else:
+            trade_key = '_'.join(xtrade.instIDs)
+            idx = self.under2idx[trade_key]
         for cur_trade in self.submitted_trades[idx]:
-            if etrade.id == cur_trade.id:
-                self.logger.debug('trade_id = %s is already in the strategy= %s list' % (etrade.id, self.name))
+            if xtrade.id == cur_trade.id:
+                self.logger.debug('trade_id = %s is already in the strategy= %s list' % (xtrade.id, self.name))
                 return False
-        self.logger.info('trade_id = %s is added to the strategy= %s list' % (etrade.id, self.name))
-        self.submit_trade(idx, etrade)
+        self.logger.info('trade_id = %s is added to the strategy= %s list' % (xtrade.id, self.name))
+        self.submit_trade(idx, xtrade)
         return True
 
     def day_finalize(self):
@@ -375,26 +392,22 @@ class Strategy(object):
     def on_bar(self, idx, freq):
         return False
 
-    def speedup(self, etrade):
-        self.logger.info('need to speed up the trade = %s' % etrade.id)
-        pass
-
     def open_tradepos(self, idx, direction, price, volume = 0):
         tunit = self.trade_unit[idx] if volume == 0 else volume
         start_time = self.agent.tick_id
-        end_time = start_time + self.trade_valid_time
-        conv_f = [self.agent.instruments[inst].multiple for inst in self.underliers[idx]]
-        xtrade = trade.XTrade( self.underliers[idx], self.volumes[idx], direction * tunit, price, price_unit = self.price_unit[idx], strategy=self.name,
+        end_time = start_time + self.trade_valid_time        
+        xtrade = trade.XTrade( self.tradables[idx], self.volumes[idx], direction * tunit, price, price_unit = self.price_unit[idx], strategy=self.name,
                                 book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
-        tradepos = eval(self.pos_class)(self.underliers[idx], self.volumes[idx], direction * tunit, \
-                                price, price, conv_f[-1], **self.pos_args)
+        exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
+        xtrade.set_algo(exec_algo)
+        tradepos = eval(self.pos_class)(self.tradables[idx], self.volumes[idx], direction * tunit, \
+                                price, price, self.underlying[idx].multiple, **self.pos_args)
         tradepos.entry_tradeid = xtrade.id
-        self.submit_trade(xtrade)
-        self.positions[idx].append(tradepos)
-        return
+        self.submit_trade(idx, xtrade)
+        self.positions[idx].append(tradepos)        
 
-    def submit_trade(self, xtrade):
-        idx = int(xtrade.book)
+    def submit_trade(self, idx, xtrade):
+        xtrade.book = str(idx)
         self.submitted_trades[idx].append(xtrade)
         self.agent.submit_trade(xtrade)
 
@@ -403,8 +416,10 @@ class Strategy(object):
         end_time = start_time + self.trade_valid_time
         xtrade = trade.XTrade( tradepos.insts, tradepos.volumes, -tradepos.pos, price, price_unit = self.price_unit[idx], strategy=self.name,
                                 book= str(idx), agent = self.agent, start_time = start_time, end_time = end_time)
+        exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
+        xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
-        self.submit_trade(xtrade)
+        self.submit_trade(idx, xtrade)
         return
 
     def update_trade_unit(self):
@@ -456,8 +471,8 @@ class Strategy(object):
                     #direction = int(row[3])
                     entry_target = float(row[7])
                     exit_target = float(row[11])
-                    price_unit = float(row[15])
-                    tradepos = eval(self.pos_class)(insts, vols, pos, entry_target, exit_target, price_unit, **self.pos_args)
+                    multiple = float(row[15])
+                    tradepos = eval(self.pos_class)(insts, vols, pos, entry_target, exit_target, multiple, **self.pos_args)
                     if row[6] in ['', '19700101 00:00:00 000000']:
                         entry_time = NO_ENTRY_TIME
                         entry_price = 0
@@ -478,7 +493,7 @@ class Strategy(object):
                     if row[0] == 'unwind':
                         idx = self.unwind_key[0]
                     else:
-                        for i, under in enumerate(self.underliers):
+                        for i, under in enumerate(self.tradables):
                             if set(under) == set(insts):
                                 idx = i
                                 is_added = True
@@ -511,9 +526,9 @@ class Strategy(object):
                     inst_risk[inst][risk] = getattr(self.agent.instruments[inst], risk)
                 except:
                     continue
-        for idx, under in enumerate(self.underliers):
+        for idx, under in enumerate(self.tradables):
             pos = sum([tp.pos for tp in self.positions[idx]])
-            for instID, v in zip(self.underliers[idx], self.volumes[idx]):
+            for instID, v in zip(self.tradables[idx], self.volumes[idx]):
                 for risk in risk_list:
                     sum_risk[instID][risk] += pos * v * inst_risk[instID][risk]
         return sum_risk
