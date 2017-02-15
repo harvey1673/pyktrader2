@@ -24,7 +24,7 @@ Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderS
 class XTrade(object):
     # instances = weakref.WeakSet()
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
-    def __init__(self, instIDs, units, vol, limit_price, price_unit=1, strategy="dummy", book="0", \
+    def __init__(self, instIDs, units, vol, limit_price, price_unit = None, strategy="dummy", book="0", \
                  agent=None, start_time = 300000, end_time = 2115000, aggressiveness = 1):
         self.id = next(self.id_generator)
         self.instIDs = instIDs
@@ -55,7 +55,8 @@ class XTrade(object):
         self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
 
     def set_algo(self, algo):
-        self.algo = algo
+        algo.agent = self.agent
+        self.algo = algo        
 
     def calc_filled_price(self, order_dict):
         filled_prices = [sum([o.filled_price * o.filled_volume for o in order_dict[instID]])/sum([o.filled_volume \
