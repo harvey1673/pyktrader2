@@ -366,6 +366,7 @@ class Agent(MktDataMixin):
             if inst not in self.inst2spread:
                 self.inst2spread[inst] = []
             self.inst2spread[inst].append(key)
+        return self.spread_data[key]
                 
     def get_underlying(self, instIDs, weights, price_unit = 1):
         if len(instIDs) == 1:
@@ -549,9 +550,9 @@ class Agent(MktDataMixin):
             strat = self.strategies[strat_name]
             strat.initialize()
             strat_trades = self.trade_manager.get_trades_by_strat(strat.name)
-            for etrade in strat_trades:
-                if etrade.status != trade.TradeStatus.StratConfirm:
-                    strat.add_live_trades(etrade)
+            for xtrade in strat_trades:
+                if xtrade.status != trade.TradeStatus.StratConfirm:
+                    strat.add_live_trades(xtrade)
         for gway in self.gateways:
             gateway = self.gateways[gway]
             for inst in gateway.positions:
@@ -559,14 +560,6 @@ class Agent(MktDataMixin):
             gateway.calc_margin()
             gateway.connect()
         self.eventEngine.start()
-
-    def check_price_limit(self, inst, num_tick):
-        inst_obj = self.instruments[inst]
-        tick_base = inst_obj.tick_base
-        if (inst_obj.ask_price1 >= inst_obj.up_limit - num_tick * tick_base) or (inst_obj.bid_price1 <= inst_obj.down_limit + num_tick * tick_base):
-            return True
-        else:
-            return False
  
     def save_state(self):
         if not self.eod_flag:
