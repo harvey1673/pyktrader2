@@ -101,6 +101,13 @@ class Instrument(object):
             return min(base_price + tick_num * self.tick_base, self.up_limit)
         else:
             return max(base_price - tick_num * self.tick_base, self.down_limit)
+
+    def check_price_limit(self, num_tick = 0):        
+        tick_base = self.tick_base
+        if (self.ask_price1 >= self.up_limit - num_tick * tick_base) or (self.bid_price1 <= self.down_limit + num_tick * tick_base):
+            return True
+        else:
+            return False
             
     def fair_price(self):
         self.mid_price = (self.ask_price1 + self.bid_price1)/2.0
