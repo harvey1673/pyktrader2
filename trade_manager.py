@@ -393,7 +393,7 @@ class TradeManager(object):
                 if idx > 0:
                     instIDs = row[1].split(' ')
                     units = [ int(n) for n in row[2].split(' ')]
-                    price_unit = float(row[3])
+                    price_unit = None if len(row[3]) == 0 else float(row[3])
                     vol = int(row[4])
                     limit_price = float(row[5])
                     filled_vol = int(row[6])
@@ -407,12 +407,12 @@ class TradeManager(object):
                         for inst in str_dict:
                             if len(order_dict[inst])>0:
                                 order_dict[inst] = [int(o_id) for o_id in str_dict[inst].split('_')]
-                    strategy = row[10]
-                    book = row[11]
+                    strategy = row[12]
+                    book = row[13]
                     xtrade = XTrade(instIDs, units, vol, limit_price, price_unit = price_unit, strategy = strategy, book = book, \
                                     agent = self.agent, start_time = start_time, end_time = end_time, aggressiveness = aggressiveness)
                     xtrade.id = int(row[0])
-                    xtrade.status = int(row[12])
+                    xtrade.status = int(row[14])
                     xtrade.order_dict = order_dict
                     xtrade.filled_vol = filled_vol
                     xtrade.filled_price = filled_price

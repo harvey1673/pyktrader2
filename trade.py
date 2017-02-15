@@ -50,6 +50,7 @@ class XTrade(object):
     def set_agent(self, agent):
         self.agent = agent
         self.underlying = agent.get_underlying(self.instIDs, self.units, self.price_unit)
+        self.price_unit = self.underlying.multiple
 
     def set_algo(self, algo):
         algo.agent = self.agent
@@ -102,6 +103,8 @@ class XTrade(object):
 
     def on_trade(self, price, volume):
         new_vol = self.filled_vol + volume
+        if new_vol == 0:
+            return
         self.filled_price = (self.filled_price * self.filled_vol + price * volume)/new_vol
         self.filled_vol = new_vol
         self.remaining_vol = self.vol - self.working_vol - self.filled_vol
