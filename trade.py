@@ -16,7 +16,7 @@ class OrderFillStatus:
     Empty, Partial, Full = range(3)
 # Pending: trigger trade, Ready: ok to start process with zero vol, OrderSent: wait for order update
 
-Alive_Trade_Status = [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled]
+Alive_Trade_Status = [TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFilled, TradeStatus.Cancelled]
 
 class XTrade(object):
     # instances = weakref.WeakSet()
@@ -70,6 +70,8 @@ class XTrade(object):
             return self.underlying.price(prices=filled_prices)
 
     def refresh(self):
+        if self.status not in Alive_Trade_Status:
+            return self.status
         filled_vol = []
         open_vol = 0
         total_vol = 0
