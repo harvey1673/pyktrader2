@@ -368,13 +368,14 @@ class TradeManager(object):
         for trade_id in self.ref2trade:
             xtrade = self.ref2trade[trade_id]
             xtrade.refresh()
-            if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready, TradeStatus.OrderSent]:
-                xtrade.status = TradeStatus.Cancelled
+            if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready]:
+                xtrade.status = TradeStatus.Done
                 xtrade.order_dict = {}
+                xtrade.filled_vol = 0
                 xtrade.remaining_vol = xtrade.vol - xtrade.filled_vol
                 strat = self.agent.strategies[xtrade.strategy]
                 strat.on_trade(xtrade)
-            if xtrade.remaining_vol > 0:
+            elif xtrade.remaining_vol > 0:
                 xtrade.status = TradeStatus.PFilled
                 self.agent.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
                 pfilled_dict[trade_id] = xtrade
