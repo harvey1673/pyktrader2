@@ -149,6 +149,7 @@ class SpreadInst(object):
     def shift_price(self, direction, tick_num = 0, price_level = '1'):
         price_str = 'bid_price' + str(price_level) if direction > 0 else 'ask_price' + str(price_level)
         base_price = getattr(self, price_str)
+        return base_price + sign(direction) * tick_num * sum([abs(tb) for tb in self.tick_base])
 
     def price(self, direction = 'mid', prices = None):
         if prices == None:
