@@ -178,11 +178,11 @@ def tradepos2dict(tradepos):
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
                      'daily_close_buffer': 3, 'pos_class': 'TradePos', 'pos_args': {},\
-                     'exec_class': 'ExecAlgoFixTimer'}
+                     'exec_class': 'ExecAlgo1DFixT'}
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': None, \
                     'close_tday': False, 'last_min_id': 2057, 'trail_loss': 0, \
                     'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
-                                  'order_offset': True, 'tick_num': 1} }
+                                  'order_offset': True, 'tick_num': 1, 'order_type': '', 'inst_order': None} }
     def __init__(self, config, agent = None):
         self.load_config(config)
         num_assets = len(self.underliers)

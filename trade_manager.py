@@ -233,7 +233,7 @@ class SimpleTradeBook(object):
         self.instrument = inst_obj
     
     def get_all_trades(self):
-        return [xtrade.id for xtrade in self.bids + self.asks]
+        return [xtrade.id for xtrade in self.bids + self.asks if xtrade.status in trade.Alive_Trade_Status]
         
     def remove_trade(self, xtrade):
         if xtrade.vol > 0:

@@ -5,7 +5,7 @@ import os
 import csv
 import numpy as np
 import datetime
-from tradeagent import *
+from agent import *
 from misc import *
 
 def discount(irate, dtoday, dexp):
@@ -14,7 +14,7 @@ def discount(irate, dtoday, dexp):
 class OptAgentMixin(object):
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         self.volgrids = {}
-        self.irate = config.get('irate', {'CNY': 0.03,})
+        self.irate = config.get('irate', {'CNY': 0.02,})
     
     def load_volgrids(self):
         self.logger.info('loading volgrids')

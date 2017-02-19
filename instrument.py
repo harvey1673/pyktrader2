@@ -130,7 +130,7 @@ class SpreadInst(object):
         self.inst_objs = [inst_data[inst] for inst in instIDs]
         self.weights = weights
         self.conv_factor = [ inst_obj.multiple for inst_obj in self.inst_objs ]
-        self.tick_size = [inst_obj.tick_base for inst_obj in self.inst_objs]
+        self.tick_base = [inst_obj.tick_base for inst_obj in self.inst_objs]
         self.multiple = multiple if multiple != None else self.conv_factor[-1]
         self.last_update = [inst_obj.last_update for inst_obj in self.inst_objs]
         self.ask_price1 = 0.0
@@ -145,7 +145,11 @@ class SpreadInst(object):
         self.mid_price = (self.ask_price1 + self.bid_price1)/2.0
         self.bid_vol1 = min([inst_obj.bid_vol1 if w > 0 else inst_obj.ask_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
         self.ask_vol1 = min([inst_obj.ask_vol1 if w > 0 else inst_obj.bid_vol1 for inst_obj, w in zip(self.inst_objs, self.weights)])
-        
+
+    def shift_price(self, direction, tick_num = 0, price_level = '1'):
+        price_str = 'bid_price' + str(price_level) if direction > 0 else 'ask_price' + str(price_level)
+        base_price = getattr(self, price_str)
+
     def price(self, direction = 'mid', prices = None):
         if prices == None:
             if direction == 'bid':
@@ -154,8 +158,8 @@ class SpreadInst(object):
                 fields = ['ask_price1', 'bid_price1']
             else:
                 fields = ['mid_price', 'mid_price']
-            curr_prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
-        return sum([ p * w * cf for (p, w, cf) in zip(curr_prices, self.weights, self.conv_factor)])/self.multiple
+            prices = [getattr(inst_obj, fields[0]) if w>0 else getattr(inst_obj, fields[1]) for inst_obj, w in zip(self.inst_objs, self.weights)]
+        return sum([ p * w * cf for (p, w, cf) in zip(prices, self.weights, self.conv_factor)])/self.multiple
         
 class Stock(Instrument):
     def __init__(self,name):
