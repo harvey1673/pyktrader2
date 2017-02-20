@@ -35,7 +35,7 @@ class XTrade(object):
         self.strategy = strategy
         self.book = book
         self.agent = agent
-        self.status = TradeStatus.Pending
+        self.status = TradeStatus.Ready
         self.order_dict = {}
         self.working_vol = 0
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol

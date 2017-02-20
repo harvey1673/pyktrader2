@@ -398,7 +398,8 @@ class Strategy(object):
                                 price, price, self.underlying[idx].multiple, **self.pos_args)
         tradepos.entry_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
-        self.positions[idx].append(tradepos)        
+        self.positions[idx].append(tradepos)
+        self.save_state()
 
     def submit_trade(self, idx, xtrade):
         xtrade.book = str(idx)
@@ -413,7 +414,7 @@ class Strategy(object):
         xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
-        return
+        self.save_state()
 
     def update_trade_unit(self):
         self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
