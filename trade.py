@@ -57,7 +57,7 @@ class XTrade(object):
 
     def refresh(self):
         if self.status not in Alive_Trade_Status:
-            return False
+            return self.status
         filled_vol = []
         open_vol = 0
         total_vol = 0
@@ -82,18 +82,14 @@ class XTrade(object):
             self.algo.order_filled = []
             self.status = TradeStatus.Ready
             self.on_trade(working_price, working_vol)
+            return self.status
         elif self.status == TradeStatus.Cancelled:
             self.algo.on_partial_cancel()
         else:
             self.status = TradeStatus.PFilled
         if (self.filled_vol == self.vol) or ((self.status == TradeStatus.Cancelled) and len(self.order_dict)==0):
-            self.status = TradeStatus.Done
-            self.order_dict = {}
-            self.algo.order_filled = []
-            self.working_vol = 0
-            self.remaining_vol = 0
-            self.update_strat()
-        return self.status in Alive_Trade_Status
+            self.set_done()
+        return self.status
 
     def on_trade(self, price, volume):
         new_vol = self.filled_vol + volume
@@ -107,12 +103,12 @@ class XTrade(object):
             self.algo = None
             self.update_strat()
     
-    def cancel(self):
-        self.status = TradeStatus.Cancelled
+    def set_done(self):
+        self.status = TradeStatus.Done
         self.remaining_vol = 0
         self.working_vol = 0
         self.order_dict = {}
-        self.algo.order_filled = []
+        self.algo = None
         self.update_strat()
 
     def update_strat(self):
