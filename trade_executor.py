@@ -93,10 +93,11 @@ class ExecAlgo1DFixT(ExecAlgoBase):
         if stop_flag:
             status = self.xtrade.status = trade.TradeStatus.Cancelled
         if cancel_flag:
-            return status
+            return status        
         if status == trade.TradeStatus.Cancelled:
             self.on_partial_cancel()
             return status
+        next_vol = 0
         if (self.xtrade.status == trade.TradeStatus.Ready) and (self.next_timer < self.agent.tick_id):
             self.xtrade.working_vol =  min(self.max_vol, abs(self.xtrade.remaining_vol)) * direction
             self.xtrade.remaining_vol -= self.xtrade.working_vol
@@ -106,7 +107,7 @@ class ExecAlgo1DFixT(ExecAlgoBase):
             next_price = inst_obj.shift_price(next_vol, self.tick_num) if next_vol > 0 else inst_obj.shift_price(next_vol, self.tick_num)
         elif status == trade.TradeStatus.Cancelled:
             self.on_partial_cancel()
-            return status
+            return self.xtrade.status
         elif status == trade.TradeStatus.PFilled:
             next_vol = self.xtrade.working_vol - self.order_filled[0]*sign(self.xtrade.working_vol)
             traded_prices = [iorder.filled_price for iorder in reversed(self.xtrade.order_dict[self.instIDs[0]]) if
@@ -128,7 +129,7 @@ class ExecAlgo1DFixT(ExecAlgoBase):
         if curr_vol != 0 :
             curr_p = sum([iorder.filled_price * iorder.filled_vol for iorder in self.xtrade.order_dict[self.instIDs[0]]]) / curr_vol
             self.xtrade.on_trade(curr_p, curr_vol)
-        self.cancel()
+        self.xtrade.set_done()
         
 class ExecAlgoFixTimer(ExecAlgoBase):
     '''send out order by fixed period, cancel the trade when hit the stop price '''
