@@ -670,7 +670,8 @@ class Agent(MktDataMixin):
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
         mytrade = self.trade_manager.get_trade(trade_ref)
-        if mytrade.refresh():
+        status = mytrade.refresh()
+        if status in trade.Alive_Trade_Status:
             mytrade.execute()
         self.save_state()
             
