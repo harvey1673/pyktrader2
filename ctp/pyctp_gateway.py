@@ -1007,7 +1007,7 @@ class PyctpTdApi(py_ctp.TraderApi):
         self.reqID += 1
         self.orderRef = max(self.orderRef, iorder.local_id)
         req = {}
-        req['InstrumentID'] = str(iorder.instrument.name)
+        req['InstrumentID'] = str(iorder.instrument)
         req['LimitPrice'] = iorder.limit_price
         req['VolumeTotalOriginal'] = iorder.volume
         
@@ -1039,12 +1039,11 @@ class PyctpTdApi(py_ctp.TraderApi):
     
     #----------------------------------------------------------------------
     def cancelOrder(self, iorder):
-        """撤单"""
-        inst = iorder.instrument
+        """撤单"""        
         self.reqID += 1
         req = {}
-        req['InstrumentID'] = iorder.instrument.name
-        req['ExchangeID'] = inst.exchange
+        req['InstrumentID'] = iorder.instrument
+        req['ExchangeID'] = iorder.exchange
         req['ActionFlag'] = defineDict['THOST_FTDC_AF_Delete']
         req['BrokerID'] = self.brokerID
         req['InvestorID'] = self.userID
