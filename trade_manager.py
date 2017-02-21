@@ -107,7 +107,7 @@ class TradeTree(object):
         return self.price_tree.get(price, [])
 
     def get_trade(self, trade_id):
-        return self.trade_map[trade_id]
+        return self.trade_map[trade_id] if trade_id in self.trade_map else None
 
     def create_price(self, price):
         self.depth += 1 # Add a price depth level to the tree
@@ -406,7 +406,7 @@ class TradeManager(object):
                     if ':' in row[8]:
                         str_dict =  dict([tuple(s.split(':')) for s in row[8].split(' ')])
                         for inst in str_dict:
-                            if len(order_dict[inst])>0:
+                            if len(str_dict[inst])>0:
                                 order_dict[inst] = [int(o_id) for o_id in str_dict[inst].split('_')]
                     strategy = row[12]
                     book = row[13]
@@ -417,6 +417,5 @@ class TradeManager(object):
                     xtrade.order_dict = order_dict
                     xtrade.filled_vol = filled_vol
                     xtrade.filled_price = filled_price
-                    xtrade.refresh()
                     trade_dict[xtrade.id] = xtrade
         return trade_dict

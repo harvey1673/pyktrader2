@@ -670,6 +670,9 @@ class Agent(MktDataMixin):
     def trade_update(self, event):
         trade_ref = event.dict['trade_ref']
         mytrade = self.trade_manager.get_trade(trade_ref)
+        if mytrade == None:
+            self.logger.warning("get trade update for trade_id = %s, but it is not in the trade list" % trade_ref)
+            return
         status = mytrade.refresh()
         if status in trade.Alive_Trade_Status:
             mytrade.execute()

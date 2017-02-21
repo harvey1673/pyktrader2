@@ -93,7 +93,7 @@ class ExecAlgo1DFixT(ExecAlgoBase):
             next_vol = self.xtrade.working_vol - self.xtrade.order_filled[0] * direction
             next_price = self.xtrade.underlying.shift_price(next_vol, self.tick_num)
             traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[self.instIDs[0]] if
-                            iorder.filled_vol > 0]                            
+                            iorder.filled_volume > 0]
             if len(traded_prices) > 0:
                 next_price = max(next_price, traded_prices[-1]) if next_vol > 0 else min(next_price, traded_prices[-1])
         if next_vol != 0:
@@ -109,7 +109,7 @@ class ExecAlgo1DFixT(ExecAlgoBase):
     def on_partial_cancel(self):
         curr_vol = self.xtrade.order_filled[0]
         if curr_vol != 0 :
-            curr_p = sum([iorder.filled_price * iorder.filled_vol for iorder in self.xtrade.order_dict[self.instIDs[0]]]) / curr_vol
+            curr_p = sum([iorder.filled_price * iorder.filled_volume for iorder in self.xtrade.order_dict[self.instIDs[0]]]) / curr_vol
             self.xtrade.on_trade(curr_p, curr_vol)
         self.xtrade.set_done()
         
@@ -159,7 +159,7 @@ class ExecAlgoFixTimer(ExecAlgoBase):
                     next_vol = unfilled * sign(self.xtrade.working_vol * unit)
                     next_price = inst_obj.shift_price(next_vol, self.tick_num)
                     if instID in self.xtrade.order_dict:
-                        traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[instID] if iorder.filled_vol > 0]
+                        traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[instID] if iorder.filled_volume > 0]
                     else:                        
                         traded_prices = []
                     if len(traded_prices) > 0:

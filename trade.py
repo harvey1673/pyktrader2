@@ -35,7 +35,7 @@ class XTrade(object):
         self.strategy = strategy
         self.book = book
         self.agent = agent
-        self.status = TradeStatus.Pending
+        self.status = TradeStatus.Ready
         self.order_dict = {}
         self.working_vol = 0
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol
@@ -58,11 +58,12 @@ class XTrade(object):
     def calc_filled_price(self, order_dict):
         filled_prices = []
         for instID in self.instIDs:
+            avg_p = 0.0
             if instID in order_dict:
-                filled_prices.append(sum([o.filled_price * o.filled_volume for o in order_dict[instID]]) \
-                                     /sum([o.filled_volume for o in order_dict[instID]]))
-            else:
-                filled_prices.append(0.0)
+                sum_vol = sum([o.filled_volume for o in order_dict[instID]])
+                if sum_vol > 0:
+                    avg_p = sum([o.filled_price * o.filled_volume for o in order_dict[instID]])/sum_vol
+            filled_prices.append(avg_p)
         if len(self.instIDs) == 1:
             return filled_prices[0]
         else:            
@@ -96,10 +97,10 @@ class XTrade(object):
                     self.status = TradeStatus.Ready
                 self.on_trade(working_price, working_vol)                
             else:
-                if (status != TradeStatus.Cancelled):
+                if (self.status != TradeStatus.Cancelled):
                     self.status = TradeStatus.OrderSent if open_vol > 0 else TradeStatus.PFilled
         else:
-            if (self.filled_vol == self.vol) or (self.status == TradeStatus.Cancelled)
+            if (self.filled_vol == self.vol) or (self.status == TradeStatus.Cancelled):
                 self.set_done()
             else:
                 self.status = TradeStatus.Ready            
