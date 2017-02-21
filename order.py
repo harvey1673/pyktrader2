@@ -18,6 +18,7 @@ class Order(object):
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(),'%d%H%M%S')))
     def __init__(self, instID, limit_price, vol, order_time, action_type, direction, price_type, trade_ref = 0, gateway = None):
         self.instrument = instID
+        self.exchange = ''
         self.type = self.__class__.__name__
         self.instIDs = [instID]
         self.units = [1]
@@ -44,6 +45,7 @@ class Order(object):
     def set_gateway(self, gateway):
         self.gateway = gateway
         self.positions = [ self.gateway.positions[inst] for inst in self.instIDs]
+        self.exchange = gateway.agent.instruments[self.instIDs[0]].exchange
 
     def recalc_pos(self):
         for pos in self.positions:
