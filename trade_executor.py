@@ -16,7 +16,6 @@ class ExecAlgoBase(object):
             self.inst_order = inst_order
         self.instIDs = [xtrade.instIDs[seq] for seq in self.inst_order]
         self.units = [xtrade.units[seq] for seq in self.inst_order]
-        self.order_filled = []
         self.max_vol = max_vol
         self.stop_price = stop_price
         self.set_agent(xtrade.agent)
@@ -37,20 +36,6 @@ class ExecAlgoBase(object):
 
     def execute(self):
         pass
-
-    def calc_filled_price(self, order_dict):
-        filled_prices = []
-        for instID in self.instIDs:
-            if instID in order_dict:
-                filled_prices.append(sum([o.filled_price * o.filled_volume for o in order_dict[instID]]) \
-                                     /sum([o.filled_volume for o in order_dict[instID]]))
-            else:
-                filled_prices.append(0.0)
-        if len(self.instIDs) == 1:
-            return filled_prices[0]
-        else:
-            filled_prices = [filled_prices[i] for i in self.inst_order]
-            return self.xtrade.underlying.price(prices=filled_prices)
 
 class ExecAlgo1DFixT(ExecAlgoBase):
     def __init__(self, xtrade, stop_price = None, max_vol = 20, time_period = 100, price_type = OPT_LIMIT_ORDER, \
@@ -96,36 +81,33 @@ class ExecAlgo1DFixT(ExecAlgoBase):
             return status        
         if status == trade.TradeStatus.Cancelled:
             self.on_partial_cancel()
-            return status
+            return self.xtrade.status
         next_vol = 0
         if (self.xtrade.status == trade.TradeStatus.Ready) and (self.next_timer < self.agent.tick_id):
             self.xtrade.working_vol =  min(self.max_vol, abs(self.xtrade.remaining_vol)) * direction
             self.xtrade.remaining_vol -= self.xtrade.working_vol
-            self.xtrade.order_dict[self.instIDs[0]] = []
             next_vol = self.units[0] * self.xtrade.working_vol
             inst_obj = self.xtrade.underlying
-            next_price = inst_obj.shift_price(next_vol, self.tick_num) if next_vol > 0 else inst_obj.shift_price(next_vol, self.tick_num)
-        elif status == trade.TradeStatus.Cancelled:
-            self.on_partial_cancel()
-            return self.xtrade.status
+            next_price = inst_obj.shift_price(next_vol, self.tick_num)
         elif status == trade.TradeStatus.PFilled:
-            next_vol = self.xtrade.working_vol - self.order_filled[0]*sign(self.xtrade.working_vol)
-            traded_prices = [iorder.filled_price for iorder in reversed(self.xtrade.order_dict[self.instIDs[0]]) if
-                            iorder.filled_vol > 0]
-            last_price = traded_prices[0] if len(traded_prices) > 0 else 0
-            next_price = max(last_price, self.xtrade.underlying.shift_price(next_vol, self.tick_num)) if next_vol > 0 \
-                                else min(last_price, self.xtrade.underlying.shift_price(next_vol, self.tick_num))
+            next_vol = self.xtrade.working_vol - self.xtrade.order_filled[0] * direction
+            next_price = self.xtrade.underlying.shift_price(next_vol, self.tick_num)
+            traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[self.instIDs[0]] if
+                            iorder.filled_vol > 0]                            
+            if len(traded_prices) > 0:
+                next_price = max(next_price, traded_prices[-1]) if next_vol > 0 else min(next_price, traded_prices[-1])
         if next_vol != 0:
             gway = self.agent.gateway_map(self.instIDs[0])
             new_orders = getattr(gway, self.book_func)(self.instIDs[0], next_vol, self.price_type, next_price, trade_ref = self.xtrade.id, **self.book_args)
+            if self.instIDs[0] not in self.xtrade.order_dict:
+                self.xtrade.order_dict[self.instIDs[0]] = []
             self.xtrade.order_dict[self.instIDs[0]] += new_orders
             self.next_timer += self.timer_period
             status = self.xtrade.status = trade.TradeStatus.OrderSent
         return status
     
     def on_partial_cancel(self):
-        curr_vol = self.order_filled[0]
-        self.xtrade.working_vol = 0
+        curr_vol = self.xtrade.order_filled[0]
         if curr_vol != 0 :
             curr_p = sum([iorder.filled_price * iorder.filled_vol for iorder in self.xtrade.order_dict[self.instIDs[0]]]) / curr_vol
             self.xtrade.on_trade(curr_p, curr_vol)
@@ -165,20 +147,23 @@ class ExecAlgoFixTimer(ExecAlgoBase):
             return status
         if status == trade.TradeStatus.Cancelled:
             self.on_partial_cancel()
-            return status
+            return self.xtrade.status
         next_inst = ''
         next_vol = 0
         next_price = 0
         if status == trade.TradeStatus.PFilled:
-            for instID, unit, ofilled, inst_obj in zip(self.instIDs, self.units, self.order_filled, self.inst_objs):
-                unfilled = abs(self.xtrade.working_vol * unit) - ofilled
+            for instID, unit, inst_obj, seq in zip(self.instIDs, self.units, self.order_filled, self.inst_objs, self.inst_order):
+                unfilled = abs(self.xtrade.working_vol * unit) - self.xtrade.order_filled[seq]
                 if unfilled > 0:
                     next_inst = instID
                     next_vol = unfilled * sign(self.xtrade.working_vol * unit)
-                    traded_prices = [ iorder.filled_price for iorder in reversed(self.xtrade.order_dict[instID]) if iorder.filled_vol > 0 ]
-                    last_price = traded_prices[0] if len(traded_prices) > 0 else 0
-                    next_price = max(last_price, inst_obj.shift_price(next_vol, self.tick_num)) if next_vol > 0 \
-                                        else min(last_price, inst_obj.shift_price(next_vol, self.tick_num))
+                    next_price = inst_obj.shift_price(next_vol, self.tick_num)
+                    if instID in self.xtrade.order_dict:
+                        traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[instID] if iorder.filled_vol > 0]
+                    else:                        
+                        traded_prices = []
+                    if len(traded_prices) > 0:
+                        next_price = max(next_price, traded_prices[-1]) if next_vol > 0 else min(next_price, traded_prices[-1])                    
                     break
             if next_vol == 0:
                 self.agent.logger("something wrong with trade status = PFilled, while no actually no unfilled volume")
@@ -189,13 +174,12 @@ class ExecAlgoFixTimer(ExecAlgoBase):
             next_inst = self.instIDs[0]
             self.xtrade.order_dict[next_inst] = []
             next_vol = self.units[0] * self.xtrade.working_vol
-            next_price = self.inst_objs[0].shift_price(next_vol, self.tick_num) if next_vol > 0 \
-                                        else self.inst_objs[0].shift_price(next_vol, self.tick_num)
-        elif status == trade.TradeStatus.Cancelled:
-            self.on_partial_cancel()
+            next_price = self.inst_objs[0].shift_price(next_vol, self.tick_num)
         if next_vol != 0:
             gway = self.agent.gateway_map(next_inst)
             new_orders = gway.book_order(next_inst, next_vol, self.price_type, next_price, trade_ref = self.xtrade.id, order_num = self.order_num)
+            if next_inst not in self.xtrade.order_dict:
+                self.xtrade.order_dict[next_inst] = []
             self.xtrade.order_dict[next_inst] += new_orders
             self.next_timer += self.timer_period
             status = self.xtrade.status = trade.TradeStatus.OrderSent
@@ -203,19 +187,14 @@ class ExecAlgoFixTimer(ExecAlgoBase):
     
     def on_partial_cancel(self):
         direction = sign(self.xtrade.vol)
-        seqs = sorted(range(len(self.inst_order)), key=lambda k: self.inst_order[k])
-        order_filled = [self.order_filled[seq] for seq in seqs]
-        fillvol = min([int(abs(filled/unit)) for (filled, unit) in zip(order_filled, self.xtrade.units)]) * direction
-        price_filled = [sum([o.filled_price * o.filled_vol for o in self.xtrade.order_dict[instID]])/filled \
-                                            for instID, filled in zip(self.xtrade.instIDs, order_filled)]
+        fillvol = min([int(abs(filled/unit)) for (filled, unit) in zip(self.xtrade.order_filled, self.xtrade.units)]) * direction
+        price_filled = [sum([o.filled_price * o.filled_vol for o in self.xtrade.order_dict[instID]])/filled if filled != 0 else 0.0 \
+                                            for instID, filled in zip(self.xtrade.instIDs, self.xtrade.order_filled)]
         if fillvol != 0:
-            leftvol = [ (filled - abs(unit * fillvol)) * sign(unit*direction) for (filled, unit) in zip(order_filled, self.xtrade.units)]
-            self.xtrade.working_vol = 0
-            self.xtrade.order_dict = {}
-            self.order_filled = []
-            self.xtrade.status = trade.TradeStatus.Done
+            leftvol = [ (filled - abs(unit * fillvol)) * sign(unit*direction) for (filled, unit) in zip(self.xtrade.order_filled, self.xtrade.units)]
             working_price = self.xtrade.underlying.price(prices=price_filled)
-            self.xtrade.on_trade(working_price, fillvol)            
+            self.xtrade.on_trade(working_price, fillvol)
+            self.xtrade.set_done()
         for instID, vol, p in zip(self.xtrade.instIDs, leftvol, price_filled):
             if vol != 0:
                 pair = (instID, vol, p)
