@@ -35,7 +35,7 @@ class XTrade(object):
         self.strategy = strategy
         self.book = book
         self.agent = agent
-        self.status = TradeStatus.Ready
+        self.status = TradeStatus.Pending
         self.order_dict = {}
         self.working_vol = 0
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol
@@ -55,40 +55,54 @@ class XTrade(object):
         self.algo = algo
         self.algo.set_agent(self.agent)
 
+    def calc_filled_price(self, order_dict):
+        filled_prices = []
+        for instID in self.instIDs:
+            if instID in order_dict:
+                filled_prices.append(sum([o.filled_price * o.filled_volume for o in order_dict[instID]]) \
+                                     /sum([o.filled_volume for o in order_dict[instID]]))
+            else:
+                filled_prices.append(0.0)
+        if len(self.instIDs) == 1:
+            return filled_prices[0]
+        else:            
+            return self.underlying.price(prices=filled_prices)
+            
     def refresh(self):
         if self.status not in Alive_Trade_Status:
-            return self.status
+            return self.status        
         filled_vol = []
         open_vol = 0
         total_vol = 0
-        for instID, unit in zip(self.algo.instIDs, self.algo.units):
-            if instID in self.order_dict:
-                fill_vol = sum([o.filled_volume for o in self.order_dict[instID]])
-                full_vol = sum([o.volume for o in self.order_dict[instID]])
+        if len(self.order_dict)>0:
+            for instID, unit in zip(self.instIDs, self.units):
+                if instID in self.order_dict:
+                    fill_vol = sum([o.filled_volume for o in self.order_dict[instID]])
+                    full_vol = sum([o.volume for o in self.order_dict[instID]])
+                else:
+                    fill_vol = 0
+                    full_vol = 0
+                open_vol += full_vol - fill_vol
+                total_vol += abs(unit * self.working_vol)
+                filled_vol.append(fill_vol)
+            self.order_filled = filled_vol
+            if sum(filled_vol) >= total_vol:
+                working_price = self.calc_filled_price(self.order_dict)
+                working_vol = self.working_vol
+                self.working_vol = 0
+                self.order_dict = {}
+                self.order_filled = []
+                if self.status != TradeStatus.Cancelled:
+                    self.status = TradeStatus.Ready
+                self.on_trade(working_price, working_vol)                
             else:
-                fill_vol = 0
-                full_vol = 0
-            open_vol += full_vol - fill_vol
-            total_vol += abs(unit * self.working_vol)
-            filled_vol.append(fill_vol)
-        self.algo.order_filled = filled_vol
-        if open_vol > 0:
-            self.status = TradeStatus.OrderSent
-        elif sum(filled_vol) >= total_vol:
-            working_price = self.algo.calc_filled_price(self.order_dict)
-            working_vol = self.working_vol
-            self.working_vol = 0
-            self.order_dict = {}
-            self.algo.order_filled = []
-            self.status = TradeStatus.Ready
-            self.on_trade(working_price, working_vol)
-            return self.status
-        elif self.status == TradeStatus.Cancelled:
-            self.algo.on_partial_cancel()
+                if (status != TradeStatus.Cancelled):
+                    self.status = TradeStatus.OrderSent if open_vol > 0 else TradeStatus.PFilled
         else:
-            self.status = TradeStatus.PFilled
-        if (self.filled_vol == self.vol) or ((self.status == TradeStatus.Cancelled) and len(self.order_dict)==0):
-            self.set_done()
+            if (self.filled_vol == self.vol) or (self.status == TradeStatus.Cancelled)
+                self.set_done()
+            else:
+                self.status = TradeStatus.Ready            
         return self.status
 
     def on_trade(self, price, volume):
@@ -98,7 +112,7 @@ class XTrade(object):
         self.filled_price = (self.filled_price * self.filled_vol + price * volume)/new_vol
         self.filled_vol = new_vol
         self.remaining_vol = self.vol - self.working_vol - self.filled_vol
-        if (self.filled_vol == self.vol) or (self.status == TradeStatus.Done):
+        if (self.filled_vol == self.vol) or ((self.status == TradeStatus.Cancelled) and (len(self.order_dict) == 0)):
             self.status = TradeStatus.Done
             self.algo = None
             self.update_strat()
@@ -108,6 +122,7 @@ class XTrade(object):
         self.remaining_vol = 0
         self.working_vol = 0
         self.order_dict = {}
+        self.order_filled = []
         self.algo = None
         self.update_strat()
 
