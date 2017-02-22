@@ -197,7 +197,7 @@ class Gateway(object):
                     inst = row[3]
                     order_class = eval('order.' + str(row[14]))
                     filled_orders = {}
-                    if ':' not in in row[7]:
+                    if ':' not in row[7]:
                         continue
                     filled_str = row[7].split('|')                                        
                     for fstr in filled_str:
