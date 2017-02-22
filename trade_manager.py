@@ -292,7 +292,7 @@ class TradeManager(object):
             self.add_trade(xtrade)
 
     def get_trade(self, trade_id):
-        return self.ref2trade[trade_id]
+        return self.trade_map[trade_id] if trade_id in self.trade_map else None
 
     def get_trades_by_strat(self, strat_name):
         return [xtrade for xtrade in self.ref2trade.values() if xtrade.strategy == strat_name]
