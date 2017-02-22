@@ -197,12 +197,15 @@ class Gateway(object):
                     inst = row[3]
                     order_class = eval('order.' + str(row[14]))
                     filled_orders = {}
-                    if ':' in row[7]:
-                        filled_str = row[7].split('|')                                        
-                        for fstr in filled_str:                            
-                            forder = fstr.split(':')
-                            pair_str = forder[1].split('_')
-                            filled_orders[forder[0]] = [float(pair_str[0]), int(pair_str[1])]
+                    if ':' not in in row[7]:
+                        continue
+                    filled_str = row[7].split('|')                                        
+                    for fstr in filled_str:
+                        if (':' not in fstr) or ('_' not in fstr):
+                            continue
+                        forder = fstr.split(':')
+                        pair_str = forder[1].split('_')
+                        filled_orders[forder[0]] = [float(pair_str[0]), int(pair_str[1])]
                     iorder = order_class(inst, float(row[11]), int(row[4]), int(row[12]),
                                    row[8], row[9], row[10], int(row[15]))
                     iorder.sys_id = row[1]
