@@ -509,9 +509,8 @@ class CtpGateway(GrossGateway):
                     event.dict['trade_ref'] = iorder.trade_ref
                     self.eventEngine.put(event)
                 elif sorder['OrderStatus'] in ['3', '1', 'a']:
-                    if iorder.status != order.OrderStatus.Sent or iorder.conditionals != {}:
-                        iorder.status = order.OrderStatus.Sent
-                        iorder.conditionals = {}
+                    if iorder.status != order.OrderStatus.Sent:
+                        iorder.status = order.OrderStatus.Sent                        
                         logContent = 'order status for OrderSysID = %s, Inst=%s is set to %s, but should be waiting in exchange queue' % (iorder.sys_id, iorder.instrument.name, iorder.status)
                         self.onLog(logContent, level = logging.INFO)
                 elif sorder['OrderStatus'] in ['5', '2', '4']:
