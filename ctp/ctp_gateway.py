@@ -186,12 +186,11 @@ class CtpGateway(GrossGateway):
     #----------------------------------------------------------------------
     def cancelOrder(self, iorder):
         """撤单"""
-        self.tdApi.cancelOrder(iorder)
-        inst = iorder.instrument
-        self.order_stats[inst.name]['cancel'] += 1
+        self.tdApi.cancelOrder(iorder)        
+        self.order_stats[iorder.instrument]['cancel'] += 1
         self.order_stats['total_cancel'] += 1
-        self.onLog( u'A_CC:取消命令: OrderRef=%s, OrderSysID=%s, exchange=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' % (iorder.local_id, \
-                            iorder.sys_id, inst.exchange, inst.name, iorder.volume, iorder.filled_volume, iorder.cancelled_volume), level = logging.DEBUG)     		
+        self.onLog( u'A_CC:取消命令: OrderRef=%s, OrderSysID=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' % (iorder.local_id, \
+                            iorder.sys_id, iorder.instrument, iorder.volume, iorder.filled_volume, iorder.cancelled_volume), level = logging.DEBUG)     		
         
     #----------------------------------------------------------------------
     def qryAccount(self):
