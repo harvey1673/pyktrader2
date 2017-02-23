@@ -11,7 +11,7 @@ XBASE = 100 #用于一般化的除数基数
 
 import sys
 import functools
-
+from logging.handlers import RotatingFileHandler
 import logging
 import decorator
 from inspect import (
@@ -24,7 +24,13 @@ CONSOLE_FORMAT = '%(asctime)s%(message)s'
 
 #设定日志
 def config_logging(filename,level=logging.DEBUG,format=MY_FORMAT,to_console=True,console_level=logging.INFO):
-    logging.basicConfig(filename=filename,level=level,format=format)
+    #logging.basicConfig(filename=filename,level=level,format=format)
+    my_handler = RotatingFileHandler(filename, mode='a', maxBytes=5*1024*1024, 
+                                    backupCount=2, encoding=None, delay=0)
+    my_handler.setFormatter(MY_FORMAT)
+    my_handler.setLevel(level)
+    app_log = logging.getLogger('')
+    app_log.addHandler(my_handler)
     if to_console:
         add_log2console(console_level)
 
@@ -235,7 +241,6 @@ def _icache(func, *args, **kw):
         单独使用仅用于超级简单的情况
         可以与@indicator一起使用，但提供的增益有限(因指标内部必须处理源序列增加的事宜),只减少了几个指标内部的判断语句
         ####通常，任何情况下icache都是不必要的. icache引入的开销比不上它要节省的开销, 而且引入了额外的复杂性，更不宜于理解####
-
         vojb用于固定住输入中用id标识的对象，防止在计算过程中被释放后重新分配给其它对象
     '''
     key = args + kw.iteritems() if kw else args
@@ -298,7 +303,6 @@ def MA_EXAMPLE(src,mlen,_ts=None):
     '''
         所有指标都必须设定_ts这个参数,且默认值为None,装饰器将传入暂存对象
         #_ts必须是最后一个固定位置参数
-
         返回值:
             移动平均序列
             当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
@@ -320,5 +324,3 @@ def MA_EXAMPLE(src,mlen,_ts=None):
         _ts.ma.append((ss-_ts.sa[-rlen-1]+rlen/2)/rlen) 
     #print _ts.sa
     return _ts.ma
-
-
