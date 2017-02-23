@@ -10,12 +10,10 @@ import csv
 import json
 import os
 import sec_bits
+import logging
 
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
                    'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'multiple']
-
-STRAT_POS_CANCEL = 0
-STRAT_POS_MUST_EXEC = 1
 
 class TrailLossType:
     Ratio, Level = range(2)
@@ -193,7 +191,6 @@ class Strategy(object):
         self.submitted_trades = dict([(idx, []) for idx in range(num_assets)])
         self.agent = agent
         self.folder = ''
-        self.logger = None
         self.inst2idx = {}
         self.under2idx = {}
         self.num_entries = [0] * num_assets
@@ -235,7 +232,6 @@ class Strategy(object):
     def set_agent(self, agent):
         self.agent = agent
         self.folder = self.agent.folder + self.name + '_'
-        self.logger = self.agent.logger
         self.inst2idx = {}
         for idx, under in enumerate(self.tradables):             
             under_key = '_'.join(under)
@@ -261,7 +257,18 @@ class Strategy(object):
     def initialize(self):
         self.load_state()
         self.update_trade_unit()
-
+    
+    def on_log(self, text, level = logging.INFO, args = {}):    
+        event = Event(type=EVENT_LOG)
+        event.dict['data'] = log_content
+        event.dict['owner'] = "strategy_" + self.name
+        event.dict['level'] = level
+        self.agent.eventEngine.put(event)
+        
+        event = Event(type=EVENT_LOG)        
+            self.gateway.onLog(logContent, level = logging.DEBUG)    
+        self.agent.logger.log(level, text, **arg) 
+        
     def add_unwind(self, pair):
         instID = pair[0]
         vol = pair[1]
@@ -291,7 +298,8 @@ class Strategy(object):
             i = exit_ids.index(xtrade.id)
             is_entry = False
         else:
-            self.logger.warning('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (xtrade.id, xtrade.status, self.name))
+            self.on_log('the trade %s is in status = %s but not found in the strat=%s tradepos table' % (xtrade.id, xtrade.status, self.name), \
+                                                                            level = logging.WARNING)
             xtrade.status = trade.TradeStatus.StratConfirm
             return
         tradepos = self.positions[idx][i]        
@@ -299,13 +307,13 @@ class Strategy(object):
         if is_entry:
             if xtrade.filled_vol != 0:
                 tradepos.open( traded_price, xtrade.filled_vol, datetime.datetime.now())
-                self.logger.info('strat %s successfully opened a position on %s after tradeid=%s is done, trade status is changed to confirmed' %
-                            (self.name, '_'.join(tradepos.insts), xtrade.id))
+                self.on_log('strat %s successfully opened a position on %s after tradeid=%s is done, trade status is changed to confirmed' %
+                            (self.name, '_'.join(tradepos.insts), xtrade.id), level = logging.INFO)
                 self.num_entries[idx] += 1
             else:
                 tradepos.cancel_open()
-                self.logger.info('strat %s cancelled an open position on %s after tradeid=%s is cancelled. Both trade and position will be removed.' %
-                                (self.name, '_'.join(tradepos.insts), xtrade.id))
+                self.on_log('strat %s cancelled an open position on %s after tradeid=%s is cancelled. Both trade and position will be removed.' %
+                                (self.name, '_'.join(tradepos.insts), xtrade.id), level = logging.INFO)
             xtrade.status = trade.TradeStatus.StratConfirm    
         else:
             if xtrade.filled_vol == xtrade.vol:
@@ -314,8 +322,8 @@ class Strategy(object):
                 save_pos = tradepos.partial_close( traded_price, xtrade.filled_vol, datetime.datetime.now())
             if save_pos != None:
                 self.save_closed_pos(save_pos)
-                self.logger.info('strat %s closed a position on %s after tradeid=%s (filled = %s, full = %s) is done, the closed trade position is saved' %
-                            (self.name, '_'.join(tradepos.insts), xtrade.id, xtrade.filled_vol, xtrade.vol))
+                self.on_log('strat %s closed a position on %s after tradeid=%s (filled = %s, full = %s) is done, the closed trade position is saved' %
+                            (self.name, '_'.join(tradepos.insts), xtrade.id, xtrade.filled_vol, xtrade.vol), level = logging.INFO)
             xtrade.status = trade.TradeStatus.StratConfirm
             self.num_exits[idx] += 1
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
@@ -327,7 +335,7 @@ class Strategy(object):
         if len(self.positions[idx]) > 0:
             for pos in self.positions[idx]:
                 if (pos.entry_time > NO_ENTRY_TIME) and (pos.exit_tradeid == 0):
-                    self.logger.info( 'strat=%s is liquidating underliers = %s' % ( self.name,   '_'.join(pos.insts)))
+                    self.on_log( 'strat=%s is liquidating underliers = %s' % ( self.name,   '_'.join(pos.insts)), level = logging.INFO)
                     self.close_tradepos(idx, pos, self.curr_prices[idx])
                     save_status = True
         return save_status
@@ -340,14 +348,14 @@ class Strategy(object):
             idx = self.under2idx[trade_key]
         for cur_trade in self.submitted_trades[idx]:
             if xtrade.id == cur_trade.id:
-                self.logger.debug('trade_id = %s is already in the strategy= %s list' % (xtrade.id, self.name))
+                self.on_log('trade_id = %s is already in the strategy= %s list' % (xtrade.id, self.name), level = logging.DEBUG)
                 return False
-        self.logger.info('trade_id = %s is added to the strategy= %s list' % (xtrade.id, self.name))
+        self.on_log('trade_id = %s is added to the strategy= %s list' % (xtrade.id, self.name), level= logging.INFO)
         self.submit_trade(idx, xtrade)
         return True
 
     def day_finalize(self):
-        self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
+        self.on_log('strat %s is finalizing the day - update trade unit, save state' % self.name, level = logging.INFO)
         self.update_trade_unit()
         self.num_entries = [0] * len(self.underliers)
         self.num_exits = [0] * len(self.underliers)
@@ -365,7 +373,6 @@ class Strategy(object):
         for idx in idx_list:
             self.calc_curr_price(idx)
             if self.run_flag[idx] == 1:
-                #save_status = save_status or self.check_tradepos(idx)
                 save_status = save_status or self.on_tick(idx, ctick)
             elif self.run_flag[idx] == 2:
                 save_status = save_status or self.liquidate_tradepos(idx)
@@ -398,8 +405,7 @@ class Strategy(object):
                                 price, price, self.underlying[idx].multiple, **self.pos_args)
         tradepos.entry_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
-        self.positions[idx].append(tradepos)
-        self.save_state()
+        self.positions[idx].append(tradepos)        
 
     def submit_trade(self, idx, xtrade):
         xtrade.book = str(idx)
@@ -414,16 +420,15 @@ class Strategy(object):
         xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
-        self.save_state()
+        return
 
     def update_trade_unit(self):
         self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
 
     def status_notifier(self, msg):
-        self.logger.info(msg)
+        self.on_log(msg, level = logging.INFO)
         if len(self.email_notify) > 0:
             send_mail(sec_bits.EMAIL_HOTMAIL, self.email_notify, '%s trade signal' % (self.name), msg)
-        return
 
     def save_local_variables(self, file_writer):
         pass
@@ -433,7 +438,7 @@ class Strategy(object):
 
     def save_state(self):
         filename = self.folder + 'strat_status.csv'
-        self.logger.debug('save state for strat = %s' % self.name)
+        self.on_log('save state for strat = %s' % self.name, level = logging.DEBUG)
         with open(filename,'wb') as log_file:
             file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             for key in sorted(self.positions.keys()):
@@ -454,7 +459,7 @@ class Strategy(object):
         if not os.path.isfile(logfile):
             self.positions  = positions
             return
-        self.logger.debug('load state for strat = %s' % self.name)
+        self.on_log('load state for strat = %s' % self.name, level = logging.DEBUG)
         with open(logfile, 'rb') as f:
             reader = csv.reader(f)
             for row in reader:
@@ -493,7 +498,7 @@ class Strategy(object):
                                 is_added = True
                                 break
                         if not is_added:
-                            self.logger.info('underlying = %s is missing in strategy=%s, put it in undwind' % (insts, self.name))
+                            self.on_log('underlying = %s is missing in strategy=%s, put it in undwind' % (insts, self.name), level = logging.INFO)
                             idx = self.unwind_key[0]
                     positions[idx].append(tradepos)
                 else:
