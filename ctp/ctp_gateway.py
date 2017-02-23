@@ -544,6 +544,7 @@ class CtpGateway(GrossGateway):
         inst = porder['InstrumentID']
         if local_id in self.id2order:
             myorder = self.id2order[local_id]
+            inst = myorder.instrument
             myorder.on_cancel()
             event = Event(type=EVENT_ETRADEUPDATE)
             event.dict['trade_ref'] = myorder.trade_ref
@@ -564,11 +565,11 @@ class CtpGateway(GrossGateway):
         '''
         porder = event.dict['data']
         error = event.dict['error']
-        inst = porder['InstrumentID']
-        logContent = 'Order Cancel is wrong, local_id=%s, instrument=%s, error=%s. ' % (porder['OrderRef'], inst, error['ErrorMsg'])
+        inst = porder['InstrumentID']        
         if porder['OrderRef'].isdigit():
             local_id = int(porder['OrderRef'])
             myorder = self.id2order[local_id]
+            inst = myorder.instrument
             if int(error['ErrorID']) in [25,26] and myorder.status not in [order.OrderStatus.Cancelled, order.OrderStatus.Done]:
                 #myorder.on_cancel()
                 #event = Event(type=EVENT_ETRADEUPDATE)
@@ -577,6 +578,7 @@ class CtpGateway(GrossGateway):
                 self.qry_commands.append(self.tdApi.qryOrder)
         else:
             self.qry_commands.append(self.tdApi.qryOrder)
+        logContent = 'Order Cancel is wrong, local_id=%s, instrument=%s, error=%s. ' % (porder['OrderRef'], inst, error['ErrorMsg'])
         if inst not in self.order_stats:
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
         self.order_stats[inst]['failure'] += 1
