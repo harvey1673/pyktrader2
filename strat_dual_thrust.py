@@ -1,6 +1,7 @@
 #-*- coding:utf-8 -*-
 from misc import *
 from strategy import *
+import logging
  
 class DTTrader(Strategy):
     common_params =  dict({'price_limit_buffer': 5,}, **Strategy.common_params)
@@ -76,13 +77,13 @@ class DTTrader(Strategy):
         inst = self.underliers[idx][0]
         self.tday_open[idx] = self.agent.cur_day[inst]['open']
         if (self.tday_open[idx] <= 0.0) or (self.cur_rng[idx] <= 0) or (self.curr_prices[idx] <= 0.001):
-            self.logger.warning("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name))
+            self.on_log("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name), level = logging.WARNING)
             return
         min_id = self.agent.tick_id/1000.0
         num_pos = len(self.positions[idx])
         buysell = 0
         if num_pos > 1:
-            self.logger.warning('something wrong with position management - submitted trade is empty but trade position is more than 1')
+            self.on_log('something wrong with position management - submitted trade is empty but trade position is more than 1', level = logging.WARNING)
             return
         elif num_pos == 1:
             buysell = self.positions[idx][0].direction
