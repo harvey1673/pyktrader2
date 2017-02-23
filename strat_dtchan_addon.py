@@ -1,6 +1,7 @@
 #-*- coding:utf-8 -*-
 from base import *
 from misc import *
+import logging
 import data_handler as dh
 import copy
 from strategy import *
@@ -45,8 +46,7 @@ class DTSplitChanAddon(Strategy):
             inst = under[0]
             self.agent.inst2strat[inst][self.name].append(1)
             if self.freq[idx] > 1:
-                self.agent.inst2strat[inst][self.name].append(self.freq[idx])
-            #self.logger.debug("stat = %s register bar event for inst=%s freq = 1" % (self.name, inst, ))
+                self.agent.inst2strat[inst][self.name].append(self.freq[idx])            
 
     def initialize(self):
         self.load_state()
@@ -124,8 +124,7 @@ class DTSplitChanAddon(Strategy):
         if (self.open_period[pid] > min_id) and (self.open_period[pid] <= curr_min):
             self.tday_open[idx] = self.agent.instruments[inst].price
             self.open_idx[idx] = pid
-            self.recalc_rng(idx, self.agent.min_data[inst][1].data)
-            #self.logger.info("Note: the new split open is set to %s for inst=%s for stat = %s" % (self.tday_open[idx], inst, self.name, ))
+            self.recalc_rng(idx, self.agent.min_data[inst][1].data)            
         if min_id < 300:
             return False
         if (self.freq[idx]>0) and (freq == self.freq[idx]):
@@ -141,7 +140,7 @@ class DTSplitChanAddon(Strategy):
                 buy_p = (min_data['high'][-1] + min_data['low'][-1] + min_data['close'][-1])/3.0
                 sell_p = buy_p
             else:
-                self.logger.warning('Unsupported price type for strat=%s inst=%s' % (self.name, inst))
+                self.on_log('Unsupported price type for strat=%s inst=%s' % (self.name, inst), level = logging.WARNING)
             save_status = self.check_trigger(idx, buy_p, sell_p)
             return save_status
 
@@ -155,13 +154,13 @@ class DTSplitChanAddon(Strategy):
             return save_status
         inst = self.underliers[idx][0]
         if (self.tday_open[idx] <= 0.0) or (self.cur_rng[idx] <= 0) or (self.curr_prices[idx] <= 0.001):
-            self.logger.warning("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name))
+            self.on_log("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name), level = logging.WARNING)
             return save_status
         min_id = int(self.agent.instruments[inst].last_update/1000.0)
         num_pos = len(self.positions[idx])
         buysell = 0
         if num_pos > self.max_pos[idx]:
-            self.logger.warning('something wrong - number of tradepos is more than max_pos=%s' % self.max_pos[idx])
+            self.on_log('something wrong - number of tradepos is more than max_pos=%s' % self.max_pos[idx], level = logging.WARNING)
             return save_status
         elif num_pos >= 1:
             buysell = self.positions[idx][0].direction
