@@ -11,7 +11,7 @@ XBASE = 100 #用于一般化的除数基数
 
 import sys
 import functools
-from logging.handlers import RotatingFileHandler
+import logging.handlers
 import logging
 import decorator
 from inspect import (
@@ -24,13 +24,14 @@ CONSOLE_FORMAT = '%(asctime)s%(message)s'
 
 #设定日志
 def config_logging(filename,level=logging.DEBUG,format=MY_FORMAT,to_console=True,console_level=logging.INFO):
-    #logging.basicConfig(filename=filename,level=level,format=format)
-    my_handler = RotatingFileHandler(filename, mode='a', maxBytes=5*1024*1024, 
-                                    backupCount=2, encoding=None, delay=0)
-    my_handler.setFormatter(MY_FORMAT)
-    my_handler.setLevel(level)
-    app_log = logging.getLogger('')
-    app_log.addHandler(my_handler)
+    logging.basicConfig(filename=filename,level=level,format=format) \
+    #my_logger = logging.getLogger('root')
+    #my_handler = logging.handlers.RotatingFileHandler(filename, mode='a', maxBytes=100*1024, \
+    #                                backupCount=2, encoding=None, delay=0)
+    #formatter = logging.Formatter(format)
+    #my_handler.setFormatter(formatter)
+    #my_handler.setLevel(level)
+    #my_logger.addHandler(my_handler)
     if to_console:
         add_log2console(console_level)
 
@@ -45,7 +46,7 @@ def add_log2console(level = logging.INFO):
     # tell the handler to use this format
     console.setFormatter(formatter)
     # add the handler to the root logger
-    logging.getLogger('').addHandler(console)
+    logging.getLogger().addHandler(console)
  
 def is_if(instrument):#判断是否是IF
     return instrument[:2].upper() == 'IF'

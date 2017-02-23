@@ -245,7 +245,7 @@ class Agent(MktDataMixin):
         self.folder = str(config.get('folder', self.name + os.path.sep))
         self.live_trading = config.get('live_trading', False)
         self.realtime_tick_diff = config.get('realtime_tick_diff', 100)
-        self.logger = logging.getLogger('.'.join([name, 'agent']))
+        self.logger = logging.getLogger()
         self.eod_flag = False
         self.save_flag = False
         self.scur_day = tday
@@ -574,14 +574,13 @@ class Agent(MktDataMixin):
         if len(self.strat_list) == 0:
             self.eod_flag = True
             return
-        self.trade_manager.save_pfill_trades()
+        self.trade_manager.day_finalize(self.scur_day, self.folder)
         for strat_name in self.strat_list:
             strat = self.strategies[strat_name]
             strat.day_finalize()
-        self.save_state()
-        self.eod_flag = True
         for name in self.gateways:
             self.gateways[name].day_finalize(self.scur_day)
+        self.eod_flag = True
         self.ref2order = {}
         for inst in self.instruments:
             self.instruments[inst].prev_close = self.cur_day[inst]['close']

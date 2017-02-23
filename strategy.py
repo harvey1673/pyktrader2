@@ -1,6 +1,8 @@
 #-*- coding:utf-8 -*-
 from base import *
 from misc import *
+from eventType import *
+from eventEngine import Event
 import data_handler
 import trade
 from trade_executor import *
@@ -260,15 +262,11 @@ class Strategy(object):
     
     def on_log(self, text, level = logging.INFO, args = {}):    
         event = Event(type=EVENT_LOG)
-        event.dict['data'] = log_content
+        event.dict['data'] = text
         event.dict['owner'] = "strategy_" + self.name
         event.dict['level'] = level
         self.agent.eventEngine.put(event)
-        
-        event = Event(type=EVENT_LOG)        
-            self.gateway.onLog(logContent, level = logging.DEBUG)    
-        self.agent.logger.log(level, text, **arg) 
-        
+
     def add_unwind(self, pair):
         instID = pair[0]
         vol = pair[1]
@@ -361,7 +359,6 @@ class Strategy(object):
         self.num_exits = [0] * len(self.underliers)
         self.save_state()
         self.initialize()
-        return
 
     def calc_curr_price(self, idx):
         self.curr_prices[idx] = self.underlying[idx].mid_price
@@ -420,7 +417,6 @@ class Strategy(object):
         xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
-        return
 
     def update_trade_unit(self):
         self.trade_unit = [ int(self.pos_scaler * self.alloc_w[idx] + 0.5) for idx in range(len(self.underliers))]
@@ -451,7 +447,6 @@ class Strategy(object):
                     row = [header] + [tradedict[itm] for itm in tradepos_header]
                     file_writer.writerow(row)
             self.save_local_variables(file_writer)
-        return
 
     def load_state(self):
         logfile = self.folder + 'strat_status.csv'
@@ -512,7 +507,6 @@ class Strategy(object):
             file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             tradedict = tradepos2dict(tradepos)
             file_writer.writerow([tradedict[itm] for itm in tradepos_header])
-        return
 
     def risk_agg(self, risk_list):
         sum_risk = {}

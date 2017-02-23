@@ -291,6 +291,30 @@ class TradeManager(object):
             xtrade.refresh()
             self.add_trade(xtrade)
 
+    def day_finalize(self, scur_day, file_prefix):
+        pfilled_dict = {}
+        for trade_id in self.ref2trade:
+            xtrade = self.ref2trade[trade_id]
+            xtrade.refresh()
+            if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready]:
+                xtrade.status = TradeStatus.Done
+                xtrade.order_dict = {}
+                xtrade.filled_vol = 0
+                xtrade.remaining_vol = xtrade.vol - xtrade.filled_vol
+                strat = self.agent.strategies[xtrade.strategy]
+                strat.on_trade(xtrade)
+            elif xtrade.remaining_vol > 0:
+                xtrade.status = TradeStatus.PFilled
+                self.agent.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
+                pfilled_dict[trade_id] = xtrade
+        if len(pfilled_dict)>0:
+            file_prefix = self.agent.folder + 'PFILLED_'
+            self.save_trade_list(self.agent.scur_day, pfilled_dict, file_prefix)
+        self.save_trade_list(scur_day, self.ref2trade, file_prefix)
+        self.tradebooks = {}
+        self.pending_trades = {}
+        self.ref2trade = {}
+
     def get_trade(self, trade_id):
         return self.ref2trade[trade_id] if trade_id in self.ref2trade else None
 
@@ -362,26 +386,6 @@ class TradeManager(object):
                 file_writer.writerow([xtrade.id, insts, units, xtrade.price_unit, xtrade.vol, xtrade.limit_price,
                                       xtrade.filled_vol, xtrade.filled_price, order_dict, xtrade.aggressive_level,
                                       xtrade.start_time, xtrade.end_time, xtrade.strategy, xtrade.book, xtrade.status])
-
-    def save_pfill_trades(self):
-        pfilled_dict = {}
-        for trade_id in self.ref2trade:
-            xtrade = self.ref2trade[trade_id]
-            xtrade.refresh()
-            if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready]:
-                xtrade.status = TradeStatus.Done
-                xtrade.order_dict = {}
-                xtrade.filled_vol = 0
-                xtrade.remaining_vol = xtrade.vol - xtrade.filled_vol
-                strat = self.agent.strategies[xtrade.strategy]
-                strat.on_trade(xtrade)
-            elif xtrade.remaining_vol > 0:
-                xtrade.status = TradeStatus.PFilled
-                self.agent.logger.warning('Still partially filled after close. trade id= %s' % trade_id)
-                pfilled_dict[trade_id] = xtrade
-        if len(pfilled_dict)>0:
-            file_prefix = self.agent.folder + 'PFILLED_'
-            self.save_trade_list(self.agent.scur_day, pfilled_dict, file_prefix)
 
     def load_trade_list(self, curr_date, file_prefix):
         logfile = file_prefix + 'trade_' + curr_date.strftime('%y%m%d')+'.csv'
