@@ -7,6 +7,55 @@ import numpy as np
 import datetime
 import backtest
 
+def run_sim(config):
+    mdf = config['mdf']
+    close_daily = config['close_daily']
+    offset = config['offset']
+    k = config['param'][0]
+    win = config['param'][1]
+    multiplier = config['param'][2]
+    f = config['param'][3]
+    pos_update = config['pos_update']
+    pos_class = config['pos_class']
+    pos_args  = config['pos_args']
+    proc_func = config['proc_func']
+    proc_args = config['proc_args']
+    chan_func = config['chan_func']
+    chan_high = eval(chan_func['high']['func'])
+    chan_low  = eval(chan_func['low']['func'])
+    tcost = config['trans_cost']
+    unit = config['unit']
+    SL = config['stoploss']
+    min_rng = config['min_range']
+    chan = config['chan']
+    use_chan = config['use_chan']
+    no_trade_set = config['no_trade_set']
+    xdf = proc_func(mdf, **proc_args)
+    if win == -1:
+        tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))],
+                       join='outer', axis=1).max(axis=1)
+    elif win == 0:
+        tr = pd.concat([(pd.rolling_max(xdf.high, 2) - pd.rolling_min(xdf.close, 2))*multiplier,
+                        (pd.rolling_max(xdf.close, 2) - pd.rolling_min(xdf.low, 2))*multiplier,
+                        xdf.high - xdf.close,
+                        xdf.close - xdf.low],
+                        join='outer', axis=1).max(axis=1)
+    else:
+        tr= pd.concat([pd.rolling_max(xdf.high, win) - pd.rolling_min(xdf.close, win),
+                       pd.rolling_max(xdf.close, win) - pd.rolling_min(xdf.low, win)],
+                       join='outer', axis=1).max(axis=1)
+    xdf['TR'] = tr
+    xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1),
+                       xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
+                       xdf['open']], axis=1, keys=['tr','ma', 'chanh', 'chanl', 'dopen']).fillna(0)
+    df = mdf.join(xdata, how = 'left').fillna(method='ffill')
+    df['pos'] = 0
+    df['cost'] = 0
+    df['traded_price'] = df['open']
+    sim_data = dh.DynamicRecArray(dataframe=df)
+    
+
+
 def dual_thrust_sim( mdf, config):
     close_daily = config['close_daily']
     marginrate = config['marginrate']

@@ -111,11 +111,10 @@ class SimctpTdApi(object):
 
     def cancelOrder(self, iorder):
         """撤单"""
-        inst = self.agent.instruments[iorder.instrument]
         self.reqID += 1
         req = {}
-        req['InstrumentID'] = inst.name
-        req['ExchangeID'] = inst.exchange
+        req['InstrumentID'] = iorder.instrument
+        req['ExchangeID'] = iorder.exchange
         req['ActionFlag'] = defineDict['THOST_FTDC_AF_Delete']
         req['BrokerID'] = self.brokerID
         req['InvestorID'] = self.userID

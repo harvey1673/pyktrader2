@@ -19,7 +19,8 @@ def date_datetime64(d):
     return np.datetime64(dt)
 
 class DynamicRecArray(object):
-    def __init__(self, dtype = [], dataframe = None):
+    def __init__(self, dtype = [], dataframe = None, size_ratio = 1.5):
+        self.size_ratio = size_ratio
         if isinstance(dataframe, pd.DataFrame) and (len(dataframe) > 0):
             self.create_from_df(dataframe)
         else:
@@ -61,8 +62,8 @@ class DynamicRecArray(object):
     
     def extend_from_df(self, df):
         df_len = len(df)
-        if (self.size - self.length) <= df_len * 1.5:
-            self.size = self.length + int(1.5 * df_len)
+        if (self.size - self.length) <= df_len * self.size_ratio:
+            self.size = self.length + int(self.size_ratio * df_len)
             self._data = np.resize(self._data, self.size)
         s_idx = self.length
         e_idx = self.length + df_len
@@ -72,7 +73,7 @@ class DynamicRecArray(object):
 
     def create_from_df(self, df, need_index = False):
         df_len = len(df)
-        self.size = int(1.5 * df_len)
+        self.size = int(self.size_ratio * df_len)
         self._data = np.resize(np.array(df.to_records(index = need_index)), self.size)
         self.dtype = self._data.dtype
         self.length = df_len
