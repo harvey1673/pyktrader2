@@ -295,6 +295,8 @@ class TradeManager(object):
         pfilled_dict = {}
         for trade_id in self.ref2trade:
             xtrade = self.ref2trade[trade_id]
+            if xtrade.status == TradeStatus.StratConfirm:
+                continue
             xtrade.refresh()
             if xtrade.status in [TradeStatus.Pending, TradeStatus.Ready]:
                 xtrade.status = TradeStatus.Done

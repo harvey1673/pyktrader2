@@ -14,6 +14,7 @@ import backtest
 
 def dual_thrust_sim( mdf, config):
     close_daily = config['close_daily']
+    price_mode = config.get('mode', "HL")
     offset = config['offset']
     k = config['param'][0]
     win = config['param'][1]
@@ -30,6 +31,7 @@ def dual_thrust_sim( mdf, config):
     SL = config['stoploss']
     min_rng = config['min_range']
     chan = config['chan']
+    machan = config['machan']
     xdf = proc_func(mdf, **proc_args)
     if win == -1:
         tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))], 
@@ -47,24 +49,37 @@ def dual_thrust_sim( mdf, config):
     xdf['tr'] = tr
     xdf['chan_h'] = chan_high(xdf, chan, **chan_func['high']['args'])
     xdf['chan_l'] = chan_low(xdf, chan, **chan_func['low']['args'])
-    xdf['atr'] = dh.ATR(xdf, chan)
-    xdf['ma'] = pd.rolling_mean(xdf.close, chan)
-    xdata = pd.concat([xdf['tr'].shift(1), xdf['ma'].shift(1),
+    xdf['atr'] = dh.ATR(xdf, machan)
+    xdf['ma'] = pd.rolling_mean(xdf.close, machan)
+    xdf['rng'] = pd.DataFrame([min_rng * xdf['open'], k * xdf['tr'].shift(1)]).max()
+    xdf['upper'] = xdf['open'] + xdf['rng'] * (1 + (xdf['open'] < xdf['ma'].shift(1))*f)
+    xdf['lower'] = xdf['open'] - xdf['rng'] * (1 + (xdf['open'] > xdf['ma'].shift(1))*f)
+    xdata = pd.concat([xdf['upper'], xdf['lower'],
                        xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
-                       xdf['open'], xdf['atr'].shift(1)], axis=1, keys=['tr','ma', 'chan_h', 'chan_l', 'xopen', 'atr']).fillna(0)
+                       xdf['open']], axis=1, keys=['upper','lower', 'chan_h', 'chan_l', 'xopen']).fillna(0)
     mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
-    rng = pd.DataFrame([min_rng * mdf['xopen'], k * mdf['tr']]).max()
     mdf['dt_signal'] = np.nan
-    mdf.ix[mdf['high'] >= mdf['xopen'] + rng, 'dt_signal'] = 1
-    mdf.ix[mdf['low'] <= mdf['xopen'] - rng, 'dt_signal'] = -1
+    if price_mode == "HL":
+        up_price = mdf['high']
+        dn_price = mdf['low']
+    elif price_mode == "TP":
+        up_price = (mdf['high'] + mdf['low'] + mdf['close'])/3.0
+        dn_price = up_price
+    elif price_mode == "CL":
+        up_price = mdf['close']
+        dn_price = mdf['close']
+    else:
+        print "unsupported price mode"
+    mdf.ix[up_price >= mdf['upper'], 'dt_signal'] = 1
+    mdf.ix[dn_price <= mdf['lower'], 'dt_signal'] = -1
     if close_daily:
         mdf.ix[ mdf['min_id'] >= config['exit_min'], 'dt_signal'] = 0
     addon_signal = copy.deepcopy(mdf['dt_signal'])
     mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
     mdf['chan_sig'] = np.nan
     if combo_signal:
-        mdf.ix[(mdf['high'] >= mdf['chan_h']) & (addon_signal > 0), 'chan_sig'] = 1
-        mdf.ix[(mdf['low'] <= mdf['chan_l']) & (addon_signal < 0), 'chan_sig'] = -1
+        mdf.ix[(up_price >= mdf['chan_h']) & (addon_signal > 0), 'chan_sig'] = 1
+        mdf.ix[(dn_price <= mdf['chan_l']) & (addon_signal < 0), 'chan_sig'] = -1
     else:
         mdf.ix[(mdf['high'] >= mdf['chan_h']), 'chan_sig'] = 1
         mdf.ix[(mdf['low'] <= mdf['chan_l']), 'chan_sig'] = -1
@@ -83,7 +98,7 @@ def gen_config_file(filename):
     sim_config['sim_func']  = 'bktest.bkvec_split_dt.dual_thrust_sim'
     sim_config['scen_keys'] = ['param', 'chan']
     sim_config['sim_name']   = 'DTsigdchan_2y'
-    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', \
+    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ni', 'ru', 'm', 'RM', 'FG', 'CF',\
                                 'y', 'p', 'OI', 'a', 'cs', 'c', 'jd', 'SR', 'pp', 'l', 'v',\
                                 'TA', 'MA', 'ag', 'au', 'cu', 'al', 'zn', 'IF', 'IH', 'IC', 'TF', 'T']
     sim_config['start_date'] = '20150102'

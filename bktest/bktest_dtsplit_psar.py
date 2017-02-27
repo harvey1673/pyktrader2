@@ -30,6 +30,7 @@ def run_sim(config):
     chan = config['chan']
     use_chan = config['use_chan']
     no_trade_set = config['no_trade_set']
+    pos_freq = config.get('pos_freq', 1)
     xdf = proc_func(mdf, **proc_args)
     if win == -1:
         tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))],
@@ -45,6 +46,8 @@ def run_sim(config):
                        pd.rolling_max(xdf.close, win) - pd.rolling_min(xdf.low, win)],
                        join='outer', axis=1).max(axis=1)
     xdf['TR'] = tr
+    xdf['chan_h'] = chan_high(xdf['high'], chan, **chan_func['high']['args'])
+    xdf['chan_l'] = chan_low(xdf['low'], chan, **chan_func['low']['args'])
     xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1),
                        xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
                        xdf['open']], axis=1, keys=['tr','ma', 'chanh', 'chanl', 'dopen']).fillna(0)
@@ -53,8 +56,45 @@ def run_sim(config):
     df['cost'] = 0
     df['traded_price'] = df['open']
     sim_data = dh.DynamicRecArray(dataframe=df)
-    
-
+    nlen = len(sim_data)
+    positions = []
+    closed_trades = []
+    tradeid = 0
+    curr_date = None
+    buytrig = selltrig = 0.0
+    pos = 0
+    for n in range(nlen):
+        sim_data['pos'][n] = pos
+        if sim_data['ma'][n] == 0 or sim_data['chan_h'] == 0 or sim_data['dopen'] == 0:
+            continue
+        if len(positions)>0:
+            need_close = (close_daily and sim_data['min_id'][n] >= config['exit_min'])
+            for tradepos in positions:
+                ep = sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
+                if need_close or tradepos.check_exit(sim_data['close'][n], 0):
+                    tradepos.close(sim_data['close'][n] - offset * misc.sign(tradepos.pos), sim_data['datetime'][n])
+                    tradepos.exit_tradeid = tradeid
+                    tradeid += 1
+                    pos -= tradepos.pos
+                    closed_trades.append(tradepos)
+                elif pos_update:
+                    tradepos.update_price(ep)
+            positions = [pos for pos in positions if not pos.is_closed]
+            if need_close:
+                continue
+        if curr_date != sim_data['date']:
+            dopen = sim_data['dopen']
+            rng = max(min_rng * dopen, k * sim_data['tr'][n])
+            buytrig = dopen + rng
+            selltrig = dopen - rng
+            if sim_data['ma'][n] > dopen:
+                buytrig += f * rng
+            else:
+                selltrig -= f * rng
+        if (sim_data['close'][n] > buytrig) and (pos <= 0):
+            pass
+        elif (sim_data['close'][n] < selltrig) and (pos >= 0):
+            pass
 
 def dual_thrust_sim( mdf, config):
     close_daily = config['close_daily']
