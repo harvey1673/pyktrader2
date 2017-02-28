@@ -7,7 +7,6 @@ import numpy as np
 import datetime
 import backtest
 
-def 
 def run_sim(config):
     mdf = config['mdf']
     close_daily = config['close_daily']
@@ -64,14 +63,14 @@ def run_sim(config):
     tradeid = 0
     curr_date = None
     buytrig = selltrig = 0.0
-    pos = 0
-    for n in range(nlen):
+    for n in range(nlen-1):
         cost = 0
-        sim_data['pos'][n] = pos        
-        if sim_data['ma'][n] == 0 or sim_data['chan_h'] == 0 or sim_data['dopen'] == 0:
+        pos = sim_data['pos'][n]
+        if sim_data['ma'][n] == 0 or sim_data['chan_h'][n] == 0 or sim_data['dopen'][n] == 0:
             continue
-        if curr_date != sim_data['date']:
-            dopen = sim_data['dopen']
+        if curr_date != sim_data['date'][n]:
+            curr_date = sim_data['date'][n]
+            dopen = sim_data['dopen'][n]
             rng = max(min_rng * dopen, k * sim_data['tr'][n])
             buytrig = dopen + rng
             selltrig = dopen - rng
@@ -79,18 +78,27 @@ def run_sim(config):
                 buytrig += f * rng
             else:
                 selltrig -= f * rng
-        ref_price = (sim_data['close'][n] + sim_data['high'][n] + sim_data['low'][n])/3.0 if price_mode == 'TP' else sim_data['close'][n]
-        target_pos = (ref_price > buytrig) - (ref_price < selltrig)               
+            continue
+        if price_mode == 'TP':
+            ref_long = ref_short = (sim_data['close'][n] + sim_data['high'][n] + sim_data['low'][n])/3.0
+        elif price_mode == 'HL':
+            ref_long  = sim_data['high'][n]
+            ref_short = sim_data['low'][n]
+        elif price_mode == 'CL':
+            ref_long = ref_short = sim_data['close'][n]
+        else:
+            ref_long = ref_short = sim_data['open'][n+1]
+        target_pos = (ref_long > buytrig) - (ref_short < selltrig)
         if len(positions)>0:
-            need_close = (close_daily and sim_data['min_id'][n] >= config['exit_min'])
+            need_close = (close_daily or (curr_date == sim_data['date'][-1])) and (sim_data['min_id'][n] >= config['exit_min'])
             for tradepos in positions:
-                ep = sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]                
-                if need_close or tradepos.check_exit(sim_data['close'][n], 0) or ( tradepos.pos * target_pos < 0):
-                    tradepos.close(sim_data['close'][n] - offset * misc.sign(tradepos.pos), sim_data['datetime'][n])
+                ep = sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
+                if need_close or tradepos.check_exit(sim_data['open'][n+1], 0) or ( tradepos.pos * target_pos < 0):
+                    tradepos.close(sim_data['open'][n+1] - offset * misc.sign(tradepos.pos), sim_data['datetime'][n+1])
                     tradepos.exit_tradeid = tradeid
                     tradeid += 1
                     pos -= tradepos.pos
-                    cost += abs(tradepos_pos) * (offset + sim_data['close'][n]*tcost)
+                    cost += abs(tradepos.pos) * (offset + sim_data['open'][n+1]*tcost)
                     closed_trades.append(tradepos)
                 elif pos_update:
                     tradepos.update_price(ep)
@@ -98,17 +106,18 @@ def run_sim(config):
             if need_close:
                 continue
         if target_pos != 0:
-            if (not use_chan) or (((ref_price > sim_data['chanh']) and target_pos > 0) or ((ref_price < sim_data['chanl']) and target_pos < 0)):
-                new_pos = pos_class([mslice.contract], [1], unit * target_pos, mslice.close + target_pos * offset, buytrig, **pos_args)
+            if (not use_chan) or (((ref_long > sim_data['chanh'][n]) and target_pos > 0) or ((ref_short < sim_data['chanl'][n]) and target_pos < 0)):
+                new_pos = pos_class([sim_data['contract'][n]], [1], unit * target_pos, sim_data['open'][n+1] + target_pos * offset, buytrig, **pos_args)
                 tradeid += 1
                 new_pos.entry_tradeid = tradeid
-                new_pos.open(sim_data['close'][n] + target_pos * offset, sim_data['datetime'][n])
+                new_pos.open(sim_data['open'][n+1] + target_pos * offset, sim_data['datetime'][n+1])
                 positions.append(new_pos)
                 pos += unit * target_pos
-                cost += abs(target_pos) * (offset + sim_data['close'][n]*tcost)
-        sim_data['cost'][n] = cost
-        sim_data['pos'][n] = pos
-            
+                cost += abs(target_pos) * (offset + sim_data['open'][n+1]*tcost)
+        sim_data['cost'][n+1] = cost
+        sim_data['pos'][n+1] = pos
+    out_df = pd.concat([])
+    return out_df, closed_trades
 
 def dual_thrust_sim( mdf, config):
     close_daily = config['close_daily']
