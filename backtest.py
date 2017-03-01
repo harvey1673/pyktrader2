@@ -58,7 +58,25 @@ def get_bktest_folder():
     elif system == 'Windows':
         folder = 'C:\\dev\\data\\'
     return folder
-    
+
+class StratSim(object):
+    def __init__(self, config):
+        self.config = config
+        self.process_config(config)
+        self.process_data(config['mdf'])
+
+    def process_config(self, config):
+        pass
+
+    def process_data(self, mdf):
+        pass
+
+    def run_loop_sim(self):
+        pass
+
+    def run_vec_sim(self):
+        pass
+
 def get_asset_tradehrs(asset):
     exch = 'SHFE'
     for ex in misc.product_code:
