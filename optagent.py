@@ -14,7 +14,7 @@ def discount(irate, dtoday, dexp):
 class OptAgentMixin(object):
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         self.volgrids = {}
-        self.irate = config.get('irate', {'CNY': 0.02,})
+        self.irate = config.get('irate', {'CNY': 0.02, 'USD': 0.00})
     
     def load_volgrids(self):
         self.logger.info('loading volgrids')

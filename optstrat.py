@@ -8,6 +8,7 @@ import os
 import csv
 import pyktlib
 import mysqlaccess
+import trade
 import numpy as np
 import pandas as pd
 from misc import *
@@ -24,7 +25,7 @@ def fut2opt(fut_inst, expiry, otype, strike):
     if product == 'Stock':
         optkey = optkey + otype + expiry.strftime('%y%m')
     else:
-        optkey + '-' + upper(type) + '-'
+        optkey + '-' + otype.upper() + '-'
     opt_inst = optkey + str(int(strike))
     return opt_inst
 
@@ -328,13 +329,13 @@ class OptionStrategy(object):
                 multiple = self.option_map[inst, 'multiple']
                 cont_mth = self.option_map[inst, 'cont_mth']
                 pdelta = self.group_risk[cont_mth, 'delta'] 
-                volume = int( - pdeltas/multiple + 0.5)
+                volume = int( - pdelta/multiple + 0.5)
                 cum_vol += volume
                 if volume!=0:
                     curr_price = self.agent.instruments[inst].price
                     buysell = 1 if volume > 0 else -1
                     valid_time = self.agent.tick_id + 600
-                    etrade = order.ETrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
+                    etrade = trade.XTrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
                                                valid_time, self.name, self.agent.name)
                     self.submitted_pos[inst].append(etrade)
                     self.agent.submit_trade(etrade)
@@ -345,7 +346,7 @@ class OptionStrategy(object):
         if volume!=0:
             curr_price = self.agent.instruments[inst].price
             buysell = 1 if volume > 0 else -1
-            etrade = order.ETrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
+            etrade = trade.XTrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
                                 valid_time, self.name, self.agent.name)
             self.submitted_pos[inst].append(etrade)
             self.agent.submit_trade(etrade)
@@ -401,8 +402,7 @@ class OptArbStrat(CommodOptStrat):
 
 class OptSubStrat(object):
     def __init__(self, strat):
-		self.strat = strat
-        pass
+        self.strat = strat
     
     def tick_run(self, ctick):
         pass
