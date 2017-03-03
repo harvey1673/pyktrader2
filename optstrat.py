@@ -32,31 +32,26 @@ def fut2opt(fut_inst, expiry, otype, strike):
 def get_opt_margin(fut_price, strike, type):
     return 0.0
 
-class OptionArbMixin(object):
-    def __init__(self, expiries, strikes):
-        self.callspd = []
-        self.putspd = []
-        pass
-    
-    
-    
 class OptionStrategy(object):
-    def __init__(self, name, underliers, expiries, strikes, agent = None):
-        self.name = name
+    common_params = {'name': 'test_strat', 'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}    
+    def __init__(self, config, agent = None):
+        self.load_config(config)
+        
+
         self.underliers = underliers
-        self.main_cont = 0
+        self.main_cont = self.underliers[0]
         self.expiries = expiries
-        self.DFs = [1.0] * len(expiries)
-        self.volgrids = dict([(expiry, None) for expiry in expiries])
-        self.accrual = 'CFFEX'
+        self.DFs = [1.0] * len(expiries)        
+        self.accrual = 'COM'
         self.strikes = strikes
         self.opt_dict = self.get_option_map(underliers, expiries, strikes)
         self.option_insts = dict([(inst, None) for inst in self.opt_dict.values()])
-        self.option_map = pd.DataFrame(0, index = self.underliers + self.opt_dict.values(), 
-                                columns = ['underlier', 'cont_mth', 'otype', 'strike', 'multiple', 'df',
-                                           'pv', 'delta', 'gamma', 'vega', 'theta',  
-                                           'ppv', 'pdelta', 'pgamma', 'pvega', 'ptheta', 
-                                           'pos', 'outlong', 'outshort', 'margin_long', 'margin_short'])
+        self.option_map = dh.DynamicRecArray(dtype = [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'), ('pos', 'i8'), \
+                                                       ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'), \
+                                                       ('out_long', 'i8'), ('out_short', 'i8'), ('margin_long', 'f8'), ('margin_short', 'f8'), \
+                                                       ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
+                                                       ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8'), \
+                                                       ])
         self.group_risk = None
         for inst in underliers:
             self.option_map.loc[inst, 'underlier'] = inst
@@ -78,6 +73,33 @@ class OptionStrategy(object):
         self.spot_model = False
         self.pricer = pyktlib.BlackPricer
         self.last_updated = dict([(expiry, {'dtoday':0, 'fwd':0.0}) for expiry in expiries]) 
+
+        
+    def save_config(self):
+        config = {}
+        d = self.__dict__
+        for key in self.common_params:
+            config[key] = d[key]
+        config['assets'] = []
+        fname = self.folder + 'config.json'
+        with open(fname, 'w') as ofile:
+            json.dump(config, ofile)        
+    
+    def load_config(self, config):
+        d = self.__dict__
+        for key in self.common_params:
+            d[key] = config.get(key, self.common_params[key])
+
+    def set_agent(self, agent):
+        self.agent = agent
+        self.folder = self.agent.folder + self.name + '_'        
+        for idx, under in enumerate(self.tradables):        
+            under_key = '_'.join(under)
+            self.under2idx[under_key] = idx
+            if len(under) > 1:
+                self.underlying[idx] = self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
+            else:
+                self.underlying[idx] = self.agent.instruments[under[0]]             
         
     def reset(self):
         if self.agent != None:
