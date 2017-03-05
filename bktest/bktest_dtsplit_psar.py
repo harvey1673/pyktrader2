@@ -29,12 +29,16 @@ class DTStopSim(StratSim):
         self.chan_low  = eval(chan_func['low']['func'])
         self.tcost = config['trans_cost']
         self.unit = config['unit']
+        self.weights = config.get('weights', [1])
         self.SL = config['stoploss']
         self.min_rng = config['min_range']
         self.chan = config['chan']
         self.use_chan = config['use_chan']
         self.no_trade_set = config['no_trade_set']
         self.pos_freq = config.get('pos_freq', 1)
+        self.exit_min = config.get('exit_min', 2058)
+        self.buy_trig = 0.0
+        self.sell_trig = 0.0
      
     def process_data(self, mdf):
         xdf = self.proc_func(mdf, **self.proc_args)
@@ -61,69 +65,43 @@ class DTStopSim(StratSim):
         self.df['cost'] = 0
         self.df['pos'] = 0
         self.df['traded_price'] = self.df['open']
-    
-    def run_loop_sim(self):
-        sim_data = dh.DynamicRecArray(dataframe=self.df)
-        nlen = len(sim_data)
-        positions = []
-        closed_trades = []
-        tradeid = 0
-        curr_date = None
-        for n in range(nlen-3):
-            cost = 0
-            pos = sim_data['pos'][n]
-            if sim_data['ma'][n] == 0 or sim_data['chan_h'][n] == 0 or sim_data['dopen'][n] == 0:
-                continue
-            if curr_date != sim_data['date'][n]:
-                curr_date = sim_data['date'][n]
-                dopen = sim_data['dopen'][n]
-                rng = max(self.min_rng * dopen, self.k * sim_data['tr'][n])
-                buytrig = dopen + rng
-                selltrig = dopen - rng
-                if sim_data['ma'][n] > dopen:
-                    buytrig += self.f * rng
-                else:
-                    selltrig -= self.f * rng
-                continue
-            if self.price_mode == 'TP':
-                ref_long = ref_short = (sim_data['close'][n] + sim_data['high'][n] + sim_data['low'][n])/3.0
-            elif self.price_mode == 'HL':
-                ref_long  = sim_data['high'][n]
-                ref_short = sim_data['low'][n]
-            elif self.price_mode == 'CL':
-                ref_long = ref_short = sim_data['close'][n]
-            else:
-                ref_long = ref_short = sim_data['open'][n+1]
-            target_pos = (ref_long > buytrig) - (ref_short < selltrig)
-            if len(positions)>0:
-                need_close = (self.close_daily or (curr_date == sim_data['date'][-1])) and (sim_data['min_id'][n] >= config['exit_min'])
-                for tradepos in positions:
-                    ep = sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
-                    if need_close or tradepos.check_exit(sim_data['open'][n+1], 0) or ( tradepos.pos * target_pos < 0):
-                        tradepos.close(sim_data['open'][n+1] - self.offset * misc.sign(tradepos.pos), sim_data['datetime'][n+1])
-                        tradepos.exit_tradeid = tradeid
-                        tradeid += 1
-                        pos -= tradepos.pos
-                        cost += abs(tradepos.pos) * (self.offset + sim_data['open'][n+1]*self.tcost)
-                        closed_trades.append(tradepos)
-                    elif self.pos_update:
-                        tradepos.update_price(ep)
-                positions = [pos for pos in positions if not pos.is_closed]
-                if need_close:
-                    continue
-            if target_pos != 0:
-                if (not self.use_chan) or (((ref_long > sim_data['chanh'][n]) and target_pos > 0) or ((ref_short < sim_data['chanl'][n]) and target_pos < 0)):
-                    new_pos = self.pos_class([sim_data['contract'][n]], [1], self.unit * target_pos, sim_data['open'][n+1] + target_pos * self.offset, buytrig, **self.pos_args)
-                    tradeid += 1
-                    new_pos.entry_tradeid = tradeid
-                    new_pos.open(sim_data['open'][n+1] + target_pos * self.offset, sim_data['datetime'][n+1])
-                    positions.append(new_pos)
-                    pos += self.unit * target_pos
-                    cost += abs(target_pos) * (self.offset + sim_data['open'][n+1]*self.tcost)
-            sim_data['cost'][n+1] = cost
-            sim_data['pos'][n+1] = pos
-        out_df = pd.concat([])
-        return out_df, closed_trades    
+
+    def daily_initialize(self, sim_data, n):
+        self.dopen = sim_data['dopen'][n]
+        rng = max(self.min_rng * self.dopen, self.k * sim_data['tr'][n])
+        self.buy_trig = self.dopen + rng
+        self.sell_trig = self.dopen - rng
+        if sim_data['ma'][n] > self.dopen:
+            self.buy_trig += self.f * rng
+        else:
+            self.sell_trig -= self.f * rng
+
+    def check_data_invalid(self, sim_data, n):
+        return (sim_data['ma'][n] == 0) or (sim_data['chan_h'][n] == 0) or (sim_data['dopen'][n] == 0) \
+               or (sim_data['date'][n] != sim_data['date'][n + 1])
+
+    def on_bar(self, sim_data, n):
+        if self.price_mode == 'TP':
+            ref_long = ref_short = (sim_data['close'][n] + sim_data['high'][n] + sim_data['low'][n])/3.0
+        elif self.price_mode == 'HL':
+            ref_long  = sim_data['high'][n]
+            ref_short = sim_data['low'][n]
+        elif self.price_mode == 'CL':
+            ref_long = ref_short = sim_data['close'][n]
+        else:
+            ref_long = ref_short = sim_data['open'][n+1]
+        target_pos = (ref_long > self.buy_trig) - (ref_short < self.sell_trig)
+        if len(self.positions)>0:
+            need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
+            for tradepos in self.positions:
+                if need_close or (tradepos.pos * target_pos < 0):
+                    self.close_tradepos(tradepos, sim_data['open'][n+1])
+            self.positions = [pos for pos in self.positions if not pos.is_closed]
+            if need_close:
+                return
+        if target_pos != 0:
+            if (not self.use_chan) or (((ref_long > sim_data['chanh'][n]) and target_pos > 0) or ((ref_short < sim_data['chanl'][n]) and target_pos < 0)):
+                self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], target_pos)
     
 def run_sim(config):
     mdf = config['mdf']
@@ -239,7 +217,8 @@ def run_sim(config):
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest_dtsplit_psar.run_sim'
+    sim_config['sim_class']  = 'bktest_dtsplit_psar.DTStopSim'
+    sim_config['sim_func'] = 'run_loop_sim'
     sim_config['scen_keys'] = ['param']
     sim_config['sim_name']   = 'DT_psar'
     sim_config['products']   = ['m', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j' ]

@@ -238,11 +238,8 @@ product_ticksize = {'zn': 5,
                    }
 
 def reverse_direction(direction):
-    if direction == ORDER_BUY:
-        return ORDER_SELL
-    else:
-        return ORDER_BUY
-                    
+    return ORDER_SELL if direction == ORDER_BUY else ORDER_BUY
+
 def date2xl(d):
     return (d-datetime.date(1970,1,1)).days + 25569.0
 
@@ -304,7 +301,7 @@ def inst2product(inst):
         key = inst[:2]
     else:
         key = inst[:1]
-    if '-' in inst:
+    if len(inst)> 8 and (('C' in inst[5:]) or ('P' in inst[5:])):
         key = key + '_Opt'
     return key
 

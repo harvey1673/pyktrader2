@@ -4,6 +4,7 @@ optstrat.py
 Created on Feb 03, 2015
 @author: Harvey
 '''
+import json
 import os
 import csv
 import pyktlib
@@ -11,6 +12,7 @@ import mysqlaccess
 import trade
 import numpy as np
 import pandas as pd
+import data_handler as dh
 from misc import *
 
 RISK_FREE_RATE = 0.04
@@ -33,19 +35,15 @@ def get_opt_margin(fut_price, strike, type):
     return 0.0
 
 class OptionStrategy(object):
-    common_params = {'name': 'test_strat', 'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}    
+    common_params = {'name': 'test_strat', 'underliers':['m1705', 'm1709'], 'expiries': ['20170510', '20170910'], \
+                     'strikes':[2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200], \
+                     'underliers': [], 'accrual': 'COM', 'main_cont': 'm1705', \
+                     'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}
     def __init__(self, config, agent = None):
         self.load_config(config)
-        
-
-        self.underliers = underliers
-        self.main_cont = self.underliers[0]
-        self.expiries = expiries
-        self.DFs = [1.0] * len(expiries)        
-        self.accrual = 'COM'
-        self.strikes = strikes
-        self.opt_dict = self.get_option_map(underliers, expiries, strikes)
-        self.option_insts = dict([(inst, None) for inst in self.opt_dict.values()])
+        nlen = len(self.expiries)
+        self.DFs = [1.0] * nlen
+        self.opt_dict = self.get_option_map(self.underliers, self.expiries, self.strikes)
         self.option_map = dh.DynamicRecArray(dtype = [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'), ('pos', 'i8'), \
                                                        ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'), \
                                                        ('out_long', 'i8'), ('out_short', 'i8'), ('margin_long', 'f8'), ('margin_short', 'f8'), \
@@ -53,7 +51,7 @@ class OptionStrategy(object):
                                                        ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8'), \
                                                        ])
         self.group_risk = None
-        for inst in underliers:
+        for inst in self.underliers:
             self.option_map.loc[inst, 'underlier'] = inst
             self.option_map.loc[inst, 'df'] = 1.0
         for key in self.opt_dict:
@@ -72,8 +70,10 @@ class OptionStrategy(object):
         self.hedge_config = {'order_type': OPT_MARKET_ORDER, 'num_tick':1}
         self.spot_model = False
         self.pricer = pyktlib.BlackPricer
-        self.last_updated = dict([(expiry, {'dtoday':0, 'fwd':0.0}) for expiry in expiries]) 
+        self.last_updated = dict([(expiry, {'dtoday':0, 'fwd':0.0}) for expiry in self.expiries])
 
+    def dep_instIDs(self):
+        return self.underliers + self.opt_dict.values()
         
     def save_config(self):
         config = {}

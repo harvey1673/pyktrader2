@@ -61,9 +61,22 @@ def get_bktest_folder():
 
 class StratSim(object):
     def __init__(self, config):
+        self.pos_update = False
+        self.pos_class = None
+        self.pos_args = {}
+        self.weights = [1]
+        self.offset = 0
         self.config = config
         self.process_config(config)
         self.process_data(config['mdf'])
+        self.positions = []
+        self.closed_trades = []
+        self.tradeid = 0
+        self.timestamp = 0
+        self.traded_vol = 0
+        self.traded_cost = 0
+        self.traded_price = 0.0
+        self.scur_day = None
 
     def process_config(self, config):
         pass
@@ -71,10 +84,76 @@ class StratSim(object):
     def process_data(self, mdf):
         pass
 
-    def run_loop_sim(self):
+    def on_bar(self, sim_data, n):
         pass
 
+    def run_loop_sim(self):
+        sim_data = dh.DynamicRecArray(dataframe=self.df)
+        nlen = len(sim_data)
+        for n in range(nlen-3):
+            self.timestamp = sim_data['datetime'][n]
+            if self.check_data_invalid:
+                continue
+            if self.scur_day != sim_data['date'][n]:
+                self.scur_day = sim_data['date'][n]
+                self.daily_initialize()
+            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], 0)
+            sim_data['pos'][n] = sim_data['pos'][n-1] + self.traded_vol
+            sim_data['cost'][n] = self.traded_cost
+            sim_data['traded_price'][n] = self.traded_price
+            self.traded_vol = self.traded_price = self.traded_cost = 0
+            self.on_bar(sim_data, n)
+        pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
+        tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
+        cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
+        out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, self.df.datetime, pos, tp, cost], \
+                           join='outer', axis = 1)
+        return out_df, self.closed_trades
+
     def run_vec_sim(self):
+        pass
+
+    def check_data_invalid(self, sim_data, n):
+        return False
+
+    def close_tradepos(self, tradepos, traded_price):
+        tradepos.close(traded_price - self.offset * tradepos.direction, self.timestamp)
+        tradepos.exit_tradeid = self.tradeid
+        self.tradeid += 1
+        self.closed_trades.append(tradepos)
+        self.traded_price = (self.traded_price * self.traded_vol - traded_price * tradepos.pos)/(self.traded_vol - tradepos.pos)
+        self.traded_vol -= tradepos.pos
+        self.traded_cost += abs(tradepos.pos) * (self.offset + traded_price * self.tcost)
+
+    def open_tradepos(self, contracts, price, traded_pos):
+        traded_price = price + traded_pos * self.offset
+        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price,traded_price, **self.pos_args)
+        new_pos.entry_tradeid = self.tradeid
+        self.tradeid += 1
+        new_pos.open(traded_price, self.timestamp)
+        self.positions.append(new_pos)
+        self.traded_price = (self.traded_price * self.traded_vol + traded_price * new_pos.pos)/(self.traded_vol + new_pos.pos)
+        self.traded_vol += new_pos.pos
+        self.traded_cost += abs(new_pos.pos) * (self.offset + price * self.tcost)
+
+    def check_curr_pos(self, ohlc, exit_gap = 0):
+        pos = cost = 0
+        for tradepos in self.positions:
+            ep =  ohlc[2] if tradepos.pos > 0 else ohlc[1]
+            if tradepos.check_exit(ep, exit_gap):
+                if tradepos.check_exit(ohlc[0], exit_gap):
+                    traded_price = ohlc[0]
+                else:
+                    traded_price = tradepos.exit_target - tradepos.direction * exit_gap
+                dpos, dcost = self.close_tradepos(tradepos, traded_price)
+                pos += dpos
+                dcost += dcost
+            elif self.pos_update:
+                tradepos.update_price(ep)
+        self.positions = [pos for pos in self.positions if not pos.is_closed]
+        return pos, cost
+
+    def daily_initialize(self):
         pass
 
 def get_asset_tradehrs(asset):
@@ -742,11 +821,12 @@ class BacktestManager(object):
     def __init__(self, config_file):
         with open(config_file, 'r') as fp:
             sim_config = json.load(fp)
-        bktest_split = sim_config['sim_module'].split('.')
-        sim_module = __import__(bktest_split[0])
+        bktest_split = sim_config['sim_class'].split('.')
+        sim_class = __import__(bktest_split[0])
         for i in range(1, len(bktest_split)):
-            sim_module = getattr(sim_module, bktest_split[i])
-        self.sim_func = sim_module
+            sim_class = getattr(sim_class, bktest_split[i])
+        self.sim_class = sim_class
+        self.sim_func = sim_config['sim_func']
         dir_name = config_file.split('.')[0]
         dir_name = dir_name.split(os.path.sep)[-1]
         test_folder = self.get_bktest_folder()
@@ -988,7 +1068,10 @@ class BacktestManager(object):
                 for key, seq in zip(self.scen_keys, s):
                     self.config[key] = self.scen_param[key][seq]
                 self.prepare_data(idx, cont_idx = 0)
-                sim_df, closed_trades = self.sim_func(self.config)
+                sim_strat = self.sim_class(self.config)
+                #sim_strat.process_config()
+                # sim_strat.process_data()
+                sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                 (res_pnl, ts) = self.get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
                 res_trade = self.get_trade_stats(closed_trades)
                 res = dict( res_pnl.items() + res_trade.items())

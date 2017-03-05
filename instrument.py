@@ -310,24 +310,29 @@ class FutOptionInst(OptionInst):
     def initialize(self):
         self.ptype = ProductType.Option
         self.product = inst2product(self.name)
-        sep_name = self.name.split('-')
-        if self.product == 'IO_Opt':
-            self.underlying = sep_name[0].replace('IO','IF')
-            self.strike = float(sep_name[2])
-            self.otype = str(sep_name[1])
-            self.cont_mth = int(self.underlying[-4:]) + 200000 
+        if (self.product[-3:] == 'Opt') and (self.product[:-3] in product_code['CZCE']):
+            self.underlying = self.name[:5]
+            self.otype = self.name[5]
+            self.cont_mth = int(self.underlying[-3:]) + 201000
+            self.strike = float(self.name[6:])
+            self.product = self.name[:2]
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
-            self.product = 'IO'
-        elif '_Opt' in self.product:
-            self.underlying = sep_name[0]
-            self.strike = float(sep_name[2])
-            self.otype = str(sep_name[1])
-            if inst2exch(self.underlying) == 'CZCE':
-                self.cont_mth = int(self.underlying[-3:]) + 201000
-            else:
+        else:
+            sep_name = self.name.split('-')
+            if self.product == 'IO_Opt':
+                self.underlying = sep_name[0].replace('IO','IF')
+                self.strike = float(sep_name[2])
+                self.otype = str(sep_name[1])
                 self.cont_mth = int(self.underlying[-4:]) + 200000
-            self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
-            self.product = self.product[:-4]
+                self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
+                self.product = 'IO'
+            elif '_Opt' in self.product:
+                self.underlying = sep_name[0]
+                self.strike = float(sep_name[2])
+                self.otype = str(sep_name[1])
+                self.cont_mth = int(self.underlying[-4:]) + 200000
+                self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
+                self.product = self.product[:-4]
         prod_info = mysqlaccess.load_product_info(self.product)
         self.exchange = prod_info['exch']
         self.start_tick_id =  prod_info['start_min'] * 1000
