@@ -17,7 +17,6 @@ from misc import *
 
 RISK_FREE_RATE = 0.04
 
-
 def fut2opt(fut_inst, expiry, otype, strike):
     product = inst2product(fut_inst)
     if product == 'IF':

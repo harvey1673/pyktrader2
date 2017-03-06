@@ -87,6 +87,9 @@ class StratSim(object):
     def on_bar(self, sim_data, n):
         pass
 
+    def get_tradepos_exit(self, sim_data, n):
+        return 0
+
     def run_loop_sim(self):
         sim_data = dh.DynamicRecArray(dataframe=self.df)
         nlen = len(sim_data)
@@ -97,7 +100,8 @@ class StratSim(object):
             if self.scur_day != sim_data['date'][n]:
                 self.scur_day = sim_data['date'][n]
                 self.daily_initialize()
-            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], 0)
+            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], \
+                                self.get_tradepos_exit(sim_data, n))
             sim_data['pos'][n] = sim_data['pos'][n-1] + self.traded_vol
             sim_data['cost'][n] = self.traded_cost
             sim_data['traded_price'][n] = self.traded_price
@@ -127,7 +131,7 @@ class StratSim(object):
 
     def open_tradepos(self, contracts, price, traded_pos):
         traded_price = price + traded_pos * self.offset
-        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price,traded_price, **self.pos_args)
+        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price, traded_price, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
         new_pos.open(traded_price, self.timestamp)
