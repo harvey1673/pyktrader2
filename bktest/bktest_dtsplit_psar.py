@@ -1,4 +1,7 @@
-import sys
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 import json
 import misc
 import data_handler as dh
@@ -57,13 +60,15 @@ class DTStopSim(StratSim):
                            pd.rolling_max(xdf.close, self.win) - pd.rolling_min(xdf.low, self.win)],
                            join='outer', axis=1).max(axis=1)
         xdf['TR'] = tr
-        xdf['chan_h'] = self.chan_high(xdf['high'], self.chan, **self.chan_func['high']['args'])
-        xdf['chan_l'] = self.chan_low(xdf['low'], self.chan, **self.chan_func['low']['args'])
+        xdf['chanh'] = self.chan_high(xdf['high'], self.chan, **self.chan_func['high']['args'])
+        xdf['chanl'] = self.chan_low(xdf['low'], self.chan, **self.chan_func['low']['args'])
         xdf['ATR'] = dh.ATR(xdf, n = self.atr_len)
+        xdf['MA'] = dh.MA(xdf, n=self.atr_len, field = 'close')
         xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1), xdf['ATR'].shift(1),
-                           xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
+                           xdf['chanh'].shift(1), xdf['chanl'].shift(1),
                            xdf['open']], axis=1, keys=['tr','ma', 'atr', 'chanh', 'chanl', 'dopen']).fillna(0)
         self.df = mdf.join(xdata, how = 'left').fillna(method='ffill')
+        self.df['datetime'] = self.df.index
         self.df['cost'] = 0
         self.df['pos'] = 0
         self.df['traded_price'] = self.df['open']
@@ -79,7 +84,7 @@ class DTStopSim(StratSim):
             self.sell_trig -= self.f * rng
 
     def check_data_invalid(self, sim_data, n):
-        return (sim_data['ma'][n] == 0) or (sim_data['chan_h'][n] == 0) or (sim_data['dopen'][n] == 0) \
+        return (sim_data['ma'][n] == 0) or (sim_data['chanh'][n] == 0) or (sim_data['dopen'][n] == 0) \
                or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, sim_data, n):

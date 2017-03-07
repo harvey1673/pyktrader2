@@ -91,15 +91,16 @@ class StratSim(object):
         return 0
 
     def run_loop_sim(self):
-        sim_data = dh.DynamicRecArray(dataframe=self.df)
-        nlen = len(sim_data)
+        dra = dh.DynamicRecArray(dataframe=self.df)
+        sim_data = dra.data
+        nlen = len(dra)
         for n in range(nlen-3):
-            self.timestamp = sim_data['datetime'][n]
-            if self.check_data_invalid:
+            self.timestamp = sim_data['datetime'][n].astype(datetime.datetime)
+            if self.check_data_invalid(sim_data, n):
                 continue
             if self.scur_day != sim_data['date'][n]:
                 self.scur_day = sim_data['date'][n]
-                self.daily_initialize()
+                self.daily_initialize(sim_data, n)
             self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], \
                                 self.get_tradepos_exit(sim_data, n))
             sim_data['pos'][n] = sim_data['pos'][n-1] + self.traded_vol
@@ -110,7 +111,7 @@ class StratSim(object):
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
-        out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, self.df.datetime, pos, tp, cost], \
+        out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, pos, tp, cost], \
                            join='outer', axis = 1)
         return out_df, self.closed_trades
 
@@ -134,7 +135,7 @@ class StratSim(object):
         new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price, traded_price, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
-        new_pos.open(traded_price, self.timestamp)
+        new_pos.open(traded_price, self.unit * traded_pos, self.timestamp)
         self.positions.append(new_pos)
         self.traded_price = (self.traded_price * self.traded_vol + traded_price * new_pos.pos)/(self.traded_vol + new_pos.pos)
         self.traded_vol += new_pos.pos
@@ -149,13 +150,10 @@ class StratSim(object):
                     traded_price = ohlc[0]
                 else:
                     traded_price = tradepos.exit_target - tradepos.direction * exit_gap
-                dpos, dcost = self.close_tradepos(tradepos, traded_price)
-                pos += dpos
-                dcost += dcost
+                self.close_tradepos(tradepos, traded_price)
             elif self.pos_update:
                 tradepos.update_price(ep)
         self.positions = [pos for pos in self.positions if not pos.is_closed]
-        return pos, cost
 
     def daily_initialize(self):
         pass
@@ -218,7 +216,7 @@ def simdf_to_trades1(df, slippage = 0):
             new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
             tradeid += 1
             new_pos.entry_tradeid = tradeid
-            new_pos.open(tprice, dtime)
+            new_pos.open(tprice, pos - prev_pos, dtime)
             pos_list.append(new_pos)
         else:
             for i, tp in enumerate(reversed(pos_list)):
@@ -236,7 +234,7 @@ def simdf_to_trades1(df, slippage = 0):
                     new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
-                    new_pos.open(tprice, dtime)
+                    new_pos.open(tprice, pos - prev_pos, dtime)
                     pos_list.append(new_pos)
                 else:  
                     print "Warning: handling partial position for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
@@ -267,13 +265,13 @@ def simdf_to_trades2(df, slippage = 0.0):
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
             pos_list = pos_list + new_pos
             new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
             pos_list = pos_list + new_pos
         else:
             for i, tp in enumerate(reversed(pos_list)):
@@ -293,7 +291,7 @@ def simdf_to_trades2(df, slippage = 0.0):
                     for tpos in new_pos:
                         tradeid += 1
                         tpos.entry_tradeid = tradeid
-                        tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, dtime)
+                        tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
                     pos_list = pos_list + new_pos                    
                 else:  
                     print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
@@ -826,7 +824,7 @@ class BacktestManager(object):
         with open(config_file, 'r') as fp:
             sim_config = json.load(fp)
         bktest_split = sim_config['sim_class'].split('.')
-        sim_class = __import__(bktest_split[0])
+        sim_class = __import__('.'.join(bktest_split[:2]))
         for i in range(1, len(bktest_split)):
             sim_class = getattr(sim_class, bktest_split[i])
         self.sim_class = sim_class
@@ -897,6 +895,7 @@ class BacktestManager(object):
             self.config['start_date'] = max(sim_start_dict[asset], self.start_date)
         else:
             self.config['start_date'] = self.start_date
+        self.config['end_date'] = self.end_date
         self.config['tick_base'] = sum([trade_offset_dict[prod] for prod in assets])
         self.config['offset'] = self.sim_offset * self.config['tick_base']
         max_margin = max([sim_margin_dict[prod] for prod in assets])
@@ -905,7 +904,7 @@ class BacktestManager(object):
         self.config['rollrule'] = '-50b'
         self.config['exit_min'] = 2057
         self.config['no_trade_set'] = range(300, 301) + range(1500, 1501) + range(2059, 2100) \
-                                                if self.no_trade_set == None else self.no_trade_set
+                                                if 'no_trade_set' not in self.config else self.config['no_trade_set']
         if asset in ['cu', 'al', 'zn']:
             self.config['nearby'] = 3
             self.config['rollrule'] = '-1b'
@@ -921,7 +920,7 @@ class BacktestManager(object):
 
     def load_curr_results(self, idx):
         asset = self.sim_assets[idx]
-        file_prefix = self.file_prefix + '_' + '_'.join(self.sim_mode + asset)
+        file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
         fname = file_prefix + '_stats.json'
         output = {}
         if os.path.isfile(fname):
@@ -1012,7 +1011,7 @@ class BacktestManager(object):
         ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
         return res, ts
 
-    def get_trade_stats(trade_list):
+    def get_trade_stats(self, trade_list):
         res = {}
         res['n_trades'] = len(trade_list)
         res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
@@ -1057,6 +1056,7 @@ class BacktestManager(object):
         return res
 
     def run_all_assets(self):
+        summary_df = None
         for idx, asset in enumerate(self.sim_assets):
             output = self.load_curr_results(idx)
             if len(output.keys()) == len(self.scenarios):
@@ -1064,11 +1064,11 @@ class BacktestManager(object):
             self.set_config(idx)
             self.load_data(idx)
             for ix, s in enumerate(self.scenarios):
-                file_prefix = self.file_prefix + '_' + '_'.join(self.sim_mode + asset)
-                fname1 = file_prefix + str(ix) + '_trades.csv'
-                fname2 = file_prefix + str(ix) + '_dailydata.csv'
-                if os.path.isfile(fname1) and os.path.isfile(fname2):
+                if ix in output:
                     continue
+                file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
+                fname1 = file_prefix + '_'+ str(ix) + '_trades.csv'
+                fname2 = file_prefix + '_'+ str(ix) + '_dailydata.csv'
                 for key, seq in zip(self.scen_keys, s):
                     self.config[key] = self.scen_param[key][seq]
                 self.prepare_data(idx, cont_idx = 0)
@@ -1080,7 +1080,7 @@ class BacktestManager(object):
                 res_trade = self.get_trade_stats(closed_trades)
                 res = dict( res_pnl.items() + res_trade.items())
                 res.update(dict(zip(self.scen_keys, s)))
-                res['asset'] = asset
+                res['asset'] = '_'.join(asset)
                 output[ix] = res
                 print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
                 all_trades = {}
@@ -1098,11 +1098,11 @@ class BacktestManager(object):
             res = res.reset_index()
             res.set_index(['asset', 'scenario'])
             out_res = res[self.output_columns()]
-            if len(summary_df) == 0:
+            if summary_df == None:
                 summary_df = out_res[:30].copy(deep = True)
             else:
                 summary_df = summary_df.append(out_res[:30])
-            fname = self.config['file_prefix'] + 'summary.csv'
+            fname = self.file_prefix + 'summary.csv'
             summary_df.to_csv(fname)
 
 class ContBktestManager(BacktestManager):
@@ -1168,6 +1168,7 @@ class ContBktestManager(BacktestManager):
         self.config['mdf'] = mdf
 
     def run_all_assets(self):
+        summary_df = None
         for idx, asset in enumerate(self.sim_assets):
             cont_map = self.cont_maplist[idx]
             output = self.load_curr_results(idx)
@@ -1233,11 +1234,11 @@ class ContBktestManager(BacktestManager):
             cont_df.to_csv(fname)
             res = scen_dict_to_df(output['total'])
             out_res = res[self.output_columns()]
-            if len(summary_df) == 0:
+            if summary_df == None:
                 summary_df = out_res[:30].copy(deep = True)
             else:
                 summary_df = summary_df.append(out_res[:30])
-            fname = self.config['file_prefix'] + 'summary.csv'
+            fname = self.file_prefix + 'summary.csv'
             summary_df.to_csv(fname)
 
 if __name__=="__main__":
