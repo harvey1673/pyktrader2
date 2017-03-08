@@ -94,19 +94,21 @@ class StratSim(object):
         dra = dh.DynamicRecArray(dataframe=self.df)
         sim_data = dra.data
         nlen = len(dra)
-        for n in range(nlen-3):
-            self.timestamp = sim_data['datetime'][n].astype(datetime.datetime)
+        for n in range(1, nlen-1):
+            self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
+            sim_data['pos'][n] = sim_data['pos'][n - 1]
             if self.check_data_invalid(sim_data, n):
                 continue
             if self.scur_day != sim_data['date'][n]:
                 self.scur_day = sim_data['date'][n]
                 self.daily_initialize(sim_data, n)
-            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], \
-                                self.get_tradepos_exit(sim_data, n))
-            sim_data['pos'][n] = sim_data['pos'][n-1] + self.traded_vol
+            exit_gap = self.get_tradepos_exit(sim_data, n)
+            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], exit_gap)
+            sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
             sim_data['traded_price'][n] = self.traded_price
-            self.traded_vol = self.traded_price = self.traded_cost = 0
+            self.traded_vol = self.traded_cost = 0
+            self.traded_price = sim_data['close'][n]
             self.on_bar(sim_data, n)
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
@@ -131,7 +133,7 @@ class StratSim(object):
         self.traded_cost += abs(tradepos.pos) * (self.offset + traded_price * self.tcost)
 
     def open_tradepos(self, contracts, price, traded_pos):
-        traded_price = price + traded_pos * self.offset
+        traded_price = price + misc.sign(traded_pos) * self.offset
         new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price, traded_price, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
@@ -149,7 +151,8 @@ class StratSim(object):
                 if tradepos.check_exit(ohlc[0], exit_gap):
                     traded_price = ohlc[0]
                 else:
-                    traded_price = tradepos.exit_target - tradepos.direction * exit_gap
+                    tp = (tradepos.exit_target - tradepos.direction * exit_gap)/self.offset
+                    traded_price = int(tp) * self.offset if tp > 0 else (int(tp)-1) * self.offset
                 self.close_tradepos(tradepos, traded_price)
             elif self.pos_update:
                 tradepos.update_price(ep)
@@ -1056,7 +1059,7 @@ class BacktestManager(object):
         return res
 
     def run_all_assets(self):
-        summary_df = None
+        self.restart()
         for idx, asset in enumerate(self.sim_assets):
             output = self.load_curr_results(idx)
             if len(output.keys()) == len(self.scenarios):
@@ -1098,7 +1101,7 @@ class BacktestManager(object):
             res = res.reset_index()
             res.set_index(['asset', 'scenario'])
             out_res = res[self.output_columns()]
-            if summary_df == None:
+            if len(summary_df):
                 summary_df = out_res[:30].copy(deep = True)
             else:
                 summary_df = summary_df.append(out_res[:30])
@@ -1168,7 +1171,7 @@ class ContBktestManager(BacktestManager):
         self.config['mdf'] = mdf
 
     def run_all_assets(self):
-        summary_df = None
+        summary_df = pd.DataFrame()
         for idx, asset in enumerate(self.sim_assets):
             cont_map = self.cont_maplist[idx]
             output = self.load_curr_results(idx)
@@ -1234,7 +1237,7 @@ class ContBktestManager(BacktestManager):
             cont_df.to_csv(fname)
             res = scen_dict_to_df(output['total'])
             out_res = res[self.output_columns()]
-            if summary_df == None:
+            if len(summary_df)==0:
                 summary_df = out_res[:30].copy(deep = True)
             else:
                 summary_df = summary_df.append(out_res[:30])

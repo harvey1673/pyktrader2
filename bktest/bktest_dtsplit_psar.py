@@ -103,6 +103,7 @@ class DTStopSim(StratSim):
             ref_long = ref_short = sim_data['open'][n+1]
         target_pos = (ref_long > self.buy_trig) - (ref_short < self.sell_trig)
         if len(self.positions)>0:
+            curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
             for tradepos in self.positions:
                 if need_close or (tradepos.pos * target_pos < 0):
@@ -110,7 +111,9 @@ class DTStopSim(StratSim):
             self.positions = [pos for pos in self.positions if not pos.is_closed]
             if need_close:
                 return
-        if target_pos != 0:
+        else:
+            curr_pos = 0
+        if target_pos!=0 and (curr_pos * target_pos <= 0):
             if (not self.use_chan) or (((ref_long > sim_data['chanh'][n]) and target_pos > 0) or ((ref_short < sim_data['chanl'][n]) and target_pos < 0)):
                 self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], target_pos)
 
