@@ -1,9 +1,7 @@
 #include "amopt.h"
 #include "euopt.h"
 
-const int bin_tree_nstep = 128;
-
-double american_prem_fut_btree(double F,double K,double vol,double t_exp,double df, std::string PutCall) 
+double american_prem_fut_btree(double F,double K,double vol,double t_exp,double df, std::string PutCall, int bin_tree_nstep) 
 {
 	if (t_exp < 0.0) return 0.0;
 
@@ -74,22 +72,22 @@ double american_prem_fut_btree(double F,double K,double vol,double t_exp,double 
 	return F * ( aopay[0] - eopay[0] );
 }
 
-double AmericanOptFutPrice(double F,double K,double vol,double t_exp,double df, std::string PutCall) 
+double AmericanOptFutPrice(double F,double K,double vol,double t_exp,double df, std::string PutCall, int bin_tree_nstep) 
 {
 	double european = BlackPrice( F, K, vol, t_exp, df, PutCall); 
-	double am_prem = american_prem_fut_btree( F, K, vol, t_exp, df, PutCall); 
+	double am_prem = american_prem_fut_btree( F, K, vol, t_exp, df, PutCall, bin_tree_nstep); 
 	return (european + am_prem);
 }
 
-double AmericanImpliedVol(double MktPrice, double F,double K,double r,double T, std::string PutCall) {
+double AmericanImpliedVol(double MktPrice, double F,double K,double r,double T, std::string PutCall, int bin_tree_nstep) {
 	double df = std::exp(-r*T);
 	double euiv = BlackImpliedVol(MktPrice, F, K, r, T, PutCall);
 	double a = 0.5 * euiv;
 	double b = 1.1 * euiv;
-	double lowdiff = AmericanOptFutPrice(F,K,a,T,df,PutCall) - MktPrice;
-	double highdiff = AmericanOptFutPrice(F,K,b,T,df,PutCall) - MktPrice;
+	double lowdiff = AmericanOptFutPrice(F,K,a,T,df,PutCall, bin_tree_nstep) - MktPrice;
+	double highdiff = AmericanOptFutPrice(F,K,b,T,df,PutCall, bin_tree_nstep) - MktPrice;
 	double midv = euiv;
-	double middiff = AmericanOptFutPrice(F,K,euiv,T,df,PutCall) - MktPrice; 
+	double middiff = AmericanOptFutPrice(F,K,euiv,T,df,PutCall, bin_tree_nstep) - MktPrice; 
 	double tol = 1e-6;
 	int MaxIter = 100;
 
@@ -107,7 +105,7 @@ double AmericanImpliedVol(double MktPrice, double F,double K,double r,double T, 
 			}
 
 			midv = (highdiff * a - lowdiff * b)/(highdiff - lowdiff);
-			middiff = AmericanOptFutPrice(F,K,midv,T,df,PutCall) - MktPrice;
+			middiff = AmericanOptFutPrice(F,K,midv,T,df,PutCall, bin_tree_nstep) - MktPrice;
 		}
 	}
 
@@ -116,4 +114,3 @@ double AmericanImpliedVol(double MktPrice, double F,double K,double r,double T, 
 	else
 		return midv;
 }
-
