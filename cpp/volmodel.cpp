@@ -10,9 +10,25 @@ double SamuelsonFactor(double a, double b, double t, double T, double mat)
 	return factor2/factor1;
 }
 
-double VolNode::expiry_()
+double SamuelsonFactor(double a, double b, double t2T, double t2mat)
 {
-	return this->time2expiry_(this->dtoday_(), this->dexp_());
+	double factor1 = std::sqrt(1 + 2 * a * ExpIntegral(b, t2T) + a*a*ExpIntegral(2*b, t2T));
+	double tdiff = t2T - t2mat;
+	double factor2 = std::sqrt(1 + 2 * a * std::exp( -tdiff * b) * ExpIntegral(b, t2mat) + 
+							a*a*std::exp( -2*b*tdiff) * ExpIntegral( 2*b, t2mat));
+	return factor2/factor1;
+}
+
+void VolNode::setExp( double dexp )
+{   
+    _dexp = dexp; 
+    _expiryTimes = this->time2expiry_( this->dtoday_(), dexp); 
+}
+
+void VolNode::setToday( double dtoday )
+{
+    _dtoday = dtoday; 
+    _expiryTimes = this->time2expiry_( dtoday, this->dexp_());
 }
 
 double VolNode::time2expiry_(const double dtoday, const double dexp)
@@ -35,32 +51,29 @@ double VolNode::nextwkday_(const double dtoday)
 		return NextBusDay(dtoday, CHN_Holidays);
 }
 
-double SamuelVolNode::GetVolByMoneyness(const double ratio, const double dmat)
+double SamuelVolNode::GetVolByMoneyness(const double ratio, const double t2mat)
 {	
 	double vol = this->atmVol_();
-	double T = this->dexp_()/365.0;
-	double t = this->dtoday_()/365.0;
-	double mat = dmat / 365.0;
+	double t2T = this->expiry_();	
 	double a = this->alpha_();
 	double b = this->beta_();
 
 	if (T <= t)
 		return vol;
 	else
-		return vol * SamuelsonFactor(a,b,t,T, mat);
+		return vol * SamuelsonFactor(a,b,t2T,t2mat);
 }
 
-double SamuelVolNode::GetInstVol(const double d)
+double SamuelVolNode::GetInstVol(const double t2mat)
 {
 	double vol = this->atmVol_();
-	double T = this->dexp_()/365.0;
-	double t = d/365.0;
+	double t2T = this->expiry_();	
 	double a = this->alpha_();
 	double b = this->beta_();
-	if (T <= t)
+	if (t2T <= t2mat)
 		return vol;
 	else
-		return vol * ( 1 + a * std::exp(-b*(T-t)));
+		return vol * ( 1 + a * std::exp(-b*(t2T-t2mat)));
 }
 
 void Delta5VolNode::setAtm( double atm ) 
@@ -109,30 +122,47 @@ Delta5VolNode::Delta5VolNode(const double dtoday,
 {
 	initialize();
 }
+Delta5VolNode::Delta5VolNode(const double time2expiry,
+					const double fwd,
+					const double atm, 
+					const double v90, 
+					const double v75, 
+					const double v25, 
+					const double v10,
+					const std::string accrual):
+					VolNode(atm, time2expiry, accrual),
+					_fwd(fwd),
+					_d90Vol(v90),
+					_d75Vol(v75),
+					_d25Vol(v25),
+					_d10Vol(v10),
+					_omega(0.75) 
+{
+	initialize();
+}
 
-double Delta5VolNode::GetVolByStrike(const double strike, const double dmat) {
+double Delta5VolNode::GetVolByStrike(const double strike, const double t2mat) {
 	double atmvol = this->atmVol_();
 	double expiry = this->expiry_();
 
 	if ( (expiry <= 0) || (strike <= 0) )
 		return atmvol;
 	else
-		return this->GetVolByMoneyness( std::log(strike/this->fwd_()), dmat );
+		return this->GetVolByMoneyness( std::log(strike/this->fwd_()), t2mat );
 }
 
-double Delta5VolNode::GetVolByDelta(const double delta, const double dmat) {
+double Delta5VolNode::GetVolByDelta(const double delta, const double t2mat) {
 	double atmvol = this->atmVol_();
 	double expiry = this->expiry_();
-
 	if ( (expiry <= 0))
 		return atmvol;
 	else {
 		double logmoneyness = atmvol * (0.5 * atmvol * expiry - std::sqrt(expiry) * norminv(delta));
-		return this->GetVolByMoneyness( logmoneyness, dmat );
+		return this->GetVolByMoneyness( logmoneyness, t2mat );
 	}
 }
 
-double Delta5VolNode::GetVolByMoneyness(const double xr, const double dmat) 
+double Delta5VolNode::GetVolByMoneyness(const double xr, const double t2mat) 
 {
 	if ( (this->expiry_() <=0))
 		return this->atmVol_();
@@ -153,23 +183,34 @@ SamuelDelta5VolNode::SamuelDelta5VolNode(const double dtoday,
 				const std::string accrual):
 				Delta5VolNode(dtoday, dexp, fwd, atm, v90, v75, v25, v10, accrual),
 				_alpha(alpha), _beta(beta){}
-
-double SamuelDelta5VolNode::GetVolByMoneyness(const double ratio, const double dmat)
+                
+SamuelDelta5VolNode::SamuelDelta5VolNode(const double time2expiry,
+				const double fwd,
+				const double atm, 
+				const double v90, 
+				const double v75, 
+				const double v25, 
+				const double v10,
+				const double alpha,
+				const double beta,
+				const std::string accrual):
+				Delta5VolNode(time2expiry, fwd, atm, v90, v75, v25, v10, accrual),
+				_alpha(alpha), _beta(beta){}
+                
+double SamuelDelta5VolNode::GetVolByMoneyness(const double ratio, const double t2mat)
 {
 	double impvol = Delta5VolNode::GetVolByMoneyness(ratio);
-	double T = this->dexp_()/365.0;
-	double t = this->dtoday_()/365.0;
-	double mat = dmat / 365.0;
+	double t2T = thie->expiry_();
 	double a = this->alpha_();
 	double b = this->beta_();
 
 	if (T <= t)
 		return impvol;
 	else
-		return impvol * SamuelsonFactor(a,b,t,T, mat);
+		return impvol * SamuelsonFactor(a,b,t2T,t2mat);
 }
 
-double SamuelDelta5VolNode::GetInstVol(const double d)
+double SamuelDelta5VolNode::GetInstVol(const double t2mat)
 {
 	double vol = this->atmVol_();
 	double T = this->dexp_()/365.0;
@@ -180,8 +221,8 @@ double SamuelDelta5VolNode::GetInstVol(const double d)
 		return vol;
 	else
 	{
-		double factor = std::sqrt(1 + 2 * a * ExpIntegral(b, T - t) + 
-							a*a*ExpIntegral( 2*b, T - t));
-		return vol / factor * ( 1 + a * std::exp(-b*(T-t)));
+		double factor = std::sqrt(1 + 2 * a * ExpIntegral(b, t2T - t2mat) + 
+							a*a*ExpIntegral( 2*b, t2T - t2mat));
+		return vol / factor * ( 1 + a * std::exp(-b*(t2T-t2mat)));
 	}
 }
