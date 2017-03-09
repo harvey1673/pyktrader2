@@ -109,6 +109,31 @@ inline double NextBusDay(const double startD, const int hols[])
 	return res;
 }
 
+DblVector FitDelta5VolParams( const double dtoday,
+					const double dexp,
+					const double fwd,
+					DblVector &strikeList,
+					DblVector &volList)
+{
+	double expiry = (dexp - dtoday)/365.0;
+	DblVector xi(strikeList.size());
+	for (size_t i = 0; i < strikeList.size(); ++i)
+		xi[i] = std::log(strikeList[i]/fwd);	
+	ConvInterpolator intp( xi, volList, 0.75);
+	DblVector volparam(5);
+	double atm = intp.value(0);	
+	volparam[0] = atm;
+	xi.resize(4);
+	xi[0] = 0.9;
+	xi[1] = 0.75;
+	xi[2] = 0.25;
+	xi[3] = 0.1;
+	for (size_t i = 0; i < 4; ++i )
+		volparam[i+1] = intp.value( atm * (0.5 * atm * expiry - std::sqrt(expiry) * norminv(xi[i])) ) - atm;
+	return volparam;
+}
+
+
 inline double GetDayFraction(const double dExp, std::string accrual)
 {
 	double res = 0.0;
@@ -120,43 +145,70 @@ inline double GetDayFraction(const double dExp, std::string accrual)
 		if (frac < 9.5/24.0)
 			res = 0.0;
 		else if (frac < 11.5/24.0)
-			res = (frac - 9.5/24.0)*6.0;
+			res = (frac*6.0 - 9.5/4.0);
 		else if (frac < 13.0/24.0)
 			res = 0.5;
 		else if (frac < 15.0/24.0)
-			res = 0.5 + (frac -13.0/24.0)*6.0;
+			res = 0.5 + (frac*6.0 -13.0/4.0);
 		else
 			res = 1.0;
 	}
 	else if (accrual == "CFFEX")
 	{
 		double frac = dExp - int(dExp);
+        double fact = 24.0/4.25;
 		if (frac < 9.25/24.0)
 			res = 0.0;
 		else if (frac < 11.5/24.0)
-			res = (frac - 9.25/24.0)*24.0/4.25;
+			res = (frac - 9.25/24.0)*fact;
 		else if (frac < 13.0/24.0)
 			res = 2.25/4.25;
 		else if (frac < 15.0/24.0)
-			res = 2.25/4.25 + (frac -13.0/24.0)*24.0/4.25;
+			res = 2.25/4.25 + (frac -13.0/24.0)*fact;
 		else
 			res = 1.0;
 	}
-	else if (accrual == "COM")
+    else if (accrual == "COMN1")
+	{
+		double frac = dExp - int(dExp) + 6.0/24.0;
+        if (frac >= 1)
+            frac = frac - 1
+        double fact = 24/6.25;
+		if (frac < 3.0/24.0)
+			res = 0;
+		else if (frac < 5.5/24.0)
+			res = (frac * fact - 3.0/6.25);
+		else if (frac < 15.0/24.0)
+			res = 2.5/6.25;
+		else if (frac < 16.25/24.0)
+			res = 2.5/6.25 + (frac * fact -15.0/6.25);
+		else if (frac < 16.5/24.0)
+			res = 3.75/6.25;
+		else if (frac < 17.5/24.0)
+			res = 3.75/6.25 + (frac * fact -16.5/6.25);
+		else if (frac < 19.5/24.0)
+            res = 4.75/6.25;
+        else if (frac < 21.0/24.0)
+            res = 4.75/6.25 + (frac * fact -19.5/6.25);
+        else
+			res = 1.0;
+	}
+	else
 	{
 		double frac = dExp - int(dExp);
+        double fact = 24/3.75;
 		if (frac < 9.0/24.0)
 			res = 0.0;
 		else if (frac < 10.25/24.0)
-			res = (frac - 9.0/24.0)*24.0/3.75;
+			res = (frac * fact - 9.0/3.75);
 		else if (frac < 10.5/24.0)
 			res = 1.25/3.75;
 		else if (frac < 11.5/24.0)
-			res = 1.25/3.75 + (frac -10.5/24.0)*24.0/3.75;
+			res = 1.25/3.75 + (frac * fact -10.5/3.75);
 		else if (frac < 13.5/24.0)
 			res = 2.25/3.75;
 		else if (frac < 15.0/24.0)
-			res = 2.25/3.75 + (frac -13.5/24.0)*24.0/3.75;
+			res = 2.25/3.75 + (frac * fact -13.5/3.75);
 		else
 			res = 1.0;
 	}
