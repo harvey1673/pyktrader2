@@ -13,10 +13,15 @@ public:
 	Pricer( const double dtoday, const double dexp, 
 			const double fwd, VolNode *vol,
 			const double strike, const double ir, std::string otype):
-			_dtoday(dtoday), _dexp(dexp), 
+			_dtoday(dtoday), _dexp(dexp),
+			_fwd(fwd), _vol(vol), 
+			_strike(strike), _irate(ir), _otype(otype) { _time2expiry = vol.time2expiry_(dtoday, dexp);}
+    Pricer( const double time2expiry, 
+			const double fwd, VolNode *vol,
+			const double strike, const double ir, std::string otype):
+			_time2expiry(time2expiry), _dtoday(0), _dexp(time2expiry*245), 
 			_fwd(fwd), _vol(vol), 
 			_strike(strike), _irate(ir), _otype(otype) {}
-
 	virtual double price() = 0;
 	virtual double delta();
 	virtual double gamma();
@@ -27,14 +32,16 @@ public:
 	virtual void setFwd( const double fwd) { _fwd = fwd; }
 	virtual void setVol( VolNode *vol) { _vol = vol; }
 	virtual void setIR( const double ir) { _irate = ir; }
-	virtual void setExpiry( const double dexp) { _dexp = dexp; }
-	virtual void setToday( const double dtoday) { _dtoday = dtoday; }
+	virtual void setExpiry( const double dexp) { _dexp = dexp; _time2expiry = _vol.time2expiry_(this->dtoday_(), dexp); }
+    virtual void setT2Exp( const double time2expiry ) { _time2expiry = time2expiry; }
+	virtual void setToday( const double dtoday) { _dtoday = dtoday; _time2expiry = _vol.time2expiry_(dtoday, this->dexp_());}
 	void setOtype( const std::string otype) { _otype = otype; }
 	double strike_() { return _strike; }
 	double fwd_() { return _fwd; }
 	VolNode* vol_() { return _vol; }
 	double dexp_() { return _dexp; }
 	double dtoday_() { return _dtoday; }
+    double time2expiry_() { return _time2expiry; }
 	double irate_() { return _irate; }
 	std::string otype_() { return _otype; }
 	virtual double priceTweak() { return 0.001; }
@@ -45,6 +52,7 @@ private:
 	double _strike;
 	double _dexp;
 	double _dtoday;
+    double _time2expiry;
 	double _irate;
 	std::string _otype;
 };
@@ -55,7 +63,10 @@ public:
 			const double fwd, VolNode *vol,
 			const double strike, const double ir, std::string otype)
 			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ) {}
-
+	BlackPricer( const double time2expiry, 
+			const double fwd, VolNode *vol,
+			const double strike, const double ir, std::string otype)
+			: Pricer( time2expiry, fwd, vol, strike, ir, otype ) {}
 	virtual double price();
 };
 
@@ -63,10 +74,15 @@ class AmericanFutPricer : public Pricer {
 public:
 	AmericanFutPricer( const double dtoday, const double dexp, 
 			const double fwd, VolNode *vol,
-			const double strike, const double ir, std::string otype)
-			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ) {}
-
+			const double strike, const double ir, std::string otype, const int tree_steps = 128)
+			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ), _tree_steps(tree_steps) {}
+	AmericanFutPricer( const double time2expiry,  
+			const double fwd, VolNode *vol,
+			const double strike, const double ir, std::string otype, const int tree_steps = 128)
+			: Pricer( time2expiry, fwd, vol, strike, ir, otype ), _tree_steps(tree_steps) {}
 	virtual double price();
+private:
+	int _tree_steps;    
 };
 
 class DigitalPricer : public Pricer {
@@ -76,7 +92,11 @@ public:
 			const double ir, std::string otype)
 			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ), 
 			  _sprdwidth(0.0001) {}
-
+	DigitalPricer( const double time2expiry, 
+			const double fwd, VolNode *vol, const double strike, 
+			const double ir, std::string otype)
+			: Pricer( time2expiry, fwd, vol, strike, ir, otype ), 
+			  _sprdwidth(0.0001) {}
 	virtual double price();
 private:
 	double _sprdwidth;
@@ -88,106 +108,11 @@ public:
 			const double fwd, VolNode *vol,
 			const double strike, const double ir, std::string otype)
 			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ) {}
-
+	BachelierPricer( const double time2expiry, 
+			const double fwd, VolNode *vol,
+			const double strike, const double ir, std::string otype)
+			: Pricer( time2exp, fwd, vol, strike, ir, otype ) {}
 	virtual double price();
 };
 
-class BlackStripPricer : public Pricer {
-public:
-	BlackStripPricer( const double dtoday, 
-		const double startDate, const double endDate, 
-		const double fwd, VolNode *vol,
-		const double strike, const double ir, 
-		const std::string otype, const DblVector &hols );
-	virtual double price();
-	virtual void setFwd( const double fwd);
-	virtual void setVol( VolNode *vol);
-	virtual void setIR( const double ir);
-	virtual void setToday( const double dtoday);
-
-private:
-	vector<BlackPricer> _pvec;
-	DblVector _bdays;
-	DblVector _hols;
-	double _sDate;
-	double _eDate;
-};
-
-class DigitalStripPricer : public Pricer {
-public:
-	DigitalStripPricer( const double dtoday, 
-		const double startDate, const double endDate, 
-		const double fwd, VolNode *vol,
-		const double strike, const double ir, 
-		const std::string otype, const DblVector &hols );
-	virtual double price();
-	virtual void setFwd( const double fwd);
-	virtual void setVol( VolNode *vol);
-	virtual void setIR( const double ir);
-	virtual void setToday( const double dtoday);
-
-private:
-	vector<DigitalPricer> _pvec;
-	DblVector _bdays;
-	DblVector _hols;
-	double _sDate;
-	double _eDate;
-};
-
-class BarrierPricer : public Pricer {
-public:
-	BarrierPricer( const double dtoday, const double dexp, 
-			const double fwd, VolNode *vol, const double strike, 
-			const double barrier, const std::string btype,
-			const double ir, std::string otype, const std::string mtype)
-			: Pricer( dtoday, dexp, fwd, vol, strike, ir, otype ), 
-			  _barrier(barrier), _btype(btype), _mtype(mtype) {}
-
-	virtual double price();
-
-	void setBarrier(const double barrier) { _barrier = barrier; }
-	void setBtype(const std::string btype) { _btype = btype; }
-	void setMtype(const std::string mtype) { _mtype = mtype; }
-
-	double barrier_() { return _barrier; }
-	std::string btype_()   { return _btype;   }
-	std::string mtype_()   { return _mtype;   }
-private:
-	double _barrier;
-	std::string _btype;
-	std::string _mtype;
-};
-
-class BarrierStripPricer : public Pricer {
-public:
-	BarrierStripPricer( const double dtoday, 
-		const double startDate, const double endDate, 
-		const double fwd, VolNode *vol, const double strike, 
-		const double barrier, const std::string btype,
-		const double ir, std::string otype, const std::string mtype,
-		const DblVector &hols );
-	virtual double price();
-	virtual void setFwd( const double fwd);
-	virtual void setVol( VolNode *vol);
-	virtual void setIR( const double ir);
-	virtual void setToday( const double dtoday);
-
-	void setBarrier(const double barrier) { _barrier = barrier; }
-	void setBtype(const std::string btype) { _btype = btype; }
-	void setMtype(const std::string mtype) { _mtype = mtype; }
-
-	double barrier_() { return _barrier; }
-	std::string btype_()   { return _btype;   }
-	std::string mtype_()   { return _mtype;   }
-
-private:
-	vector<BarrierPricer> _pvec;
-	DblVector _bdays;
-	DblVector _hols;
-	double _sDate;
-	double _eDate;
-	double _barrier;
-	std::string _btype;
-	std::string _mtype;
-};
 #endif
