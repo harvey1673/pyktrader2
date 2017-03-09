@@ -28,23 +28,27 @@ public:
 	}
 
 	virtual void setAtm( double atm ) { _atmVol = atm; }
-	void setToday( double dtoday ) { _dtoday = dtoday; }
-	void setExp( double dexp ) { _dexp = dexp; }
+	void setToday( double dtoday );
+	void setExp( double dexp );
+    void setTime2Exp( double expiryTimes ) { _expiryTimes = expiryTimes; }
+    void setAccrual( std::string accrual) { _accrual = accrual; }
 
 	double atmVol_() { return _atmVol; } 
 	double dtoday_() { return _dtoday; }
 	double dexp_() { return _dexp; }
 	std::string accrual_() { return _accrual; }
-	double expiry_();
+	double expiry_() { return _expiryTimes; }
 	double time2expiry_(const double dtoday, const double dexp);
 	double nextwkday_(const double dtoday);
 
 	VolNode():_atmVol(0.0), _dexp(0.0), _dtoday(0.0), _accrual("act365") {}
-	VolNode(double vol, double dtoday, double dexp, std::string accrual):_atmVol(vol), _dtoday(dtoday), _dexp(dexp), _accrual(accrual) {}
+	VolNode(double vol, double dtoday, double dexp, std::string accrual):_atmVol(vol), _dtoday(dtoday), _dexp(dexp), _accrual(accrual) { _expiryTimes = this->time2expiry_(dtoday, dexp); }
+    VolNode(double vol, double time2expiry, std::string accrual):_atmVol(vol), _expiryTimes(time2expiry), _accrual(accrual), _dtoday(0), _dexp(time2expiry*245) {}
 private:
 	double _atmVol;
 	double _dtoday;
 	double _dexp;
+    double _expiryTimes;
 	std::string _accrual; 
 };
 
@@ -56,11 +60,15 @@ public:
 				  const double alpha,
 				  const double beta,
 				  const std::string accrual):VolNode(atm, dtoday, dexp, accrual), _alpha(alpha), _beta(beta) {}
+    SamuelVolNode(const double time2expiry, 
+				  const double atm,
+				  const double alpha,
+				  const double beta,
+				  const std::string accrual):VolNode(atm, time2expiry, accrual), _alpha(alpha), _beta(beta) {}
 	double alpha_() { return _alpha; }
 	double beta_() { return _beta; }
 	void setAlpha( double alpha ) { _alpha = alpha; }
 	void setBeta( double beta ) { _beta = beta; }
-
 	double GetVolByMoneyness(const double ratio, const double dmat);
 	double GetInstVol(const double d);
 private:
@@ -79,6 +87,14 @@ public:
 				  const double v25, 
 				  const double v10,
 				  const std::string accrual);
+Delta5VolNode(const double time2expiry,				  
+				  const double fwd,
+				  const double atm, 
+				  const double v90, 
+				  const double v75, 
+				  const double v25, 
+				  const double v10,
+				  const std::string accrual);                  
 	//Delta5VolNode( const Delta5VolNode & other);
 	~Delta5VolNode() { delete _interp; }
 
@@ -96,9 +112,9 @@ public:
 	double d90Vol_() { return _d90Vol; } 
 	double fwd_() { return _fwd; }
 	double omega_() { return _omega; }
-	double GetVolByStrike(const double strike, const double dmat=0);
-	double GetVolByDelta(const double delta, const double dmat=0);
-	virtual double GetVolByMoneyness(const double ratio, const double dmat=0);
+	double GetVolByStrike(const double strike, const double t2mat=0);
+	double GetVolByDelta(const double delta, const double t2mat=0);
+	virtual double GetVolByMoneyness(const double ratio, const double t2mat=0);
 
 private:
 	ConvInterpolator *_interp;
@@ -114,6 +130,16 @@ class SamuelDelta5VolNode: public Delta5VolNode {
 public:
 	SamuelDelta5VolNode(const double dtoday,
 				  const double dexp, 
+				  const double fwd,
+				  const double atm, 
+				  const double v90, 
+				  const double v75, 
+				  const double v25, 
+				  const double v10,
+				  const double alpha,
+				  const double beta,
+				  const std::string accrual);
+	SamuelDelta5VolNode(const double time2expiry,
 				  const double fwd,
 				  const double atm, 
 				  const double v90, 
