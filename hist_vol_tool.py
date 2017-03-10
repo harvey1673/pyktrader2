@@ -1,11 +1,11 @@
 import bsopt
+import copy
+import dateutil
 import pandas as pd
-import numpy as np
 import math
 import mysqlaccess
 from scipy.stats import norm
 from misc import *
-import statsmodels.tsa.stattools as ts
 
 SOLVER_ERROR_EPSILON = 1e-5
 ITERATION_NUM = 100
@@ -180,3 +180,43 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry, vol_df
+
+def variance_ratio(ts, freqs):
+    data = ts.values
+    nlen = len(data)
+    res = {'n': [], 'ln':[]}
+    var1 = np.var(data[1:] - data[:-1])
+    lnvar1 = np.var(np.log(data[1:]/data[:-1]))
+    for freq in freqs:
+        nrow = nlen/freq
+        nsize = freq * nrow
+        shaped_arr = np.reshape(data[:nsize], (nrow, freq))
+        diff = shaped_arr[1:,freq-1] - shaped_arr[:-1,freq-1]
+        res['n'].append(np.var(diff)/freq/var1)
+        ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
+        res['ln'].append(np.var(ln_diff)/freq/lnvar1)
+    return res
+
+def price_stats(df):
+    stats  = {}
+    stats['20H'] = max(df['high'][-20:])
+    stats['20H'] = min(df['low'][-20:])
+
+def validate_db_data(tday, filter = False):
+    all_insts = filter_main_cont(tday, filter)
+    data_count = {}
+    inst_list = {'min': [], 'daily': [] }
+    for instID in all_insts:
+        df = mysqlaccess.load_daily_data_to_df('fut_daily', instID, tday, tday)
+        if len(df) <= 0:
+            inst_list['daily'].append(instID)
+        elif (df.close[-1] == 0) or (df.high[-1] == 0) or (df.low[-1] == 0) or df.open[-1] == 0:
+            inst_list['daily'].append(instID)
+        df = mysqlaccess.load_min_data_to_df('fut_min', instID, tday, tday, minid_start=300, minid_end=2115, database='blueshale')
+        if len(df) <= 100:
+            output = instID + ':' + str(len(df))
+            inst_list['min'].append(output)
+        elif df.min_id < 2055:
+            output = instID + ': end earlier'
+            inst_list['min'].append(output)        
+    print inst_list
