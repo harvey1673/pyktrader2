@@ -15,11 +15,11 @@ public:
 			const double strike, const double ir, std::string otype):
 			_dtoday(dtoday), _dexp(dexp),
 			_fwd(fwd), _vol(vol), 
-			_strike(strike), _irate(ir), _otype(otype) { _time2expiry = vol.time2expiry_(dtoday, dexp);}
+			_strike(strike), _irate(ir), _otype(otype) { _time2expiry = vol->time2expiry_(dtoday, dexp);}
     Pricer( const double time2expiry, 
 			const double fwd, VolNode *vol,
 			const double strike, const double ir, std::string otype):
-			_time2expiry(time2expiry), _dtoday(0), _dexp(time2expiry*245), 
+			_time2expiry(time2expiry), _dtoday(0), _dexp(time2expiry*Yearly_Accrual_Days), 
 			_fwd(fwd), _vol(vol), 
 			_strike(strike), _irate(ir), _otype(otype) {}
 	virtual double price() = 0;
@@ -32,9 +32,9 @@ public:
 	virtual void setFwd( const double fwd) { _fwd = fwd; }
 	virtual void setVol( VolNode *vol) { _vol = vol; }
 	virtual void setIR( const double ir) { _irate = ir; }
-	virtual void setExpiry( const double dexp) { _dexp = dexp; _time2expiry = _vol.time2expiry_(this->dtoday_(), dexp); }
+	virtual void setExpiry( const double dexp) { _dexp = dexp; _time2expiry = _vol->time2expiry_(this->dtoday_(), dexp); }
     virtual void setT2Exp( const double time2expiry ) { _time2expiry = time2expiry; }
-	virtual void setToday( const double dtoday) { _dtoday = dtoday; _time2expiry = _vol.time2expiry_(dtoday, this->dexp_());}
+	virtual void setToday( const double dtoday) { _dtoday = dtoday; _time2expiry = _vol->time2expiry_(dtoday, this->dexp_());}
 	void setOtype( const std::string otype) { _otype = otype; }
 	double strike_() { return _strike; }
 	double fwd_() { return _fwd; }
@@ -111,7 +111,7 @@ public:
 	BachelierPricer( const double time2expiry, 
 			const double fwd, VolNode *vol,
 			const double strike, const double ir, std::string otype)
-			: Pricer( time2exp, fwd, vol, strike, ir, otype ) {}
+			: Pricer( time2expiry, fwd, vol, strike, ir, otype ) {}
 	virtual double price();
 };
 

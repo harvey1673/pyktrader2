@@ -54,7 +54,7 @@ double Pricer::vega()
 
 	vol->setAtm(atmvol);
 
-	return (uprice - dprice)/(uvol - dvol);
+	return (uprice - dprice)/(uvol - dvol)/100.0;
 }
 
 double Pricer::theta()
@@ -64,7 +64,7 @@ double Pricer::theta()
 		return 0.0;
 	double price = this->price();
 	VolNode *vol = this->vol_();
-    double newt2exp = (t2exp>=1/245.0)? (t2exp-1/245.0):0;
+	double newt2exp = (t2exp >= 1/Yearly_Accrual_Days)? (t2exp-1/Yearly_Accrual_Days):0;
 	this->setT2Exp(newt2exp);
 	double nextprice = this->price();
 	this->setT2Exp(t2exp);

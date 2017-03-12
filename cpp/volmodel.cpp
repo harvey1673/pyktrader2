@@ -19,6 +19,28 @@ double SamuelsonFactor(double a, double b, double t2T, double t2mat)
 	return factor2/factor1;
 }
 
+std::vector<double> FitDelta5VolParams(const double t2exp,
+	const double fwd,
+	std::vector<double> strikeList,
+	std::vector<double> volList)
+{
+	DblVector xi(strikeList.size());
+	for (size_t i = 0; i < strikeList.size(); ++i)
+		xi[i] = std::log(strikeList[i] / fwd);
+	ConvInterpolator intp(xi, volList, 0.75);
+	DblVector volparam(5);
+	double atm = intp.value(0);
+	volparam[0] = atm;
+	xi.resize(4);
+	xi[0] = 0.9;
+	xi[1] = 0.75;
+	xi[2] = 0.25;
+	xi[3] = 0.1;
+	for (size_t i = 0; i < 4; ++i)
+		volparam[i + 1] = intp.value(atm * (0.5 * atm * t2exp - std::sqrt(t2exp) * norminv(xi[i]))) - atm;
+	return volparam;
+}
+
 void VolNode::setExp( double dexp )
 {   
     _dexp = dexp; 
@@ -31,16 +53,14 @@ void VolNode::setToday( double dtoday )
     _expiryTimes = this->time2expiry_( dtoday, this->dexp_());
 }
 
-double VolNode::time2expiry_(const double dtoday, const double dexp)
+double VolNode::getDayFraction_(const double dd)
 {
-	if ( _accrual == "act365") 
-		return (dexp - dtoday)/365.0;
-	else {
-		double ndays = NumBusDays(dtoday, dexp, CHN_Holidays);
-		if (ndays >= 1)
-			ndays = ndays - GetDayFraction(dtoday, _accrual) + GetDayFraction(dexp, _accrual) - 1;
-		return ndays/245.0;
-	}
+	return GetDayFraction(dd, _accrual);
+}
+
+int VolNode::numBusDays_(const double dtoday, const double dexp)
+{
+	return NumBusDays(dtoday, dexp, CHN_Holidays);
 }
 
 double VolNode::nextwkday_(const double dtoday)
@@ -51,6 +71,18 @@ double VolNode::nextwkday_(const double dtoday)
 		return NextBusDay(dtoday, CHN_Holidays);
 }
 
+double VolNode::time2expiry_(const double dtoday, const double dexp)
+{
+	if (_accrual == "act365")
+		return (dexp - dtoday) / 365.0;
+	else {
+		double ndays = this->numBusDays_(dtoday, dexp);
+		if (ndays >= 1)
+			ndays = ndays - this->getDayFraction_(dtoday) + this->getDayFraction_(dexp) - 1;
+		return ndays / Yearly_Accrual_Days;
+	}
+}
+
 double SamuelVolNode::GetVolByMoneyness(const double ratio, const double t2mat)
 {	
 	double vol = this->atmVol_();
@@ -58,7 +90,7 @@ double SamuelVolNode::GetVolByMoneyness(const double ratio, const double t2mat)
 	double a = this->alpha_();
 	double b = this->beta_();
 
-	if (T <= t)
+	if (t2T <=0 )
 		return vol;
 	else
 		return vol * SamuelsonFactor(a,b,t2T,t2mat);
@@ -200,11 +232,11 @@ SamuelDelta5VolNode::SamuelDelta5VolNode(const double time2expiry,
 double SamuelDelta5VolNode::GetVolByMoneyness(const double ratio, const double t2mat)
 {
 	double impvol = Delta5VolNode::GetVolByMoneyness(ratio);
-	double t2T = thie->expiry_();
+	double t2T = this->expiry_();
 	double a = this->alpha_();
 	double b = this->beta_();
 
-	if (T <= t)
+	if ( t2T <=0 )
 		return impvol;
 	else
 		return impvol * SamuelsonFactor(a,b,t2T,t2mat);
@@ -213,11 +245,10 @@ double SamuelDelta5VolNode::GetVolByMoneyness(const double ratio, const double t
 double SamuelDelta5VolNode::GetInstVol(const double t2mat)
 {
 	double vol = this->atmVol_();
-	double T = this->dexp_()/365.0;
-	double t = d/365.0;
+	double t2T = this->expiry_();
 	double a = this->alpha_();
 	double b = this->beta_();
-	if (T <= t)
+	if ( t2T<=0 )
 		return vol;
 	else
 	{
@@ -226,3 +257,4 @@ double SamuelDelta5VolNode::GetInstVol(const double t2mat)
 		return vol / factor * ( 1 + a * std::exp(-b*(t2T-t2mat)));
 	}
 }
+

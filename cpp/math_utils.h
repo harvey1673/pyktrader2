@@ -39,16 +39,18 @@ typedef std::vector <BoolVector>          BoolMatrix2D;
 typedef std::vector<std::string>          StringVector;
 typedef std::vector<StringVector>         StringMatrix2D;
 
+const double Yearly_Accrual_Days = 245;
+
 const int CHN_Holidays[] = {41640, 41641, 41642, 41670, 41673, 41674, 41675, 41676, \
-						  41736, 41760, 41761, 41792, 41890, 41913, 41914, 41915, \
-						  41918, 41919, 42005, 42006, 42053, 42054, 42055, 42058, \
-						  42059, 42100, 42125, 42177, 42275, 42278, 42279, 42282, \
-						  42283, 42284, 42370, 42408, 42409, 42410, 42411, 42412, \
-						  42464, 42492, 42530, 42531, 42628, 42629, 42646, 42647, \
-						  42648, 42649, 42650, 42737, 42765, 42766, 42767, 42768, \
-						  42769, 42830, 42856, 42885, 43010, 43011, 43012, 43013, \
-						  43014, 43101, 43147, 43150, 43151, 43152, 43195, 43221, \
-						  43269, 43367, 43374, 43375, 43376, 43377, 43378, 0};
+							41736, 41760, 41761, 41792, 41890, 41913, 41914, 41915, \
+							41918, 41919, 42005, 42006, 42053, 42054, 42055, 42058, \
+							42059, 42100, 42125, 42177, 42250, 42251, 42278, 42279, 42282, \
+							42283, 42284, 42370, 42408, 42409, 42410, 42411, 42412, \
+							42464, 42492, 42530, 42531, 42628, 42629, 42646, 42647, \
+							42648, 42649, 42650, 42737, 42762, 42765, 42766, 42767, 42768, \
+							42828, 42829, 42856, 42884, 42885, 43010, 43011, 43012, 43013, \
+							43014, 43101, 43147, 43150, 43151, 43152, 43195, 43221, \
+							43269, 43367, 43374, 43375, 43376, 43377, 43378, 0 };
 
 inline size_t xl2weekday(const double xldate)
 {
@@ -109,31 +111,6 @@ inline double NextBusDay(const double startD, const int hols[])
 	return res;
 }
 
-DblVector FitDelta5VolParams( const double dtoday,
-					const double dexp,
-					const double fwd,
-					DblVector &strikeList,
-					DblVector &volList)
-{
-	double expiry = (dexp - dtoday)/365.0;
-	DblVector xi(strikeList.size());
-	for (size_t i = 0; i < strikeList.size(); ++i)
-		xi[i] = std::log(strikeList[i]/fwd);	
-	ConvInterpolator intp( xi, volList, 0.75);
-	DblVector volparam(5);
-	double atm = intp.value(0);	
-	volparam[0] = atm;
-	xi.resize(4);
-	xi[0] = 0.9;
-	xi[1] = 0.75;
-	xi[2] = 0.25;
-	xi[3] = 0.1;
-	for (size_t i = 0; i < 4; ++i )
-		volparam[i+1] = intp.value( atm * (0.5 * atm * expiry - std::sqrt(expiry) * norminv(xi[i])) ) - atm;
-	return volparam;
-}
-
-
 inline double GetDayFraction(const double dExp, std::string accrual)
 {
 	double res = 0.0;
@@ -171,8 +148,8 @@ inline double GetDayFraction(const double dExp, std::string accrual)
     else if (accrual == "COMN1")
 	{
 		double frac = dExp - int(dExp) + 6.0/24.0;
-        if (frac >= 1)
-            frac = frac - 1
+		if (frac >= 1)
+			frac = frac - 1;
         double fact = 24/6.25;
 		if (frac < 3.0/24.0)
 			res = 0;

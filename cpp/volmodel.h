@@ -1,6 +1,6 @@
 #ifndef VOLMODEL_H
 #define VOLMODEL_H
-
+#include <vector>
 #include <cmath>
 #include <string>
 #include "math_utils.h"
@@ -40,10 +40,12 @@ public:
 	double expiry_() { return _expiryTimes; }
 	double time2expiry_(const double dtoday, const double dexp);
 	double nextwkday_(const double dtoday);
+	int numBusDays_(const double dtoday, const double dexp);
+	double getDayFraction_(const double dd);
 
-	VolNode():_atmVol(0.0), _dexp(0.0), _dtoday(0.0), _accrual("act365") {}
+	VolNode():_atmVol(0.0), _dexp(0.0), _dtoday(0.0), _accrual("COM") {}
 	VolNode(double vol, double dtoday, double dexp, std::string accrual):_atmVol(vol), _dtoday(dtoday), _dexp(dexp), _accrual(accrual) { _expiryTimes = this->time2expiry_(dtoday, dexp); }
-    VolNode(double vol, double time2expiry, std::string accrual):_atmVol(vol), _expiryTimes(time2expiry), _accrual(accrual), _dtoday(0), _dexp(time2expiry*245) {}
+	VolNode(double vol, double time2expiry, std::string accrual) :_atmVol(vol), _expiryTimes(time2expiry), _accrual(accrual), _dtoday(0), _dexp(time2expiry*Yearly_Accrual_Days) {}
 private:
 	double _atmVol;
 	double _dtoday;
@@ -159,4 +161,9 @@ private:
 	double _alpha;
 	double _beta;
 };
+
+std::vector<double> FitDelta5VolParams(const double t2exp,
+	const double fwd,
+	std::vector<double> strikeList,
+	std::vector<double> volList);
 #endif

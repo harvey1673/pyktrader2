@@ -15,8 +15,6 @@ import pandas as pd
 import data_handler as dh
 from misc import *
 
-RISK_FREE_RATE = 0.04
-
 def fut2opt(fut_inst, expiry, otype, strike):
     product = inst2product(fut_inst)
     if product == 'IF':
@@ -58,7 +56,7 @@ class OptionStrategy(object):
             opt_info = {'underlier': key[0], 'cont_mth': key[1], 'otype': key[2], 'strike': key[3], 'df':1.0}
             self.option_map.loc[inst, opt_info.keys()] = pd.Series(opt_info) 
         self.instIDs = self.underliers + self.option_insts.keys()
-        self.irate = RISK_FREE_RATE
+        self.irate = 0.04
         self.agent = agent
         self.folder = ''
         self.logger = None

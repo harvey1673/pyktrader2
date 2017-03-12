@@ -245,7 +245,7 @@ def date2xl(d):
 
 def datetime2xl(dt):
     t = dt - datetime.datetime(1970,1,1,0,0,0)
-    return 25569.0 + t.days + t.seconds/60.0/60.0/24.0 
+    return 25569.0 + t.days + t.seconds/60.0/60.0/24.0
 
 def time2exp(opt_expiry, curr_time):
     curr_date = curr_time.date()
@@ -362,7 +362,7 @@ def get_opt_expiry(fut_inst, cont_mth, exch = ''):
         else:
             expiry_month =  datetime.date(cont_yr-1, 11, 30)
         expiry = workdays.workday(expiry_month, 5, CHN_Holidays) 
-    return expiry
+    return datetime.datetime.combine(expiry, datetime.time(15, 0))
 
 def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False, database = 'hist_data'):
     if start_date > end_date: 

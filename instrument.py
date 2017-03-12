@@ -13,25 +13,25 @@ class VolGrid(object):
         self.name = name
         self.accrual = accrual
         self.ccy = ccy
-        self.dtoday = date2xl(tday)
         self.df = {}
         self.fwd = {}
+        self.last_update = {}
         self.volnode = {}
         self.volparam = {}
         self.underlier = {}
-        self.dexp = {}
+        self.t2expiry = {}
         self.main_cont = ''
         self.option_insts = {}
         self.spot_model = is_spot
 
 def copy_volgrid(vg):
-    volgrid = VolGrid(vg.name, accrual = vg.accrual, is_spot = vg.spot_model)
+    volgrid = VolGrid(vg.name, accrual = vg.accrual, is_spot = vg.spot_model, ccy = vg.ccy)
     volgrid.main_cont = vg.main_cont
-    volgrid.dtoday = vg.dtoday
     for expiry in vg.option_insts:
         volgrid.df[expiry] = vg.df[expiry]
         volgrid.fwd[expiry] = vg.fwd[expiry]
-        volgrid.volnode[expiry] = pyktlib.Delta5VolNode(vg.dtoday, vg.dexp[expiry],
+        volgrid.last_update[expiry] = vg.last_update[expiry]
+        volgrid.volnode[expiry] = pyktlib.Delta5VolNode(vg.t2expiry[expiry]/BDAYS_PER_YEAR,
                                                           vg.fwd[expiry],
                                                           vg.volparam[expiry][0],
                                                           vg.volparam[expiry][1],
@@ -41,7 +41,7 @@ def copy_volgrid(vg):
                                                           vg.accrual)
         volgrid.volparam[expiry] = copy.copy(vg.volparam[expiry])
         volgrid.underlier[expiry] = copy.copy(vg.underlier[expiry])
-        volgrid.dexp[expiry] = vg.dexp[expiry]
+        volgrid.t2expiry[expiry] = vg.t2expiry[expiry]
         volgrid.option_insts[expiry] = copy.copy(vg.option_insts[expiry])
     return volgrid
 
@@ -91,7 +91,7 @@ class Instrument(object):
         self.max_holding = (500, 500)
         self.mid_price = 0.0
         self.cont_mth = 205012 # only used by option and future
-        self.expiry = datetime.date(2050,12,31)
+        self.expiry = datetime.datetime(2050,12,31, 15, 0, 0)
         self.day_finalized = False
     
     def shift_price(self, direction, tick_num = 0, price_level = '1'):
@@ -209,6 +209,8 @@ class Future(Instrument):
         self.marginrate = mysqlaccess.load_inst_marginrate(self.name)
         
 class OptionInst(Instrument):
+    Greek_Map = {'pv': 'price', 'delta': 'delta', 'gamma': 'gamma', \
+                 'theta': 'theta', 'vega': 'vega'}
     def __init__(self,name):
         self.strike = 0.0 # only used by option
         self.otype = 'C'   # only used by option
@@ -221,9 +223,18 @@ class OptionInst(Instrument):
         self.theta = 0.0
         self.gamma = 0.0
         self.vega = 0.0
+        self.risk_price = self.price
+        self.risk_updated = 0.0
         self.margin_param = [0.15, 0.1]
         self.initialize()
-        
+
+    def approx_pv(self, curr_price):
+        dp = (curr_price - self.risk_price)
+        return self.pv + self.delta * dp + self.gamma * dp * dp / 2.0
+
+    def approx_delta(self, curr_price):
+        return self.delta + (curr_price - self.risk_price) * self.gamma
+
     def initialize(self):
         pass
 
@@ -232,36 +243,22 @@ class OptionInst(Instrument):
     
     def set_pricer(self, vg, irate):
         expiry = self.expiry
-        dexp = vg.dexp[expiry]
+        t2exp = vg.t2expiry[expiry]/BDAYS_PER_YEAR
         fwd = vg.fwd[expiry]
-        self.pricer = self.pricer_func(vg.dtoday, 
-                                       vg.dexp[expiry],
+        self.pricer = self.pricer_func(t2exp,
                                        vg.fwd[expiry], 
                                        vg.volnode[expiry], 
                                        self.strike, 
                                        irate, 
                                        self.otype)
-    def update_greeks(self):
-        self.pv = self.pricer.price() 
-        self.delta = self.pricer.delta()
-        self.gamma = self.pricer.gamma()
-        self.vega  = self.pricer.vega()/100.0
-        self.theta = self.pricer.theta()
-        
-    def calc_risk(self, risk_name, refresh = True):
+
+    def update_greeks(self, last_updated,  greeks = ['pv', 'delta', 'gamma', 'vega']):
         if self.pricer == None:
-            return None    
-        risk_func = risk_name
-        if risk_name == 'pv':
-            risk_func = 'price'
-        if refresh:
-            risk = getattr(self.pricer, risk_func)()
-            if risk_name == 'vega':
-                risk = risk/100
-            setattr(self, risk_name, risk)
-        else:
-            risk = getattr(self, risk_name)
-        return risk
+            return None
+        for attr in greeks:
+            setattr(self, attr, getattr(self.pricer, self.Greek_Map[attr])())
+        self.risk_price = self.pricer.fwd_()
+        self.risk_updated = last_updated
        
     def calc_margin_amount(self, direction, price = 0.0):
         my_margin = self.price
@@ -294,7 +291,6 @@ class StockOptionInst(OptionInst):
         self.product = self.underlying
         self.cont_mth = prod_info['cont_mth']
         self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
-        return
         
 class FutOptionInst(OptionInst):
     def __init__(self,name):    
