@@ -7,8 +7,8 @@ import math
 import json
 import pandas as pd
 import agent
-from option_gui import *
-from strat_gui import *
+from gui_option import *
+from gui_strat import *
 
 vtype_func_map = {'int':int, 'float':float, 'str': str, 'bool':bool }
 
@@ -512,6 +512,8 @@ class MainApp(object):
                         inst_dict[inst]['Otype'] = inst_obj.otype
                         inst_dict[inst]['Strike'] = inst_obj.strike
                         inst_dict[inst]['Underlying'] = inst_obj.underlying
+                        inst_dict[inst]['RiskPrice'] = inst_obj.risk_price
+                        inst_dict[inst]['RiskUpdated'] = inst_obj.risk_updated
                 res[field] = inst_dict
             elif field == 'Volgrids':
                 prod = field_list[1]
@@ -521,8 +523,8 @@ class MainApp(object):
                     for expiry in vg.volnode:
                         vg_param[expiry] = {}
                         vg_param[expiry]['Fwd'] = vg.fwd[expiry]
-                        vg_param[expiry]['Updated'] = vg.dtoday
-                        vg_param[expiry]['Expiry'] = expiry
+                        vg_param[expiry]['LastUpdate'] = vg.last_update[expiry]
+                        vg_param[expiry]['T2expiry'] = vg.t2expiry[expiry]
                         vg_param[expiry]['Under'] = vg.underlier[expiry]
                         vg_param[expiry]['Df'] = vg.df[expiry]
                         vol_param = vg.volparam[expiry]

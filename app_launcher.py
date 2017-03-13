@@ -1,4 +1,5 @@
-import tradeagent as agent
+import agent
+import saveagent
 import datetime
 import sys
 import time
@@ -7,7 +8,7 @@ import mysqlaccess
 import misc
 import base
 import json
-from agent_gui import *
+from gui_agent import *
 
 def get_option_map(underliers, expiries, strikes):
     opt_map = {}
@@ -32,7 +33,7 @@ def save(name, config_file, tday, filter):
     filter_flag = (int(filter)>0)
     with open(config_file, 'r') as infile:
         config = json.load(infile)
-    save_agent = agent.SaveAgent(name = name, tday = scur_day, config = config)
+    save_agent = saveagent.SaveAgent(name = name, tday = scur_day, config = config)
     curr_insts = misc.filter_main_cont(tday, filter_flag)
     for inst in curr_insts:
         save_agent.add_instrument(inst)
