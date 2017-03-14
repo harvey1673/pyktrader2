@@ -43,10 +43,10 @@ class OptVolgridGui(object):
         self.entry_fields = []
         self.status_fields = [] 
         self.field_types = {}
-        inst_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'BidIV', 'AskPrice','AskVol','AskIV', 'Volume', 'OI', 'Updated', \
-                       'PV', 'Delta', 'Gamma','Vega', 'Theta', 'RiskPrice', 'RiskUpdated']
-        inst_types  = ['string','float', 'float', 'int', 'float', 'float', 'int','float','float', 'int', 'int', 'int',\
-                       'float', 'float', 'float', 'float', 'float', 'float', 'float']
+        inst_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'BidIV', 'AskPrice','AskVol','AskIV', 'TheoryVol', 'Intrinsic', \
+                        'Volume', 'OI', 'Updated', 'PV', 'Delta', 'Gamma','Vega', 'Theta', 'RiskPrice', 'RiskUpdated']
+        inst_types  = ['string', 'float', 'float', 'int', 'float', 'float', 'int', 'float', 'float', 'float', \
+                        'int', 'int', 'int', 'float', 'float', 'float', 'float', 'float', 'float', 'float']
         for inst in self.option_insts:
             if inst not in self.root.stringvars:
                 self.root.stringvars[inst] = {}
@@ -72,14 +72,15 @@ class OptVolgridGui(object):
         params = self.app.get_agent_params('.'.join(['Insts'] + insts))
         for inst in params['Insts']:
             self.curr_insts[inst] = params['Insts'][inst]
-        inst_labels = ['Name', 'Price','BidPrice', 'BidVol','AskPrice', 'AskVol', 'Volume', 'OI', 'Updated']
+        inst_labels = ['Name', 'Price','BidPrice', 'BidVol','AskPrice', 'AskVol', 'Volume', 'OI', 'Updated', \
+                        'PV', 'Delta', 'Gamma','Vega', 'Theta', 'RiskPrice', 'RiskUpdated']
         under_labels = ['Name', 'Price','BidPrice','BidVol','AskPrice','AskVol', 'Volume', 'OI', 'Updated', 'UpLimit','DownLimit']
         for instlbl in under_labels:
             value = self.curr_insts[under][instlbl]
             self.root.stringvars[under][instlbl].set(keepdigit(value,4))
         for inst in self.volgrid.option_insts[expiry]:
             for instlbl in inst_labels:
-                value = self.curr_insts[inst][instlbl] 
+                value = self.curr_insts[inst][instlbl]
                 self.root.stringvars[inst][instlbl].set(keepdigit(value,4))
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10', 'T2expiry', 'LastUpdated']
         params = self.app.get_agent_params(['Volgrids.'+self.name])
@@ -107,20 +108,50 @@ class OptVolgridGui(object):
             strike = key[2]
             otype = key[1]
             Texp =  self.volgrid.volnode[expiry].expiry_()
-            bvol = pyktlib.BlackImpliedVol(bid_price, fwd, strike, self.rf, Texp, otype) if bid_price > 0 else 0
-            avol = pyktlib.BlackImpliedVol(ask_price, fwd, strike, self.rf, Texp, otype) if bid_price > 0 else 0
+            intrinsic = max(fwd - strike, 0) if otype in ['c', 'C'] else max(strike-fwd, 0)
+            self.root.stringvars[inst]['BidIV'].set(keepdigit(intrinsic,4))
+            self.curr_insts[inst]['Intrinsic'] = intrinsic
+            theo_vol = vn.GetVolByStrike(strike)
+            self.root.stringvars[inst]['TheoryVol'].set(keepdigit(theo_vol,4))
+            self.curr_insts[inst]['TheoryVol'] = theo_vol
+            bvol = pyktlib.BlackImpliedVol(bid_price, fwd, strike, self.rf, Texp, otype) if bid_price > intrinsic else np.nan
+            avol = pyktlib.BlackImpliedVol(ask_price, fwd, strike, self.rf, Texp, otype) if ask_price > intrinsic else np.nan            
             self.root.stringvars[inst]['BidIV'].set(keepdigit(bvol,4))
-            self.curr_insts[inst]['BidIV'] = bvol
+            self.curr_insts[inst]['BidIV'] = bvol            
             self.root.stringvars[inst]['AskIV'].set(keepdigit(avol,4))
             self.curr_insts[inst]['AskIV'] = avol
     
-    def calib_volgrids(self):
-        pass
-    
-    def recalc_risks(self):
+    def update_approx_risks(self):
+        insts = list(set().union(self.underliers))
+        params = self.app.get_agent_params('.'.join(['Insts'] + insts))
         for expiry in self.expiries:
-            params = (self.name, expiry, True)
-            self.app.run_agent_func('calc_volgrid', params)
+            under = self.volgrid.underlier[expiry]
+            fwd = ( self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice'])/2.0
+            for inst in self.volgrid.option_insts[expiry]
+                prev_price = self.curr_insts[inst]['RiskPrice']
+                diff_price = fwd - prev_price
+                new_pv = self.curr_insts[inst]['PV'] + self.curr_insts[inst]['Delta'] * diff_price + \
+                         self.curr_insts[inst]['Gamma'] * diff_price * diff_price/2.0
+                self.root.stringvars[inst]['PV'].set(keepdigit(new_pv,4))
+                self.curr_insts[inst]['PV'] = new_pv
+                new_delta = self.curr_insts[inst]['Delta'] + self.curr_insts[inst]['Gamma'] * diff_price
+                self.root.stringvars[inst]['Delta'].set(keepdigit(new_delta,4))
+                self.curr_insts[inst]['Delta'] = new_delta
+        
+    def calib_volgrids(self, expiry):
+        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
+        vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']
+        pos_win   = tk.Toplevel(self.frame)
+        rwo_id = col_id = 0        
+        for idx, vlbl in enumerate(vol_labels):
+            tk.Label(self.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
+            tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)        
+        
+        
+    
+    def recalc_risks(self, expiry):        
+        params = (self.name, expiry, True)
+        self.app.run_agent_func('calc_volgrid', params)
 
     def show_risks(self):
         pos_win   = tk.Toplevel(self.frame)
@@ -190,10 +221,10 @@ class OptVolgridGui(object):
                 tk.Label(self.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
                 tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
                 
-            ttk.Button(self.frame, text='Refresh', command= self.get_T_table).grid(row=row_id, column=10, columnspan=2)
-            ttk.Button(self.frame, text='CalcRisk', command= self.recalc_risks).grid(row=row_id+1, column=10, columnspan=2) 
-            ttk.Button(self.frame, text='CalibVol', command= self.calib_volgrids).grid(row=row_id, column=12, columnspan=2)
-            ttk.Button(self.frame, text='RiskGroup', command= self.show_risks).grid(row=row_id+1, column=12, columnspan=2)
+            ttk.Button(self.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=10, columnspan=2)
+            ttk.Button(self.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+1, column=10, columnspan=2) 
+            ttk.Button(self.frame, text='ApproxRisk', command= self.approx_risks).grid(row=row_id+1, column=12, columnspan=2)
+            ttk.Button(self.frame, text='CalibVol', command= self.calib_volgrids).grid(row=row_id, column=12, columnspan=2)            
             row_id += 2
             col_id = 0
             inst = self.underliers[under_id]
