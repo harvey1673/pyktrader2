@@ -1,5 +1,6 @@
 #-*- coding:utf-8 -*-
 import Tkinter as tk
+import numpy as np
 import ttk
 import pyktlib
 import instrument
@@ -127,7 +128,7 @@ class OptVolgridGui(object):
         for expiry in self.expiries:
             under = self.volgrid.underlier[expiry]
             fwd = ( self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice'])/2.0
-            for inst in self.volgrid.option_insts[expiry]
+            for inst in self.volgrid.option_insts[expiry]:
                 prev_price = self.curr_insts[inst]['RiskPrice']
                 diff_price = fwd - prev_price
                 new_pv = self.curr_insts[inst]['PV'] + self.curr_insts[inst]['Delta'] * diff_price + \
@@ -142,12 +143,10 @@ class OptVolgridGui(object):
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
         vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']
         pos_win   = tk.Toplevel(self.frame)
-        rwo_id = col_id = 0        
+        row_id = col_id = 0
         for idx, vlbl in enumerate(vol_labels):
             tk.Label(self.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
-            tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)        
-        
-        
+            tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
     
     def recalc_risks(self, expiry):        
         params = (self.name, expiry, True)
@@ -169,7 +168,6 @@ class OptVolgridGui(object):
         for idx, field in enumerate(fields):
             tk.Label(self.pos_frame, text = field).grid(row=0, column=idx)
         idy = 0
-
         for i, cmth in enumerate(self.cont_mth):
             for strike in self.strikes[i]:
                 for otype in ['C','P']:
@@ -224,7 +222,7 @@ class OptVolgridGui(object):
             ttk.Button(self.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=10, columnspan=2)
             ttk.Button(self.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+1, column=10, columnspan=2) 
             ttk.Button(self.frame, text='ApproxRisk', command= self.approx_risks).grid(row=row_id+1, column=12, columnspan=2)
-            ttk.Button(self.frame, text='CalibVol', command= self.calib_volgrids).grid(row=row_id, column=12, columnspan=2)            
+            ttk.Button(self.frame, text='CalibVol', command= lambda: self.calib_volgrids(expiry)).grid(row=row_id, column=12, columnspan=2)
             row_id += 2
             col_id = 0
             inst = self.underliers[under_id]
