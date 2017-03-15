@@ -40,7 +40,7 @@ class OptVolgridGui(object):
         self.entries = {}
         self.option_map = {}
         self.group_risk = {}
-        self.stringvars = {'Insts':{}, 'Volgrid':{}}
+        self.stringvars = {'Insts':{}, 'Volgrid':{}, 'NewVolParam': {}, }
         self.entry_fields = []
         self.status_fields = [] 
         self.field_types = {}
@@ -64,8 +64,13 @@ class OptVolgridGui(object):
         vol_types =  ['string', 'string', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float']
         for expiry in self.expiries:
             self.stringvars['Volgrid'][expiry] = {}
+            self.stringvars['NewVolParam'][expiry] = {}
             for vlbl, vtype in zip(vol_labels, vol_types):
                 self.stringvars['Volgrid'][expiry][vlbl] = get_type_var(vtype)
+            for vlbl in ['Atm', 'V90', 'V75', 'V25', 'V10']:
+                val = self.stringvars['Volgrid'][expiry][vlbl].get()
+                self.stringvars['NewVolParam'][expiry][vlbl] = get_type_var('float')
+                self.stringvars['NewVolParam'][expiry][vlbl].set(keepdigit(val,4))
                        
     def get_T_table(self, expiry):
         under = self.volgrid.underlier[expiry]
@@ -141,12 +146,16 @@ class OptVolgridGui(object):
         
     def calib_volgrids(self, expiry):
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
+        vol_params = ['Atm', 'V90', 'V75', 'V25', 'V10']
         vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']
         pos_win   = tk.Toplevel(self.frame)
         row_id = col_id = 0
         for idx, vlbl in enumerate(vol_labels):
             tk.Label(self.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
             tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
+            if vlbl in vol_params:
+                tk.Entry(self.frame, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=col_id + idx)
+        
     
     def recalc_risks(self, expiry):        
         params = (self.name, expiry, True)
@@ -222,7 +231,7 @@ class OptVolgridGui(object):
             ttk.Button(self.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=10, columnspan=2)
             ttk.Button(self.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+1, column=10, columnspan=2) 
             ttk.Button(self.frame, text='ApproxRisk', command= self.approx_risks).grid(row=row_id+1, column=12, columnspan=2)
-            ttk.Button(self.frame, text='CalibVol', command= lambda: self.calib_volgrids(expiry)).grid(row=row_id, column=12, columnspan=2)
+            ttk.Button(self.frame, text='MarkVol', command= lambda: self.calib_volgrids(expiry)).grid(row=row_id, column=12, columnspan=2)
             row_id += 2
             col_id = 0
             inst = self.underliers[under_id]
