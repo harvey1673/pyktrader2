@@ -10,7 +10,7 @@ import pyktlib
 import instrument
 import math
 from misc import *
-from gui_agent import *
+from gui_misc import *
 
 class OptVolgridGui(object):
     def __init__(self, vg, app, master):
@@ -169,7 +169,7 @@ class OptVolgridGui(object):
                 new_delta = self.curr_insts[inst]['Delta'] + self.curr_insts[inst]['Gamma'] * diff_price
                 self.root.stringvars[inst]['Delta'].set(keepdigit(new_delta,4))
                 self.curr_insts[inst]['Delta'] = new_delta
-        
+
     def calib_volgrids(self, expiry):
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
         vol_params = ['Atm', 'V90', 'V75', 'V25', 'V10']
@@ -178,42 +178,63 @@ class OptVolgridGui(object):
         # self.vm_canvas = tk.Canvas(vw_win)
         row_id = col_id = 0
         for idx, vlbl in enumerate(vol_labels):
-            tk.Label(self.vm_frame, text=vlbl).grid(row=row_id, column=col_id + idx)
-            tk.Label(self.vm_frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
+            ttk.Label(self.vm_frame, text=vlbl).grid(row=row_id, column=col_id + idx)
+            ttk.Label(self.vm_frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
             if vlbl in vol_params:
-                tk.Entry(self.vm_frame, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=col_id + idx)
+                ttk.Entry(self.vm_frame, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=col_id + idx)
+        tk.Button(self.vm_frame, text='RePlot', command=lambda: self.refresh_vm_figure(expiry) ).grid(row=row_id+2, column=0)
+        tk.Button(self.vm_frame, text='Mark', command=lambda: self.refresh_vm_figure(expiry)).grid(row=row_id+2, column=1)
         row_id += 3
         fields = ['Strike', 'C-BidIV', 'C-MidIV', 'C-AskIV', 'P-BidIV', 'P-MidIV', 'P-AskIV', 'UseCall', 'UseCalib','TheoryVol', 'NewVol', 'DiffVol']
-        idx = self.exxpiries.index(expiry)
+        for idx, f in enumerate(fields):
+            ttk.Label(self.vm_frame, text = f).grid(row=row_id, column=col_id + idx)
+        row_id += 1
+        idx = self.expiries.index(expiry)
         cont_mth = self.cont_mth[idx]
         for idy, strike in enumerate(self.strikes[idx]):
-            tk.Label(self.vm_frame, text = str(strike)).grid(row=row_id+idy, column=col_id + idx)            
+            ttk.Label(self.vm_frame, text = str(strike)).grid(row=row_id+idy, column=col_id + idx)
             for otype in ['C', 'P']:                
                 for vlbl in ['BidIV', 'MidIV', 'AskIV']:
                     inst_key = (cont_mth, otype, strike)
                     op_inst = self.opt_dict[inst_key]                
                     idx += 1
-                    tk.Label(self.vm_frame, textvariable = self.root.stringvars[op_inst][vlbl], \
+                    ttk.Label(self.vm_frame, textvariable = self.root.stringvars[op_inst][vlbl], \
                                             padx=10).grid(row=row_id+idy, column=col_id + idx)
             idx += 1
             ttk.Checkbutton(self.vm_frame, variable = self.otype_selector[expiry][strike], \
-                                            onvalue = True, offvalue = False).grid(row=row_id+idy, column=col_id + idx)            
+                                            onvalue = True, offvalue = False).grid(row=row_id+idy, column = col_id + idx)
             idx += 1
             ttk.Checkbutton(self.vm_frame, variable = self.strike_selector[expiry][strike], \
-                                            onvalue = True, offvalue = False).grid(row=row_id+idy, column=col_id + idx)
-            tk.Label(self.vm_frame, textvariable = self.stringvars['TheoryVol'][expiry][strike], \
-                                            padx=10).grid(row=row_id+idy, column=col_id + idx)
-            tk.Entry(self.vm_frame, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=col_id + idx)
-            tk.Label(self.vm_frame, textvariable = self.stringvars['TheoryVol'][expiry][strike], \
-                                            padx=10).grid(row=row_id+idy, column=col_id + idx)
-                                            
+                                            onvalue = True, offvalue = False).grid(row=row_id+idy, column = col_id + idx)
+            idx += 1
+            ttk.Label(self.vm_frame, textvariable = self.stringvars['TheoryVol'][expiry][strike], \
+                                            padx=10).grid(row=row_id+idy, column = col_id + idx)
+            idx += 1
+            ttk.Entry(self.vm_frame, textvariable = self.stringvars['NewVol'][expiry][strike]).grid(row=row_id+idy, column=col_id + idx)
+            idx += 1
+            ttk.Label(self.vm_frame, textvariable = self.stringvars['DiffVol'][expiry][strike], \
+                                            padx=10).grid(row=row_id+idy, column = col_id + idx)
+        row_id += len(self.strikes[idx])
         self.vm_figure = Figure(figsize=(4,2))
         self.vm_a = self.vm_figure.add_subplot(111)
         self.vm_a.plot([1,2,3,4,5,6,7,8],[5,6,1,3,8,9,3,5])
-        self.vm_canvas = FigureCanvasTkAgg(self.f, master=self)
-        self.vm_canvas.get_tk_widget().grid(column=2, row=1, rowspan=5, sticky="nesw")
+        self.vm_canvas = FigureCanvasTkAgg(self.vm_figure, master=self.vm_frame)
+        self.vm_canvas.get_tk_widget().grid(column=0, row=row_id, rowspan=5, sticky="nesw")
         self.vm_toolbar = NavigationToolbar2TkAgg(self.vm_canvas, self.frame)                    
-    
+
+    def refresh_vm_figure(self, exipry):
+        pass
+
+    def remark_volgrid(self, expiry):
+        vol_labels = ['Atm', 'V90', 'V75', 'V25', 'V10']
+        vol_params = []
+        for vlbl in vol_labels:
+            vol_params.append(self.stringvars['NewVolParam'][expiry][vlbl].get())
+        fwd = 0
+        tick_id = 0
+        params = (self.name, expiry, fwd, vol_params, tick_id)
+        self.app.run_agent_func('set_volgrids', params)
+
     def recalc_risks(self, expiry):        
         params = (self.name, expiry, True)
         self.app.run_agent_func('calc_volgrid', params)
