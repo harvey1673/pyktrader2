@@ -97,6 +97,7 @@ class OptVolgridGui(object):
                 self.stringvars['TheoryVol'][expiry][strike] = get_type_var('float')
                 self.stringvars['NewVol'][expiry][strike] = get_type_var('float')
                 self.stringvars['DiffVol'][expiry][strike] = get_type_var('float')
+                
     def get_T_table(self, expiry):
         under = self.volgrid.underlier[expiry]
         insts = [under] + self.volgrid.option_insts[expiry]
