@@ -211,13 +211,14 @@ class Future(Instrument):
 class OptionInst(Instrument):
     Greek_Map = {'pv': 'price', 'delta': 'delta', 'gamma': 'gamma', \
                  'theta': 'theta', 'vega': 'vega'}
-    def __init__(self,name):
+    def __init__(self, name):
         self.strike = 0.0 # only used by option
         self.otype = 'C'   # only used by option
         self.underlying = ''   # only used by option
         Instrument.__init__(self, name)
         self.pricer = None
         self.pricer_func = pyktlib.BlackPricer
+        self.pricer_param = []
         self.pv = 0.0
         self.delta = 1
         self.theta = 0.0
@@ -244,13 +245,8 @@ class OptionInst(Instrument):
     def set_pricer(self, vg, irate):
         expiry = self.expiry
         t2exp = vg.t2expiry[expiry]/BDAYS_PER_YEAR
-        fwd = vg.fwd[expiry]
-        self.pricer = self.pricer_func(t2exp,
-                                       vg.fwd[expiry], 
-                                       vg.volnode[expiry], 
-                                       self.strike, 
-                                       irate, 
-                                       self.otype)
+        param = [t2exp, vg.fwd[expiry], vg.volnode[expiry], self.strike, irate, self.otype] + self.pricer_param
+        self.pricer = self.pricer_func(*param)
 
     def update_greeks(self, last_updated,  greeks = ['pv', 'delta', 'gamma', 'vega']):
         if self.pricer == None:
@@ -297,38 +293,40 @@ class FutOptionInst(OptionInst):
         OptionInst.__init__(self, name)
         if self.exchange != 'CFFEX':
             self.pricer_func = pyktlib.AmericanFutPricer
+            self.pricer_param = [AMERICAN_OPTION_STEPS]
             self.margin_param = [0.15, 0.1]
         else:
             self.pricer_func = pyktlib.BlackPricer
+            self.pricer_param = []
             self.margin_param = [0.15, 0.1]            
         self.initialize()
         
     def initialize(self):
         self.ptype = ProductType.Option
         self.product = inst2product(self.name)
-        if (self.product[-3:] == 'Opt') and (self.product[:-3] in product_code['CZCE']):
-            self.underlying = self.name[:5]
-            self.otype = self.name[5]
+        if (self.product[-3:] == 'Opt') and (self.product[:-4] in product_code['CZCE']):
+            self.underlying = str(self.name[:5])
+            self.otype = str(self.name[5])
             self.cont_mth = int(self.underlying[-3:]) + 201000
             self.strike = float(self.name[6:])
-            self.product = self.name[:2]
+            self.product = str(self.name[:2])
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
         else:
             sep_name = self.name.split('-')
             if self.product == 'IO_Opt':
-                self.underlying = sep_name[0].replace('IO','IF')
+                self.underlying = str(sep_name[0].replace('IO','IF'))
                 self.strike = float(sep_name[2])
                 self.otype = str(sep_name[1])
                 self.cont_mth = int(self.underlying[-4:]) + 200000
                 self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
                 self.product = 'IO'
             elif '_Opt' in self.product:
-                self.underlying = sep_name[0]
+                self.underlying = str(sep_name[0])
                 self.strike = float(sep_name[2])
                 self.otype = str(sep_name[1])
                 self.cont_mth = int(self.underlying[-4:]) + 200000
                 self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
-                self.product = self.product[:-4]
+                self.product = str(self.product[:-4])
         prod_info = mysqlaccess.load_product_info(self.product)
         self.exchange = prod_info['exch']
         self.start_tick_id =  prod_info['start_min'] * 1000

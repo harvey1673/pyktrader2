@@ -455,7 +455,7 @@ class MainApp(object):
                     for expiry in vg.volnode:
                         vg_param[expiry] = {}
                         vg_param[expiry]['Fwd'] = vg.fwd[expiry]
-                        vg_param[expiry]['LastUpdate'] = vg.last_update[expiry]
+                        vg_param[expiry]['Updated'] = vg.last_update[expiry]
                         vg_param[expiry]['T2expiry'] = vg.t2expiry[expiry]
                         vg_param[expiry]['Under'] = vg.underlier[expiry]
                         vg_param[expiry]['Df'] = vg.df[expiry]
@@ -504,11 +504,11 @@ class MainApp(object):
         getattr(strat, func_name)()
 
     def run_agent_func(self, func_name, params):
-        getattr(self.agent, func_name)(*params)
+        return getattr(self.agent, func_name)(*params)
 
     def run_gateway_func(self, gway, func_name, params):
         gateway = self.agent.gateways[gway]
-        getattr(gateway, func_name)(*params)
+        return getattr(gateway, func_name)(*params)
 
     def get_hist_data(self, inst, freq, nlen = 20):
         data = []

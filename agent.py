@@ -334,7 +334,7 @@ class Agent(MktDataMixin):
                 else:
                     self.instruments[name] = instrument.Stock(name)
             else:
-                if len(name) > 10:
+                if len(name) > 8:
                     self.instruments[name] = instrument.FutOptionInst(name)
                 else:
                     self.instruments[name] = instrument.Future(name)
@@ -358,7 +358,7 @@ class Agent(MktDataMixin):
 
     def add_spread(self, instIDs, weights, multiple = None):        
         key = '_'.join([str(s) for s in instIDs + weights])
-        self.spread_data[key] = instrument.SpreadInst(instIDs, weights, multiple)
+        self.spread_data[key] = instrument.SpreadInst(self.instruments, instIDs, weights, multiple)
         self.spread_data[key].update()
         for inst in instIDs:
             if inst not in self.inst2spread:
@@ -461,6 +461,7 @@ class Agent(MktDataMixin):
         return sum_risk, risk_dict
 
     def prepare_data_env(self, inst, mid_day = True):
+        print inst
         if  self.instruments[inst].ptype == instrument.ProductType.Option:
             return
         if self.daily_data_days > 0 or mid_day:

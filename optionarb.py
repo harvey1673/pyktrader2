@@ -6,6 +6,7 @@ from strategy import *
 def get_option_map(underliers, cont_mths, strikes, exch = ''):
     opt_map = {}
     for under, cmth, ks in zip(underliers, cont_mths, strikes):
+        exch = inst2exch(under)
         for otype in ['C', 'P']:
             for strike in ks:
                 #cont_mth = int(under[-4:]) + 200000
@@ -30,7 +31,7 @@ class OptionArbStrat(Strategy):
         self.fut_unit = config.get('fut_unit', 1)
         self.opt_unit = config.get('opt_unit', 1)
         self.scaler = config.get('scaler',10)
-        self.option_map = get_option_map(self.future_conts, self.cont_mths, self.strikes)
+        self.option_map = get_option_map(self.future_conts, self.cont_mths, self.strikes, )
         underliers = []
         volumes = []
         trade_units = []
@@ -106,7 +107,8 @@ class OptionArbStrat(Strategy):
             self.inst_margin[instID] = [inst.calc_margin_amount(ORDER_BUY, ins_p), inst.calc_margin_amount(ORDER_SELL, ins_p)]
         for idx, under in enumerate(self.underliers):
             expiry = self.agent.instruments[under[0]].expiry
-            self.days_to_expiry[idx] = (expiry-self.agent.scur_day).days + 0.5
+            prod = self.agent.instruments[under[0]].product
+            self.days_to_expiry[idx] = self.agent.volgrids[prod].t2expiry[expiry]
             margin_l = sum([v*self.inst_margin[ins][0] for v, ins in zip(self.volumes[idx], under) if v > 0])
             margin_l -= sum([ v * self.inst_margin[ins][1] for v, ins in zip(self.volumes[idx], under) if v < 0])
             margin_s = sum([  v * self.inst_margin[ins][1] for v, ins in zip(self.volumes[idx], under) if v > 0])            

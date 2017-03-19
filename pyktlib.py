@@ -175,16 +175,16 @@ def BachelierPrice(F, K, vol, t_exp, df, PutCall):
     return _pyktlib.BachelierPrice(F, K, vol, t_exp, df, PutCall)
 BachelierPrice = _pyktlib.BachelierPrice
 
-def BlackImpliedVol(MktPrice, F, K, r, T, PutCall):
-    return _pyktlib.BlackImpliedVol(MktPrice, F, K, r, T, PutCall)
+def BlackImpliedVol(MktPrice, F, K, r, T, PutCall, tol=1e-5):
+    return _pyktlib.BlackImpliedVol(MktPrice, F, K, r, T, PutCall, tol)
 BlackImpliedVol = _pyktlib.BlackImpliedVol
 
-def BSImpliedVol(MktPrice, S, K, r, T, PutCall):
-    return _pyktlib.BSImpliedVol(MktPrice, S, K, r, T, PutCall)
+def BSImpliedVol(MktPrice, S, K, r, T, PutCall, tol=1e-5):
+    return _pyktlib.BSImpliedVol(MktPrice, S, K, r, T, PutCall, tol)
 BSImpliedVol = _pyktlib.BSImpliedVol
 
-def BachelierImpliedVol(MktPrice, F, K, r, T, PutCall):
-    return _pyktlib.BachelierImpliedVol(MktPrice, F, K, r, T, PutCall)
+def BachelierImpliedVol(MktPrice, F, K, r, T, PutCall, tol=1e-5):
+    return _pyktlib.BachelierImpliedVol(MktPrice, F, K, r, T, PutCall, tol)
 BachelierImpliedVol = _pyktlib.BachelierImpliedVol
 
 def american_prem_fut_btree(F, K, vol, t_exp, df, PutCall, bin_tree_nstep=128):
@@ -195,8 +195,8 @@ def AmericanOptFutPrice(F, K, vol, t_exp, df, PutCall, bin_tree_nstep=128):
     return _pyktlib.AmericanOptFutPrice(F, K, vol, t_exp, df, PutCall, bin_tree_nstep)
 AmericanOptFutPrice = _pyktlib.AmericanOptFutPrice
 
-def AmericanImpliedVol(MktPrice, F, K, r, T, PutCall, bin_tree_nstep=128):
-    return _pyktlib.AmericanImpliedVol(MktPrice, F, K, r, T, PutCall, bin_tree_nstep)
+def AmericanImpliedVol(MktPrice, F, K, r, T, PutCall, tol=1e-5, bin_tree_nstep=128):
+    return _pyktlib.AmericanImpliedVol(MktPrice, F, K, r, T, PutCall, tol, bin_tree_nstep)
 AmericanImpliedVol = _pyktlib.AmericanImpliedVol
 
 def SamuelsonFactor(a, b, t, T, mat):

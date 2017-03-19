@@ -31,6 +31,7 @@ OST_UNKNOWN = 'a' #未知
 OST_NOTOUCH = 'b' #尚未触发
 OST_TOUCHED = 'c' #已触
 
+AMERICAN_OPTION_STEPS = 40
 MKT_DATA_BIGNUMBER = 10000000
 NO_ENTRY_TIME = datetime.datetime(1970,1,1,0,0,0)
 

@@ -41,7 +41,8 @@ class OptionStrategy(object):
         nlen = len(self.expiries)
         self.DFs = [1.0] * nlen
         self.opt_dict = self.get_option_map(self.underliers, self.expiries, self.strikes)
-        self.option_map = dh.DynamicRecArray(dtype = [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'), ('pos', 'i8'), \
+        self.option_map = dh.DynamicRecArray(dtype = [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'),
+                                                      \
                                                        ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'), \
                                                        ('out_long', 'i8'), ('out_short', 'i8'), ('margin_long', 'f8'), ('margin_short', 'f8'), \
                                                        ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
@@ -275,6 +276,7 @@ class OptionStrategy(object):
     def get_option_map(self, underliers, expiries, strikes):
         opt_map = {}
         for under, expiry, ks in zip(underliers, expiries, strikes):
+            exch = inst2exch(under)
             for otype in ['C', 'P']:
                 for strike in ks:
                     cont_mth = int(under[-4:]) + 200000
@@ -377,7 +379,6 @@ class EquityOptStrat(OptionStrategy):
         self.accrual = 'SSE'
         self.proxy_flag = {'delta': True, 'gamma': True, 'vega': True, 'theta': True}
         self.spot_model = True
-        self.rate_diff = 0.06 
         self.dividends = [(datetime.date(2015,4,20), 0.0), (datetime.date(2015,11,20), 0.10)]
         
     def get_option_map(self, underliers, expiries, strikes):
@@ -398,12 +399,11 @@ class IndexFutOptStrat(OptionStrategy):
         self.accrual = 'CFFEX'
         self.proxy_flag = {'delta': True, 'gamma': True, 'vega': True, 'theta': True} 
         self.spot_model = False
-        self.rate_diff = 0.0 
 
 class CommodOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
         OptionStrategy.__init__(self, name, underliers, expiries, strikes, agent)
-        self.accrual = 'COM'
+        self.accrual = 'COMN1'
         self.proxy_flag = {'delta': False, 'gamma': False, 'vega': True, 'theta': True} 
         self.spot_model = False
         self.pricer = pyktlib.AmericanFutPricer  

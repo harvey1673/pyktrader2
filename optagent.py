@@ -43,6 +43,7 @@ class OptAgentMixin(object):
                 volgrids[prod].option_insts[expiry] = []
                 volgrids[prod].underlier[expiry] = inst.underlying
                 volgrids[prod].volparam[expiry] = [0.2, 0.0, 0.0, 0.0, 0.0]
+                volgrids[prod].fwd[expiry] = 100.0
             volgrids[prod].option_insts[expiry].append(inst.name)
         self.volgrids = volgrids
 
@@ -74,7 +75,7 @@ class OptAgentMixin(object):
                         vg.fwd[expiry] = fwd
                         vg.volparam[expiry] = [atm, v90, v75, v25, v10]
                         vg.volnode[expiry] = pyktlib.Delta5VolNode(self.dtoday, dexp, fwd, atm, v90, v75, v25, v10, self.volgrids[prod].accrual)
-                        vg.t2expiry[expiry] = vg.volnode[expiry].expiry_()
+                        vg.t2expiry[expiry] = vg.volnode[expiry].expiry_() * BDAYS_PER_YEAR
                         vg.last_update[expiry] = last_update
             else:
                 for expiry in self.volgrids[prod].option_insts:
@@ -93,7 +94,7 @@ class OptAgentMixin(object):
                     v25 = vg.volparam[expiry][3]
                     v10 = vg.volparam[expiry][4]
                     vg.volnode[expiry] = pyktlib.Delta5VolNode(self.dtoday, dexp, fwd, atm, v90, v75, v25, v10, self.volgrids[prod].accrual)
-                    vg.t2expiry[expiry] = vg.volnode[expiry].expiry_()
+                    vg.t2expiry[expiry] = vg.volnode[expiry].expiry_() * BDAYS_PER_YEAR
                     vg.last_update[expiry] = 0
 
     def save_volgrids(self):
@@ -130,17 +131,17 @@ class OptAgentMixin(object):
             vg = self.volgrids[product]
             vn = vg.volnode[expiry]
             day_fraction = self.intraday_fraction(vn, tick_id)
-            t2expiry = max(vg.t2expiry[expiry] - day_fraction, 0)/BDAYS_PER_YEAR
+            time2expiry = max(vg.t2expiry[expiry] - day_fraction, 0)/BDAYS_PER_YEAR
             vg.fwd[expiry] = fwd
             vg.volparam[expiry] = vol_param
             vn.setFwd(fwd)
-            vn.setTime2Exp(t2expiry)
-            vn.setAtm(vol_param[0])
+            vn.setTime2Exp(time2expiry)
             vn.setD90Vol(vol_param[1])
             vn.setD75Vol(vol_param[2])
             vn.setD25Vol(vol_param[3])
             vn.setD10Vol(vol_param[4])
-            vn.initialize()
+            vn.setAtm(vol_param[0])
+            # vn.initialize()
             vg.last_update[expiry] = day_fraction
         else:
             self.logger.info('expiry %s is not in the volgrid expiry for %s' % (expiry, product))
@@ -166,10 +167,10 @@ class OptAgentMixin(object):
         vg = self.volgrids[product]
         vn = vg.volnode[expiry]
         day_fraction = self.intraday_fraction(vn, tick_id)
-        t2expiry = max(vg.t2expiry[expiry] - day_fraction, 0)/BDAYS_PER_YEAR
+        time2expiry = max(vg.t2expiry[expiry] - day_fraction, 0)/BDAYS_PER_YEAR
         stkList = pyktlib.DblVector(strike_list)
         volList = pyktlib.DblVector(vol_list)
-        volparam = pyktlib.FitDelta5VolParams(t2expiry, fwd, stkList, volList)
+        volparam = pyktlib.FitDelta5VolParams(time2expiry, fwd, stkList, volList)
         atm = volparam[0]
         v90 = volparam[1]
         v75 = volparam[2]
@@ -187,6 +188,6 @@ class OptionAgent(Agent, OptAgentMixin):
     
     def restart(self):
         for prod in self.volgrids:
-            for expiry in self.volgrids[prod]:
+            for expiry in self.volgrids[prod].volnode:
                 self.calc_volgrid(prod, expiry, update_risk = True)
         Agent.restart(self)
