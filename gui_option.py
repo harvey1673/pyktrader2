@@ -215,7 +215,7 @@ class OptVolgridGui(object):
             ttk.Label(self.vm_frame, text=vlbl).grid(row=row_id, column=idx)
             ttk.Label(self.vm_frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=idx)
             if vlbl in vol_params:
-                ttk.Entry(self.vm_frame, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
+                ttk.Entry(self.vm_frame, width = 7, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
         tk.Button(self.vm_frame, text='Plot', command=lambda: self.refresh_vm_figure(expiry) ).grid(row=row_id+2, column=0)
         tk.Button(self.vm_frame, text='Fit', command=lambda: self.fit_volparam(expiry)).grid(row=row_id + 2, column=1)
         tk.Button(self.vm_frame, text='Mark', command=lambda: self.remark_volgrid(expiry)).grid(row=row_id+2, column=2)
@@ -244,7 +244,7 @@ class OptVolgridGui(object):
             idx += 1
             ttk.Label(self.vm_frame, textvariable = self.stringvars['TheoryVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
             idx += 1
-            ttk.Entry(self.vm_frame, textvariable = self.stringvars['NewVol'][expiry][strike]).grid(row=row_id+idy, column=idx)
+            ttk.Entry(self.vm_frame, width = 7, textvariable = self.stringvars['NewVol'][expiry][strike]).grid(row=row_id+idy, column=idx)
             idx += 1
             ttk.Label(self.vm_frame, textvariable = self.stringvars['DiffVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
         row_id += len(self.strikes[ix])
@@ -311,7 +311,7 @@ class OptVolgridGui(object):
             self.vm_lines[field].set_xdata(xdata)
             self.vm_lines[field].set_ydata(ydata)
         stk_list, bid_list, ask_list = self.get_fig_volcurve(expiry)
-        for field, ylist in zip(['BidIV', 'AskIV'], [bid_list, ask_list]):
+        for field, ylist in zip(['BidVol', 'AskVol'], [bid_list, ask_list]):
             self.vm_lines[field].set_xdata(stk_list)
             self.vm_lines[field].set_ydata(ylist)
 
@@ -322,7 +322,7 @@ class OptVolgridGui(object):
         idx = self.expiries.index(expiry)
         strike_list = []
         vol_list = []
-        for strike in zip(self.strikes[idx]):
+        for strike in self.strikes[idx]:
             if self.strike_selector[expiry][strike]:
                 strike_list.append(strike)
                 vol_list.append(self.stringvars['NewVol'][expiry][strike].get())
@@ -355,7 +355,7 @@ class OptVolgridGui(object):
 
     def show_risks(self):
         pos_win   = tk.Toplevel(self.frame)        
-        self.vm_frame = tk.Frame(pos_win)
+        self.pos_frame = tk.Frame(pos_win)
         pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.pos_canvas.yview)
         pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.pos_canvas.xview)
         self.pos_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
@@ -389,6 +389,12 @@ class OptVolgridGui(object):
                                 txt = self.curr_insts[inst][field]*factor
                             tk.Label(self.pos_frame, text = keepdigit(txt,3)).grid(row=idy, column=idx)
         
+    def load_volgrids(self):
+        self.app.run_agent_func('load_volgrids', ())
+    
+    def save_volgrids(self):
+        self.app.run_agent_func('save_volgrids', ())
+        
     def OnPosFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
         self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
@@ -421,8 +427,10 @@ class OptVolgridGui(object):
                 
             ttk.Button(self.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=10, columnspan=2)
             ttk.Button(self.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+1, column=10, columnspan=2) 
-            ttk.Button(self.frame, text='ApproxRisk', command= self.update_approx_risks).grid(row=row_id+1, column=12, columnspan=2)
             ttk.Button(self.frame, text='MarkVol', command= lambda: self.vol_marker(expiry)).grid(row=row_id, column=12, columnspan=2)
+            ttk.Button(self.frame, text='ApproxRisk', command= self.update_approx_risks).grid(row=row_id+1, column=12, columnspan=2)
+            ttk.Button(self.frame, text='Load', command= self.load_volgrids).grid(row=row_id+2, column=10, columnspan=2)
+            ttk.Button(self.frame, text='Save', command= self.save_volgrids).grid(row=row_id+2, column=12, columnspan=2)
             row_id += 2
             col_id = 0
             inst = self.underliers[under_id]
@@ -454,3 +462,4 @@ class OptVolgridGui(object):
     def OnFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        
