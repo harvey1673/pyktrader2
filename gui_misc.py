@@ -73,8 +73,8 @@ def variable2field(var):
 class ScrolledFrame(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self, root)
-        self.canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
-        self.frame = tk.Frame(self.canvas, background="#ffffff")
+        self.canvas = tk.Canvas(root, borderwidth=0)
+        self.frame = tk.Frame(self.canvas)
         self.vsby = tk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
         self.vsbx = tk.Scrollbar(root, orient="horizontal", command=self.canvas.xview)
         self.canvas.configure(yscrollcommand=self.vsby.set, xscrollcommand=self.vsbx.set)

@@ -54,7 +54,7 @@ class OptAgentMixin(object):
             if os.path.isfile(logfile):       
                 with open(logfile, 'rb') as f:
                     reader = csv.reader(f)
-                    for row in enumerate(reader):
+                    for row in reader:
                         inst = row[0]
                         expiry = datetime.datetime.strptime(row[1], '%Y%m%d %H%M%S')
                         fwd = float(row[2]) 
@@ -65,8 +65,12 @@ class OptAgentMixin(object):
                         v10 = float(row[7])
                         last_update = float(row[8])
                         if len(row) > 9:
-                            mark_date = datetime.date.strptime(row[9], '%Y%m%d')
-                            if self.scur_day > mark_date:
+                            ccy = str(row[9])
+                        else:
+                            ccy = 'CNY'
+                        if len(row) > 10:
+                            mark_date = datetime.datetime.strptime(row[10], '%Y%m%d')
+                            if self.scur_day > mark_date.date():
                                 last_update = 0
                         dexp = datetime2xl(expiry)
                         vg = self.volgrids[prod]
@@ -108,7 +112,7 @@ class OptAgentMixin(object):
                     if len(vg.volparam[expiry]) == 5:
                         volparam = vg.volparam[expiry]
                         row = [ vg.underlier[expiry], expiry.strftime('%Y%m%d %H%M%S'), vg.fwd[expiry] ] \
-                              + volparam + [vg.last_update[expiry], self.scur_day.strftime('%Y%m%d')]
+                              + volparam + [vg.last_update[expiry], vg.ccy, self.scur_day.strftime('%Y%m%d')]
                         file_writer.writerow(row)
     
     def set_opt_pricers(self):
@@ -182,12 +186,12 @@ class OptionAgent(Agent, OptAgentMixin):
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         Agent.__init__(self, name, tday, config)
         OptAgentMixin.__init__(self, name, tday, config)        
-    
-    def restart(self):        
-        Agent.restart(self)
         self.create_volgrids()
         self.load_volgrids()
         self.set_opt_pricers()
+
+    def restart(self):        
+        Agent.restart(self)
         for prod in self.volgrids:
             for expiry in self.volgrids[prod].volnode:
                 self.calc_volgrid(prod, expiry, update_risk = True)

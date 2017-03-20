@@ -41,26 +41,14 @@ class OptVolgridGui(object):
         self.opt_dict = {v: k for k, v in self.option_insts.iteritems()}
         self.volgrid = instrument.copy_volgrid(vg)
         self.rf = app.agent.irate.get(vg.ccy, 0.0)
-
-        self.canvas = None
-        self.pos_canvas = None
-        self.frame = None
-        self.pos_frame = None
-        self.vm_frame = {}
-        self.vm_canvas = {}
         self.vm_figure = {}
+        self.vm_lines = dict([(exp, {}) for exp in self.expiries])
         self.vm_ax = {}
-        self.vm_lines = {}
-
         self.otype_selector = {}
         self.strike_selector = {}
-        self.calib_inputs = {}
-        self.bid_vol = {}
-        self.ask_vol = {}
         self.stringvars = {'Insts': {}, 'Volgrid': {}, 'NewVolParam': {}, 'TheoryVol': {}, 'NewVol': {}, 'DiffVol': {}}
         self.new_volnode = {}
         self.curr_insts = {}
-        self.entries = {}
         self.option_map = {}
         self.group_risk = {}
 
@@ -90,9 +78,6 @@ class OptVolgridGui(object):
             self.stringvars['DiffVol'][expiry] = {}
             self.otype_selector[expiry] = {}
             self.strike_selector[expiry] = {}
-            self.bid_vol[expiry] = [0.05] * len(strikes)
-            self.ask_vol[expiry] = [0.50] * len(strikes)
-            self.calib_inputs[expiry] = {'strike': [], 'vol': []}
             vn = self.volgrid.volnode[expiry]
             self.new_volnode[expiry] = pyktlib.Delta5VolNode(vn.expiry_(), vn.fwd_(), vn.atmVol_(), vn.d90Vol_(), vn.d75Vol_(), vn.d25Vol_(), vn.d10Vol_(), vn.accrual_())
             for vlbl, vtype in zip(vol_labels, vol_types):
@@ -118,150 +103,80 @@ class OptVolgridGui(object):
                 self.stringvars['NewVol'][expiry][strike].set(keepdigit(iv, 4))
                 self.stringvars['DiffVol'][expiry][strike] = get_type_var('float')
                 self.stringvars['DiffVol'][expiry][strike].set(0.0)
+        self.stringvars['FigSetup'] = dict([(exp, {'YLow': get_type_var('float'), 'YHigh': get_type_var('float')}) for exp in self.expiries])
+        for exp in self.expiries:
+            for key, ylim in zip(['YLow', 'YHigh'], [0.05, 0.5]):
+                self.stringvars['FigSetup'][exp][key].set(ylim)
 
-    def get_T_table(self, expiry):
-        # update all the related instrument prices
-        under = self.volgrid.underlier[expiry]
-        insts = [under] + self.volgrid.option_insts[expiry]
-        params = self.app.get_agent_params(['.'.join(['Insts'] + insts)])
-        for inst in params['Insts']:
-            self.curr_insts[inst] = params['Insts'][inst]
-        inst_labels = ['Name', 'Price','BidPrice', 'BidVol','AskPrice', 'AskVol', 'Volume', 'OI', 'Updated', \
-                        'PV', 'Delta', 'Gamma','Vega', 'Theta', 'RiskPrice', 'RiskUpdated']
-        under_labels = ['Name', 'Price','BidPrice','BidVol','AskPrice','AskVol', 'Volume', 'OI', 'Updated', 'UpLimit','DownLimit']
-        for instlbl in under_labels:
-            value = self.curr_insts[under][instlbl]
-            self.stringvars[under][instlbl].set(keepdigit(value,4))
-        for inst in self.volgrid.option_insts[expiry]:
-            for instlbl in inst_labels:
-                value = self.curr_insts[inst][instlbl]
-                self.stringvars[inst][instlbl].set(keepdigit(value,4))
-        # update the volgrid info
-        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10', 'T2expiry', 'Updated']
-        params = self.app.get_agent_params(['Volgrids.'+self.name])
-        results = params['Volgrids'][self.name]
-        if expiry in self.stringvars['Volgrid']:
-            for vlbl in vol_labels:
-                if vlbl == 'Expiry':
-                    value = expiry
-                else:
-                    value = results[expiry][vlbl]
-                self.stringvars['Volgrid'][expiry][vlbl].set(keepdigit(value,5))
-        last_update = results[expiry]['Updated']
-        t2expiry = results[expiry]['T2expiry']
+    def reset_newvol(self, expiry):
         vn = self.volgrid.volnode[expiry]
-        vn.setFwd(results[expiry]['Fwd'])
-        vn.setTime2Exp((t2expiry-last_update)/BDAYS_PER_YEAR)
-        vn.setD90Vol(results[expiry]['V90'])
-        vn.setD75Vol(results[expiry]['V75'])
-        vn.setD25Vol(results[expiry]['V25'])
-        vn.setD10Vol(results[expiry]['V10'])
-        vn.setAtm(results[expiry]['Atm'])
-        # vn.initialize()
-        for inst in self.volgrid.option_insts[expiry]:
-            bid_price = self.curr_insts[inst]['BidPrice']
-            ask_price = self.curr_insts[inst]['AskPrice']
-            key = self.option_insts[inst]
-            fwd = ( self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice'])/2.0
-            strike = key[2]
-            otype = key[1]
-            Texp =  self.volgrid.volnode[expiry].expiry_()
-            intrinsic = max(fwd - strike, 0) if otype in ['c', 'C'] else max(strike-fwd, 0)
-            self.stringvars[inst]['BidIV'].set(keepdigit(intrinsic,4))
-            self.curr_insts[inst]['Intrinsic'] = intrinsic
-            theo_vol = vn.GetVolByStrike(strike)
-            self.stringvars[inst]['TheoryVol'].set(keepdigit(theo_vol,4))
-            self.curr_insts[inst]['TheoryVol'] = theo_vol
-            bid_iv_args = (bid_price, fwd, strike, self.rf, Texp, otype, self.iv_tol)
-            ask_iv_args = (ask_price, fwd, strike, self.rf, Texp, otype, self.iv_tol)
-            if self.option_style == 'AM':
-                bid_iv_args = tuple(list(bid_iv_args) + [self.iv_steps])
-                ask_iv_args = tuple(list(ask_iv_args) + [self.iv_steps])
-            bvol = self.iv_func(*bid_iv_args) if bid_price > intrinsic else np.nan
-            avol = self.iv_func(*ask_iv_args) if ask_price > intrinsic else np.nan
-            self.stringvars[inst]['BidIV'].set(keepdigit(bvol,4))
-            self.curr_insts[inst]['BidIV'] = bvol            
-            self.stringvars[inst]['AskIV'].set(keepdigit(avol,4))
-            self.curr_insts[inst]['AskIV'] = avol
-            self.stringvars[inst]['MidIV'].set(keepdigit((avol+bvol)/2.0,4))
-    
-    def update_approx_risks(self):
-        insts = list(set().union(self.underliers))
-        params = self.app.get_agent_params(['.'.join(['Insts'] + insts)])
-        for inst in params['Insts']:
-            self.curr_insts[inst] = params['Insts'][inst]
-        for expiry in self.expiries:
-            under = self.volgrid.underlier[expiry]
-            fwd = ( self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice'])/2.0
-            for inst in self.volgrid.option_insts[expiry]:
-                prev_price = self.curr_insts[inst]['RiskPrice']
-                diff_price = fwd - prev_price
-                new_pv = self.curr_insts[inst]['PV'] + self.curr_insts[inst]['Delta'] * diff_price + \
-                         self.curr_insts[inst]['Gamma'] * diff_price * diff_price/2.0
-                self.stringvars[inst]['PV'].set(keepdigit(new_pv,4))
-                self.curr_insts[inst]['PV'] = new_pv
-                new_delta = self.curr_insts[inst]['Delta'] + self.curr_insts[inst]['Gamma'] * diff_price
-                self.stringvars[inst]['Delta'].set(keepdigit(new_delta,4))
-                self.curr_insts[inst]['Delta'] = new_delta
+        self.new_volnode[expiry] = pyktlib.Delta5VolNode(vn.expiry_(), vn.fwd_(), vn.atmVol_(), vn.d90Vol_(),
+                                                         vn.d75Vol_(), vn.d25Vol_(), vn.d10Vol_(), vn.accrual_())
+        vol_params = [vn.atmVol_(), vn.d90Vol_(), vn.d75Vol_(), vn.d25Vol_(), vn.d10Vol_()]
+        for vlbl, vol_data in zip(['Atm', 'V90', 'V75', 'V25', 'V10'], vol_params):
+            self.stringvars['NewVolParam'][expiry][vlbl].set(keepdigit(vol_data, 4))
 
-    def vol_marker(self, expiry):
+    def vol_marker(self, expiry, root):
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
         vol_params = ['Atm', 'V90', 'V75', 'V25', 'V10']
         vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']        
-        self.vm_frame = tk.Toplevel(self.frame)
-        # self.vm_canvas = tk.Canvas(vw_win)
+        top_level = tk.Toplevel(root)
+        scr_frame = ScrolledFrame(top_level)
         row_id = col_id = 0
         for idx, vlbl in enumerate(vol_labels):
-            ttk.Label(self.vm_frame, text=vlbl).grid(row=row_id, column=idx)
-            ttk.Label(self.vm_frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=idx)
+            ttk.Label(scr_frame.frame, text=vlbl).grid(row=row_id, column=idx)
+            ttk.Label(scr_frame.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=idx)
             if vlbl in vol_params:
-                ttk.Entry(self.vm_frame, width = 7, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
-        tk.Button(self.vm_frame, text='Plot', command=lambda: self.refresh_vm_figure(expiry) ).grid(row=row_id+2, column=0)
-        tk.Button(self.vm_frame, text='Fit', command=lambda: self.fit_volparam(expiry)).grid(row=row_id + 2, column=1)
-        tk.Button(self.vm_frame, text='Mark', command=lambda: self.remark_volgrid(expiry)).grid(row=row_id+2, column=2)
+                ttk.Entry(scr_frame.frame, width = 7, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
+        tk.Button(scr_frame.frame, text='Plot', command=lambda: self.refresh_vm_figure(expiry) ).grid(row=row_id+2, column=0)
+        tk.Button(scr_frame.frame, text='Reset', command=lambda: self.reset_newvol(expiry)).grid(row=row_id + 2, column=1)
+        tk.Button(scr_frame.frame, text='Fit', command=lambda: self.fit_volparam(expiry)).grid(row=row_id + 2, column=2)
+        tk.Button(scr_frame.frame, text='Mark', command=lambda: self.remark_volgrid(expiry)).grid(row=row_id+2, column=3)
         row_id += 3
         fields = ['Strike', 'C-BidIV', 'C-MidIV', 'C-AskIV', 'P-BidIV', 'P-MidIV', 'P-AskIV', 'UseCall', 'UseCalib','TheoryVol', 'NewVol', 'DiffVol']
         for idx, f in enumerate(fields):
-            ttk.Label(self.vm_frame, text = f).grid(row=row_id, column=idx)
+            ttk.Label(scr_frame.frame, text = f).grid(row=row_id, column=idx)
         row_id += 1
         ix = self.expiries.index(expiry)
         cont_mth = self.cont_mth[ix]
+        row_start = row_id
         for idy, strike in enumerate(self.strikes[ix]):
-            ttk.Label(self.vm_frame, text = str(strike)).grid(row=row_id+idy, column=0)
+            ttk.Label(scr_frame.frame, text = str(strike)).grid(row=row_id+idy, column=0)
             idx = 0
             for otype in ['C', 'P']:                
                 for vlbl in ['BidIV', 'MidIV', 'AskIV']:
                     inst_key = (cont_mth, otype, strike)
                     op_inst = self.opt_dict[inst_key]                
                     idx += 1
-                    ttk.Label(self.vm_frame, textvariable = self.stringvars[op_inst][vlbl]).grid(row=row_id+idy, column=idx)
+                    ttk.Label(scr_frame.frame, textvariable = self.stringvars[op_inst][vlbl]).grid(row=row_id+idy, column=idx)
             idx += 1
-            ttk.Checkbutton(self.vm_frame, variable = self.otype_selector[expiry][strike], \
+            ttk.Checkbutton(scr_frame.frame, variable = self.otype_selector[expiry][strike], \
                                             onvalue = True, offvalue = False).grid(row=row_id+idy, column = idx)
             idx += 1
-            ttk.Checkbutton(self.vm_frame, variable = self.strike_selector[expiry][strike], \
+            ttk.Checkbutton(scr_frame.frame, variable = self.strike_selector[expiry][strike], \
                                             onvalue = True, offvalue = False).grid(row=row_id+idy, column = idx)
             idx += 1
-            ttk.Label(self.vm_frame, textvariable = self.stringvars['TheoryVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
+            ttk.Label(scr_frame.frame, textvariable = self.stringvars['TheoryVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
             idx += 1
-            ttk.Entry(self.vm_frame, width = 7, textvariable = self.stringvars['NewVol'][expiry][strike]).grid(row=row_id+idy, column=idx)
+            ttk.Entry(scr_frame.frame, width = 7, textvariable = self.stringvars['NewVol'][expiry][strike]).grid(row=row_id+idy, column=idx)
             idx += 1
-            ttk.Label(self.vm_frame, textvariable = self.stringvars['DiffVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
-        row_id += len(self.strikes[ix])
-        self.vm_figure = Figure(figsize=(8,8))
-        self.vm_ax = self.vm_figure.add_subplot(111)
+            ttk.Label(scr_frame.frame, textvariable = self.stringvars['DiffVol'][expiry][strike]).grid(row=row_id+idy, column = idx)
+        for idx, lbl in enumerate(['YLow', 'YHigh']):
+            tk.Label(scr_frame.frame, text = lbl).grid(row = row_start - 4, column=10 + idx)
+            ttk.Entry(scr_frame.frame, width=7, \
+                      textvariable=self.stringvars['FigSetup'][expiry][lbl]).grid(row=row_start-3, column=10 + idx)
+        self.vm_figure[expiry] = Figure(figsize=(5,4), facecolor='w', edgecolor='k')
+        self.vm_ax[expiry] = self.vm_figure[expiry].add_subplot(111)
+        self.vm_ax[expiry].set_ylim(0.05, 0.8)
         for field, lstyle in zip(['TheoryVol', 'NewVol'], ['b-', 'r-']):
             xdata, ydata = self.get_stringvar_field(expiry, field)
-            self.vm_lines[field], = self.vm_ax.plot(xdata, ydata, lstyle)
+            self.vm_lines[expiry][field], = self.vm_ax[expiry].plot(xdata, ydata, lstyle)
         stk_list, bid_list, ask_list = self.get_fig_volcurve(expiry, )
-        self.vm_lines['BidVol'], = self.vm_ax.plot(stk_list, bid_list, '^')
-        self.vm_lines['AskVol'], = self.vm_ax.plot(stk_list, ask_list, 'v')
-        self.vm_canvas = FigureCanvasTkAgg(self.vm_figure, master=self.vm_frame)
-        self.vm_canvas.show()
-        self.vm_canvas.get_tk_widget().grid(column=1, row=row_id, rowspan=1, columnspan = 10, sticky="nesw")
-        #self.vm_toolbar = NavigationToolbar2TkAgg(self.vm_canvas, self.vm_frame)
-        #self.vm_toolbar.grid(row = 1, sticky = tk.W)
-        #self.vm_toolbar.update()
+        self.vm_lines[expiry]['BidVol'], = self.vm_ax[expiry].plot(stk_list, bid_list, '^')
+        self.vm_lines[expiry]['AskVol'], = self.vm_ax[expiry].plot(stk_list, ask_list, 'v')
+        vm_canvas = FigureCanvasTkAgg(self.vm_figure[expiry], master=scr_frame.frame)
+        vm_canvas.show()
+        vm_canvas.get_tk_widget().grid(column=13, row=row_start, rowspan=len(self.strikes[ix]), columnspan = 1, sticky="nesw")
 
     def get_fig_volcurve(self, expiry):
         idx = self.expiries.index(expiry)
@@ -308,12 +223,18 @@ class OptVolgridGui(object):
             self.stringvars['DiffVol'][expiry][strike].set(keepdigit(new_vol - theo_vol, 4))
         for field in ['TheoryVol', 'NewVol']:
             xdata, ydata = self.get_stringvar_field(expiry, field)
-            self.vm_lines[field].set_xdata(xdata)
-            self.vm_lines[field].set_ydata(ydata)
+            self.vm_lines[expiry][field].set_xdata(xdata)
+            self.vm_lines[expiry][field].set_ydata(ydata)
         stk_list, bid_list, ask_list = self.get_fig_volcurve(expiry)
         for field, ylist in zip(['BidVol', 'AskVol'], [bid_list, ask_list]):
-            self.vm_lines[field].set_xdata(stk_list)
-            self.vm_lines[field].set_ydata(ylist)
+            self.vm_lines[expiry][field].set_xdata(stk_list)
+            self.vm_lines[expiry][field].set_ydata(ylist)
+        ylim = []
+        for key in ['YLow', 'YHigh']:
+            val = self.stringvars['FigSetup'][expiry][key].get()
+            ylim.append(val)
+        self.vm_ax[expiry].set_ylim(*tuple(ylim))
+        self.vm_figure[expiry].canvas.draw()
 
     def fit_volparam(self, expiry):
         under = self.volgrid.underlier[expiry]
@@ -353,20 +274,12 @@ class OptVolgridGui(object):
         params = (self.name, expiry, True)
         self.app.run_agent_func('calc_volgrid', params)
 
-    def show_risks(self):
-        pos_win   = tk.Toplevel(self.frame)        
-        self.pos_frame = tk.Frame(pos_win)
-        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.pos_canvas.yview)
-        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.pos_canvas.xview)
-        self.pos_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
-        pos_vsbx.pack(side="bottom", fill="x")
-        pos_vsby.pack(side="right", fill="y")
-        self.pos_canvas.pack(side="left", fill="both", expand=True)
-        self.pos_canvas.create_window((4,4), window=self.pos_frame, anchor="nw", tags="self.pos_frame")
-        self.pos_frame.bind("<Configure>", self.OnPosFrameConfigure)
+    def show_risks(self, root):
+        top_level   = tk.Toplevel(root)
+        scr_frame = ScrolledFrame(top_level)
         fields = ['Name', 'Underlying', 'Contract', 'Otype', 'Stike', 'Price', 'BidPrice', 'BidIV', 'AskPrice', 'AskIV', 'PV', 'Delta','Gamma','Vega', 'Theta']
         for idx, field in enumerate(fields):
-            tk.Label(self.pos_frame, text = field).grid(row=0, column=idx)
+            tk.Label(scr_frame.frame, text = field).grid(row=0, column=idx)
         idy = 0
         for i, cmth in enumerate(self.cont_mth):
             for strike in self.strikes[i]:
@@ -387,79 +300,145 @@ class OptVolgridGui(object):
                                 if field in ['delta', 'gamma', 'BidIV', 'AskIV']: 
                                     factor = 100
                                 txt = self.curr_insts[inst][field]*factor
-                            tk.Label(self.pos_frame, text = keepdigit(txt,3)).grid(row=idy, column=idx)
+                            tk.Label(scr_frame.frame, text = keepdigit(txt,3)).grid(row=idy, column=idx)
         
     def load_volgrids(self):
         self.app.run_agent_func('load_volgrids', ())
     
     def save_volgrids(self):
         self.app.run_agent_func('save_volgrids', ())
-        
-    def OnPosFrameConfigure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
-    
-    def set_frame(self, root):
-        self.canvas = tk.Canvas(root)
-        self.frame = tk.Frame(self.canvas)
-        self.vsby = tk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
-        self.vsbx = tk.Scrollbar(root, orient="horizontal", command=self.canvas.xview)
-        self.canvas.configure(yscrollcommand=self.vsby.set, xscrollcommand=self.vsbx.set)
-        self.vsbx.pack(side="bottom", fill="x")
-        self.vsby.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((4,4), window=self.frame, anchor="nw", tags="self.frame")
-        self.frame.bind("<Configure>", self.OnFrameConfigure)
-        self.populate()
 
-    def populate(self):
+    def get_T_table(self, expiry):
+        # update all the related instrument prices
+        under = self.volgrid.underlier[expiry]
+        insts = [under] + self.volgrid.option_insts[expiry]
+        params = self.app.get_agent_params(['.'.join(['Insts'] + insts)])
+        for inst in params['Insts']:
+            self.curr_insts[inst] = params['Insts'][inst]
+        inst_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'AskPrice', 'AskVol', 'Volume', 'OI', 'Updated', \
+                        'PV', 'Delta', 'Gamma', 'Vega', 'Theta', 'RiskPrice', 'RiskUpdated']
+        under_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'AskPrice', 'AskVol', 'Volume', 'OI', 'Updated',
+                        'UpLimit', 'DownLimit']
+        for instlbl in under_labels:
+            value = self.curr_insts[under][instlbl]
+            self.stringvars[under][instlbl].set(keepdigit(value, 4))
+        for inst in self.volgrid.option_insts[expiry]:
+            for instlbl in inst_labels:
+                value = self.curr_insts[inst][instlbl]
+                self.stringvars[inst][instlbl].set(keepdigit(value, 4))
+        # update the volgrid info
+        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10', 'T2expiry', 'Updated']
+        params = self.app.get_agent_params(['Volgrids.' + self.name])
+        results = params['Volgrids'][self.name]
+        if expiry in self.stringvars['Volgrid']:
+            for vlbl in vol_labels:
+                if vlbl == 'Expiry':
+                    value = expiry
+                else:
+                    value = results[expiry][vlbl]
+                self.stringvars['Volgrid'][expiry][vlbl].set(keepdigit(value, 5))
+        last_update = results[expiry]['Updated']
+        t2expiry = results[expiry]['T2expiry']
+        vn = self.volgrid.volnode[expiry]
+        vn.setFwd(results[expiry]['Fwd'])
+        vn.setTime2Exp((t2expiry - last_update) / BDAYS_PER_YEAR)
+        vn.setD90Vol(results[expiry]['V90'])
+        vn.setD75Vol(results[expiry]['V75'])
+        vn.setD25Vol(results[expiry]['V25'])
+        vn.setD10Vol(results[expiry]['V10'])
+        vn.setAtm(results[expiry]['Atm'])
+        for inst in self.volgrid.option_insts[expiry]:
+            bid_price = self.curr_insts[inst]['BidPrice']
+            ask_price = self.curr_insts[inst]['AskPrice']
+            key = self.option_insts[inst]
+            fwd = (self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice']) / 2.0
+            strike = key[2]
+            otype = key[1]
+            Texp = self.volgrid.volnode[expiry].expiry_()
+            intrinsic = max(fwd - strike, 0) if otype in ['c', 'C'] else max(strike - fwd, 0)
+            self.stringvars[inst]['BidIV'].set(keepdigit(intrinsic, 4))
+            self.curr_insts[inst]['Intrinsic'] = intrinsic
+            theo_vol = vn.GetVolByStrike(strike)
+            self.stringvars[inst]['TheoryVol'].set(keepdigit(theo_vol, 4))
+            self.curr_insts[inst]['TheoryVol'] = theo_vol
+            bid_iv_args = (bid_price, fwd, strike, self.rf, Texp, otype, self.iv_tol)
+            ask_iv_args = (ask_price, fwd, strike, self.rf, Texp, otype, self.iv_tol)
+            if self.option_style == 'AM':
+                bid_iv_args = tuple(list(bid_iv_args) + [self.iv_steps])
+                ask_iv_args = tuple(list(ask_iv_args) + [self.iv_steps])
+            bvol = self.iv_func(*bid_iv_args) if bid_price > intrinsic else np.nan
+            avol = self.iv_func(*ask_iv_args) if ask_price > intrinsic else np.nan
+            self.stringvars[inst]['BidIV'].set(keepdigit(bvol, 4))
+            self.curr_insts[inst]['BidIV'] = bvol
+            self.stringvars[inst]['AskIV'].set(keepdigit(avol, 4))
+            self.curr_insts[inst]['AskIV'] = avol
+            self.stringvars[inst]['MidIV'].set(keepdigit((avol + bvol) / 2.0, 4))
+
+    def update_approx_risks(self):
+        insts = list(set().union(self.underliers))
+        params = self.app.get_agent_params(['.'.join(['Insts'] + insts)])
+        for inst in params['Insts']:
+            self.curr_insts[inst] = params['Insts'][inst]
+        for expiry in self.expiries:
+            under = self.volgrid.underlier[expiry]
+            fwd = (self.curr_insts[under]['BidPrice'] + self.curr_insts[under]['AskPrice']) / 2.0
+            for inst in self.volgrid.option_insts[expiry]:
+                prev_price = self.curr_insts[inst]['RiskPrice']
+                diff_price = fwd - prev_price
+                new_pv = self.curr_insts[inst]['PV'] + self.curr_insts[inst]['Delta'] * diff_price + \
+                         self.curr_insts[inst]['Gamma'] * diff_price * diff_price / 2.0
+                self.stringvars[inst]['PV'].set(keepdigit(new_pv, 4))
+                self.curr_insts[inst]['PV'] = new_pv
+                new_delta = self.curr_insts[inst]['Delta'] + self.curr_insts[inst]['Gamma'] * diff_price
+                self.stringvars[inst]['Delta'].set(keepdigit(new_delta, 4))
+                self.curr_insts[inst]['Delta'] = new_delta
+
+    def set_frame(self, root):
+        scr_frame = ScrolledFrame(root)
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
         vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']
         inst_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'BidIV', 'AskPrice','AskVol','AskIV', 'Volume', 'OI']
-        under_labels = ['Name', 'Price','BidPrice','BidVol','AskPrice','AskVol','UpLimit','DownLimit', 'Volume', 'OI']
+        under_labels = ['Name', 'Price','Updated', 'BidPrice','BidVol','AskPrice','AskVol','UpLimit','DownLimit', 'Volume', 'OI']
         row_id = 0
         col_id = 0
         for under_id, (expiry, strikes, cont_mth, under) in enumerate(zip(self.expiries, self.strikes, self.cont_mth, self.underliers)):
             col_id = 0
             for idx, vlbl in enumerate(vol_labels):
-                tk.Label(self.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
-                tk.Label(self.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
+                tk.Label(scr_frame.frame, text=vlbl).grid(row=row_id, column=col_id + idx)
+                tk.Label(scr_frame.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=col_id + idx)
                 
-            ttk.Button(self.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=10, columnspan=2)
-            ttk.Button(self.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+1, column=10, columnspan=2) 
-            ttk.Button(self.frame, text='MarkVol', command= lambda: self.vol_marker(expiry)).grid(row=row_id, column=12, columnspan=2)
-            ttk.Button(self.frame, text='ApproxRisk', command= self.update_approx_risks).grid(row=row_id+1, column=12, columnspan=2)
-            ttk.Button(self.frame, text='Load', command= self.load_volgrids).grid(row=row_id+2, column=10, columnspan=2)
-            ttk.Button(self.frame, text='Save', command= self.save_volgrids).grid(row=row_id+2, column=12, columnspan=2)
+            ttk.Button(scr_frame.frame, text='Refresh', command= lambda: self.get_T_table(expiry)).grid(row=row_id, column=12, columnspan=2)
+            ttk.Button(scr_frame.frame, text='ApproxRisk', command=self.update_approx_risks).grid(row=row_id+1,
+                                                                                                  column=12,
+                                                                                                  columnspan=2)
+            ttk.Button(scr_frame.frame, text='CalcRisk', command= lambda: self.recalc_risks(expiry)).grid(row=row_id+2, column=12, columnspan=2)
+            ttk.Button(scr_frame.frame, text='MarkVol', command= lambda: self.vol_marker(expiry, root)).grid(row=row_id, column=14, columnspan=2)
+            ttk.Button(scr_frame.frame, text='Load', command= self.load_volgrids).grid(row=row_id+1, column=14, columnspan=2)
+            ttk.Button(scr_frame.frame, text='Save', command= self.save_volgrids).grid(row=row_id+2, column=14, columnspan=2)
             row_id += 2
             col_id = 0
             inst = self.underliers[under_id]
             for idx, ulbl in enumerate(under_labels):
-                tk.Label(self.frame, text=ulbl).grid(row=row_id, column=col_id + idx)
-                tk.Label(self.frame, textvariable = self.stringvars[inst][ulbl]).grid(row=row_id+1, column=col_id + idx)
+                tk.Label(scr_frame.frame, text=ulbl).grid(row=row_id, column=col_id + idx)
+                tk.Label(scr_frame.frame, textvariable = self.stringvars[inst][ulbl]).grid(row=row_id+1, column=col_id + idx)
             row_id += 2
             col_id = 0
             for idx, instlbl in enumerate(inst_labels + ['strike']):
-                tk.Label(self.frame, text=instlbl).grid(row=row_id, column=col_id+idx)
+                tk.Label(scr_frame.frame, text=instlbl).grid(row=row_id, column=col_id+idx)
                 if instlbl != 'strike':
-                    tk.Label(self.frame, text=instlbl).grid(row=row_id, column=col_id+2*len(inst_labels)-idx)
+                    tk.Label(scr_frame.frame, text=instlbl).grid(row=row_id, column=col_id+2*len(inst_labels)-idx)
                 for idy, strike in enumerate(strikes):
                     if instlbl == 'strike':
-                        tk.Label(self.frame, text = str(strike), padx=10).grid(row=row_id+1+idy, column=col_id+idx)
+                        tk.Label(scr_frame.frame, text = str(strike), padx=10).grid(row=row_id+1+idy, column=col_id+idx)
                     else:
                         key1 = (cont_mth, 'C', strike)
                         if key1 in self.opt_dict:
                             inst1 = self.opt_dict[key1]
-                            tk.Label(self.frame, textvariable = self.stringvars[inst1][instlbl], padx=10).grid(row=row_id+1+idy, column=col_id + idx)
+                            tk.Label(scr_frame.frame, textvariable = self.stringvars[inst1][instlbl], padx=10).grid(row=row_id+1+idy, column=col_id + idx)
 
                         key2 = (cont_mth, 'P', strike)
                         if key1 in self.opt_dict:
                             inst2 = self.opt_dict[key2]                            
-                            tk.Label(self.frame, textvariable = self.stringvars[inst2][instlbl], padx=10).grid(row=row_id+1+idy, column=col_id+2*len(inst_labels)-idx)
+                            tk.Label(scr_frame.frame, textvariable = self.stringvars[inst2][instlbl], padx=10).grid(row=row_id+1+idy, column=col_id+2*len(inst_labels)-idx)
             row_id = row_id + len(strikes) + 2
             self.get_T_table(expiry)
-
-    def OnFrameConfigure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        

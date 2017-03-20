@@ -116,7 +116,7 @@ class ExecAlgo1DFixT(ExecAlgoBase):
 class ExecAlgoFixTimer(ExecAlgoBase):
     '''send out order by fixed period, cancel the trade when hit the stop price '''
     def __init__(self, xtrade, stop_price = None, max_vol = 20, time_period = 600, price_type = OPT_LIMIT_ORDER, \
-                       order_offset = True, inst_order = None, tick_num = 1):
+                       order_offset = True, order_type = '', inst_order = None, tick_num = 1):
         super(ExecAlgoFixTimer, self).__init__(xtrade, stop_price = stop_price, max_vol = max_vol, inst_order = inst_order)
         self.timer_period = time_period
         self.next_timer = self.agent.tick_id
@@ -152,7 +152,7 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         next_vol = 0
         next_price = 0
         if status == trade.TradeStatus.PFilled:
-            for instID, unit, inst_obj, seq in zip(self.instIDs, self.units, self.order_filled, self.inst_objs, self.inst_order):
+            for instID, unit, inst_obj, seq in zip(self.instIDs, self.units, self.inst_objs, self.inst_order):
                 unfilled = abs(self.xtrade.working_vol * unit) - self.xtrade.order_filled[seq]
                 if unfilled > 0:
                     next_inst = instID
@@ -190,8 +190,8 @@ class ExecAlgoFixTimer(ExecAlgoBase):
         fillvol = min([int(abs(filled/unit)) for (filled, unit) in zip(self.xtrade.order_filled, self.xtrade.units)]) * direction
         price_filled = [sum([o.filled_price * o.filled_vol for o in self.xtrade.order_dict[instID]])/filled if filled != 0 else 0.0 \
                                             for instID, filled in zip(self.xtrade.instIDs, self.xtrade.order_filled)]
+        leftvol = [ (filled - abs(unit * fillvol)) * sign(unit*direction) for (filled, unit) in zip(self.xtrade.order_filled, self.xtrade.units)]
         if fillvol != 0:
-            leftvol = [ (filled - abs(unit * fillvol)) * sign(unit*direction) for (filled, unit) in zip(self.xtrade.order_filled, self.xtrade.units)]
             working_price = self.xtrade.underlying.price(prices=price_filled)
             self.xtrade.on_trade(working_price, fillvol)
             self.xtrade.set_done()

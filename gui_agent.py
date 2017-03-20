@@ -20,12 +20,6 @@ class Gui(tk.Tk):
         # Create textLogger
         #self.text_handler = TextHandler(self.scroll_text)
         #self.scroll_text.pack()
-        self.settings_win = None
-        self.status_win = None
-        self.pos_frame = None
-        self.pos_canvas = None
-        self.tp_frame = None
-        self.tp_canvas = None
         self.entries = {}
         self.stringvars = {'Insts':{}, 'Account':{}}
         self.status_ents = {}
@@ -89,9 +83,9 @@ class Gui(tk.Tk):
         menu.add_command(label="Exit", command=self.onExit)
         self.config(menu=menu)
         self.notebook = ttk.Notebook(self)
-        self.settings_win = ttk.Frame(self.notebook)
-        self.config_settings()
-        self.notebook.add(self.settings_win, text = 'Settings')
+        settings_win = ttk.Frame(self.notebook)
+        self.config_settings(settings_win)
+        self.notebook.add(settings_win, text = 'Settings')
         for prod in self.volgrid_gui:
             self.volgrid_frame[prod] = ttk.Frame(self)
             self.volgrid_gui[prod].set_frame(self.volgrid_frame[prod])
@@ -110,21 +104,11 @@ class Gui(tk.Tk):
         params = self.app.get_agent_params(['Positions'])
         positions = params['Positions']
         pos_win   = tk.Toplevel(self)
-        self.pos_canvas = tk.Canvas(pos_win)
-        self.pos_frame = tk.Frame(self.pos_canvas)
-        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.pos_canvas.yview)
-        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.pos_canvas.xview)
-        self.pos_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
-        pos_vsbx.pack(side="bottom", fill="x")
-        pos_vsby.pack(side="right", fill="y")
-        self.pos_canvas.pack(side="left", fill="both", expand=True)
-        self.pos_canvas.create_window((4,4), window=self.pos_frame, anchor="nw", tags="self.pos_frame")
-        self.pos_frame.bind("<Configure>", self.OnPosFrameConfigure)
-        
+        pos_frame = ScrolledFrame(pos_win)
         fields = ['gateway', 'inst', 'currlong', 'currshort', 'locklong', 'lockshort', 'ydaylong', 'ydayshort']
         for idx, field in enumerate(fields):
             row_idx = 0
-            tk.Label(self.pos_frame, text = field).grid(row=row_idx, column=idx)
+            tk.Label(pos_frame.frame, text = field).grid(row=row_idx, column=idx)
             for gway in positions.keys():
                 for inst in positions[gway]:
                     row_idx += 1
@@ -134,7 +118,7 @@ class Gui(tk.Tk):
                         txt = str(gway)
                     else:
                         txt = positions[gway][inst][field]
-                    tk.Label(self.pos_frame, text = txt).grid(row=row_idx, column=idx)
+                    tk.Label(pos_frame.frame, text = txt).grid(row=row_idx, column=idx)
 
     def tradepos_view(self):
         params = self.app.get_agent_params(['Risk.pos'])
@@ -145,35 +129,17 @@ class Gui(tk.Tk):
         for strat_name in strat_list:
             sum_risk[strat_name] = res['strats'][strat_name]
         pos_win   = tk.Toplevel(self)
-        self.tp_canvas = tk.Canvas(pos_win)
-        self.tp_frame = tk.Frame(self.tp_canvas)
-        pos_vsby = tk.Scrollbar(pos_win, orient="vertical", command=self.tp_canvas.yview)
-        pos_vsbx = tk.Scrollbar(pos_win, orient="horizontal", command=self.tp_canvas.xview)
-        self.tp_canvas.configure(yscrollcommand=pos_vsby.set, xscrollcommand=pos_vsbx.set)
-        pos_vsbx.pack(side="bottom", fill="x")
-        pos_vsby.pack(side="right", fill="y")
-        self.tp_canvas.pack(side="left", fill="both", expand=True)
-        self.tp_canvas.create_window((4,4), window=self.tp_frame, anchor="nw", tags="self.tp_frame")
-        self.tp_frame.bind("<Configure>", self.OnTPFrameConfigure)
-
+        tp_frame = ScrolledFrame(pos_win)
         fields = ['inst', 'total'] + strat_list
         for idx, field in enumerate(fields):
-            tk.Label(self.tp_frame, text = field).grid(row=0, column=idx)
+            tk.Label(tp_frame.frame, text = field).grid(row=0, column=idx)
             for idy, inst in enumerate(sum_risk['total'].keys()):
                 if field == 'inst':
                     txt = inst
                 else:
                     inst_risk = sum_risk[field].get(inst, {})
                     txt = str(inst_risk.get('pos', 0))
-                tk.Label(self.tp_frame, text = txt).grid(row=idy+1, column=idx)
-
-    def OnPosFrameConfigure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.pos_canvas.configure(scrollregion=self.pos_canvas.bbox("all"))
-
-    def OnTPFrameConfigure(self, event):
-        '''Reset the scroll region to encompass the inner frame'''
-        self.tp_canvas.configure(scrollregion=self.tp_canvas.bbox("all"))
+                tk.Label(tp_frame.frame, text = txt).grid(row=idy+1, column=idx)
 
     def qry_agent_inst(self):
         instfield = 'QryInst'
@@ -196,11 +162,11 @@ class Gui(tk.Tk):
         if len(data) == 0:
             return
         pos_win = tk.Toplevel(self)
-        pos_frame = tk.Frame(pos_win)
+        pos_frame = ScrolledFrame(pos_win)
         fields = data.dtype.names
         for idx, field in enumerate(fields):
             row_idx = 0
-            tk.Label(pos_frame, text=field).grid(row=row_idx, column=idx)
+            tk.Label(pos_frame.frame, text=field).grid(row=row_idx, column=idx)
             for i in range(len(data)):
                 row_idx += 1
                 txt = data[field][i]
@@ -211,9 +177,7 @@ class Gui(tk.Tk):
                         txt = pd.to_datetime(str(txt)).strftime("%Y-%m-%d %H%M%S")
                 elif type(txt).__name__ in ['float', 'float64']:
                     txt = round(txt, 2)
-                tk.Label(pos_frame, text=txt).grid(row=row_idx, column=idx)
-        pos_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
-        return
+                tk.Label(pos_frame.frame, text=txt).grid(row=row_idx, column=idx)
 
     def get_agent_account(self):        
         gway_keys = [ 'Account.' + gway for gway in self.gateways]
@@ -231,10 +195,10 @@ class Gui(tk.Tk):
         params = ()
         self.app.run_agent_func('run_eod', params)
             
-    def config_settings(self):
+    def config_settings(self, root):
         entry_fields = []
         label_fields = ['ScurDay', 'TickId', 'EodFlag'] 
-        lbl_frame = ttk.Labelframe(self.settings_win)
+        lbl_frame = ttk.Labelframe(root)
         row_idx = 0
         for col_idx, field in enumerate(label_fields + entry_fields):
             lab = ttk.Label(lbl_frame, text=field+": ", anchor='w')
@@ -273,7 +237,7 @@ class Gui(tk.Tk):
                 lab.grid(column=col_idx, row=row_idx, sticky="ew")
             row_idx += 1
         agent_fields = entry_fields + label_fields
-        setup_qrybtn = ttk.Button(lbl_frame, text='QueryInst', command= self.qry_agent_inst)
+        setup_qrybtn = ttk.Button(lbl_frame, text='QryInst', command= self.qry_agent_inst)
         setup_qrybtn.grid(column=0, row=row_idx, sticky="ew")
         setup_histbtn = ttk.Button(lbl_frame, text='QryHist', command= self.qry_agent_histdata)
         setup_histbtn.grid(column=1, row=row_idx, sticky="ew")
@@ -283,11 +247,11 @@ class Gui(tk.Tk):
         setup_setbtn.grid(column=3, row=row_idx, sticky="ew")
         setup_loadbtn = ttk.Button(lbl_frame, text='LoadParam', command= lambda: self.get_agent_params(agent_fields))
         setup_loadbtn.grid(column=4, row=row_idx, sticky="ew")
-        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAccount', command= self.get_agent_account)
+        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAcct', command= self.get_agent_account)
         setup_loadbtn.grid(column=5, row=row_idx, sticky="ew")
         col_idx = 6
         for gway in self.gateways:
-            setup_loadbtn = ttk.Button(lbl_frame, text='ReCalc_'+gway, command= lambda: self.recalc_margin(gway))
+            setup_loadbtn = ttk.Button(lbl_frame, text='Calc'+gway, command= lambda: self.recalc_margin(gway))
             setup_loadbtn.grid(column=col_idx, row=row_idx, sticky="ew")
             col_idx += 1
         row_idx +=1
@@ -344,8 +308,8 @@ class Gui(tk.Tk):
         pass
         
     def onStatus(self):
-        self.status_win = tk.Toplevel(self)
-        self.status_ents = self.make_status_form(self.status_win)
+        status_win = tk.Toplevel(self)
+        self.status_ents = self.make_status_form(status_win)
         
     def onReset(self):
         self.app.restart()

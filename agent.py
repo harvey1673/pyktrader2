@@ -461,7 +461,6 @@ class Agent(MktDataMixin):
         return sum_risk, risk_dict
 
     def prepare_data_env(self, inst, mid_day = True):
-        print inst
         if  self.instruments[inst].ptype == instrument.ProductType.Option:
             return
         if self.daily_data_days > 0 or mid_day:
