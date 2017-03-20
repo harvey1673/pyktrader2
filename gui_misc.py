@@ -69,3 +69,22 @@ def field2variable(name):
 
 def variable2field(var):
     return ''.join([s.capitalize() for s in var.split('_')])
+    
+class ScrolledFrame(tk.Frame):
+    def __init__(self, root):
+        tk.Frame.__init__(self, root)
+        self.canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+        self.frame = tk.Frame(self.canvas, background="#ffffff")
+        self.vsby = tk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
+        self.vsbx = tk.Scrollbar(root, orient="horizontal", command=self.canvas.xview)
+        self.canvas.configure(yscrollcommand=self.vsby.set, xscrollcommand=self.vsbx.set)
+        self.vsbx.pack(side="bottom", fill="x")
+        self.vsby.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.create_window((4,4), window=self.frame, anchor="nw")
+        self.frame.bind("<Configure>", self.onFrameConfigure)        
+
+    def onFrameConfigure(self, event):
+        '''Reset the scroll region to encompass the inner frame'''
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        
