@@ -181,13 +181,13 @@ class OptAgentMixin(object):
 class OptionAgent(Agent, OptAgentMixin):
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         Agent.__init__(self, name, tday, config)
-        OptAgentMixin.__init__(self, name, tday, config)
+        OptAgentMixin.__init__(self, name, tday, config)        
+    
+    def restart(self):        
+        Agent.restart(self)
         self.create_volgrids()
         self.load_volgrids()
         self.set_opt_pricers()
-    
-    def restart(self):
         for prod in self.volgrids:
             for expiry in self.volgrids[prod].volnode:
                 self.calc_volgrid(prod, expiry, update_risk = True)
-        Agent.restart(self)
