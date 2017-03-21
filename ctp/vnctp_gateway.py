@@ -472,12 +472,32 @@ class VnctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def onRspExecOrderInsert(self, data, error, n, last):
         """"""
-        pass
+        err = VtErrorData()
+        err.gatewayName = self.gatewayName
+        err.errorID = error['ErrorID']
+        err.errorMsg = error['ErrorMsg'].decode('gbk')
+        self.gateway.onError(err)
+
+        event2 = Event(type=EVENT_ERRORDERINSERT + self.gatewayName)
+        event2.dict['data'] = data
+        event2.dict['error'] = error
+        event2.dict['gateway'] = self.gatewayName
+        self.gateway.eventEngine.put(event2)
     
     #----------------------------------------------------------------------
     def onRspExecOrderAction(self, data, error, n, last):
         """"""
-        pass
+        err = VtErrorData()
+        err.gatewayName = self.gatewayName
+        err.errorID = error['ErrorID']
+        err.errorMsg = error['ErrorMsg'].decode('gbk')
+        self.gateway.onError(err)
+
+        event2 = Event(type=EVENT_ERRORDERCANCEL + self.gatewayName)
+        event2.dict['data'] = data
+        event2.dict['error'] = error
+        event2.dict['gateway'] = self.gatewayName
+        self.gateway.eventEngine.put(event2)
     
     #----------------------------------------------------------------------
     def onRspForQuoteInsert(self, data, error, n, last):
@@ -713,7 +733,10 @@ class VnctpTdApi(TdApi):
     #----------------------------------------------------------------------
     def onRtnExecOrder(self, data):
         """"""
-        pass
+        # 更新最大报单编号
+        event = Event(type=EVENT_RTNEXECORDER + self.gatewayName)
+        event.dict['data'] = data
+        self.gateway.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def onErrRtnExecOrderInsert(self, data, error):
@@ -1024,6 +1047,48 @@ class VnctpTdApi(TdApi):
             req['SessionID'] = self.sessionID
 
         self.reqOrderAction(req, self.reqID)
+    
+    def sendExecOrder(self, exec_order):
+        inst = exec_order.instrument
+        self.reqID += 1
+        req = {}
+        req['BrokerID'] = self.brokerID
+        req['InvestorID'] = self.userID
+        req['InstrumentID'] = exec_order.instrument
+        req['ExecOrderRef'] = str(exec_order.local_id)
+        req['OffsetFlag'] = exec_order.action_type
+        req['HedgeFlag'] = defineDict['THOST_FTDC_HF_Speculation']
+        req['ActionType'] = defineDict["THOST_FTDC_ACTP_Exec"]
+        req['PositionDirection'] = defineDict["THOST_FTDC_PD_Long"] if iorder.direction == defineDict["THOST_FTDC_D_Buy"] \
+                                 else defineDict["THOST_FTDC_PD_Short"]
+        if iorder.exchange == "CFFEX':
+            close_flag = defineDict['THOST_FTDC_EOCF_AutoClose']
+            reserve_flag = defineDict["THOST_FTDC_EOPF_UnReserve"]
+        else:
+            close_flag = defineDict['THOST_FTDC_EOCF_NotToClose']
+            reserve_flag = defineDict["THOST_FTDC_EOPF_Reserve"]
+        req['ReservePositionFlag'] = reserve_flag
+        req['CloseFlag'] = close_flag
+        self.reqExecOrderInsert(req, self.reqID)
+    
+    def cancelExecOrder(self, exec_order):
+        inst = exec_order.instrument
+        self.reqID += 1
+        req = {}
+        req['BrokerID'] = self.brokerID
+        req['InvestorID'] = self.userID
+        req['InstrumentID'] = exec_order.instrument
+        req['ExecOrderActionRef'] = ''
+        req['ExecOrderRef'] = str(exec_order.local_id)
+        if len(exec_order.sys_id) >0:
+            req['ExecOrderSysID'] = iorder.sys_id
+        else:
+            req['ExecOrderRef'] = str(iorder.local_id)
+            req['FrontID'] = self.frontID
+            req['SessionID'] = self.sessionID 
+        req['ExchangeID'] = exec_order.exchange
+        req['ActionType'] = defineDict["THOST_FTDC_ACTP_Exec"]
+        self.reqExecOrderAction(req, self.reqID)
         
     #----------------------------------------------------------------------
     def close(self):
