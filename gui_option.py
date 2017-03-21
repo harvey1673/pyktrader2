@@ -45,6 +45,7 @@ class OptVolgridGui(object):
         self.vm_lines = dict([(exp, {}) for exp in self.expiries])
         self.vm_ax = {}
         self.otype_selector = {}
+        self.cbbox = {}
         self.strike_selector = {}
         self.stringvars = {'Insts': {}, 'Volgrid': {}, 'NewVolParam': {}, 'TheoryVol': {}, 'NewVol': {}, 'DiffVol': {}}
         self.new_volnode = {}
@@ -70,6 +71,7 @@ class OptVolgridGui(object):
                 self.stringvars[inst][ulbl] = get_type_var(utype)
         vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10', 'T2expiry', 'Updated' ]
         vol_types =  ['string', 'string', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float']
+        self.combobox_choices = ['C-BidIV', 'C-MidIV', 'C-AskIV', 'P-BidIV', 'P-MidIV', 'P-AskIV']
         for strikes, expiry in zip(self.strikes, self.expiries):
             self.stringvars['Volgrid'][expiry] = {}
             self.stringvars['NewVolParam'][expiry] = {}
@@ -77,6 +79,7 @@ class OptVolgridGui(object):
             self.stringvars['NewVol'][expiry] = {}
             self.stringvars['DiffVol'][expiry] = {}
             self.otype_selector[expiry] = {}
+            self.cbbox[expiry] = {}
             self.strike_selector[expiry] = {}
             vn = self.volgrid.volnode[expiry]
             self.new_volnode[expiry] = pyktlib.Delta5VolNode(vn.expiry_(), vn.fwd_(), vn.atmVol_(), vn.d90Vol_(), vn.d75Vol_(), vn.d25Vol_(), vn.d10Vol_(), vn.accrual_())
@@ -88,14 +91,8 @@ class OptVolgridGui(object):
                 self.stringvars['NewVolParam'][expiry][vlbl].set(keepdigit(val,4))
             fwd = vn.fwd_()
             for strike in strikes:
-                self.otype_selector[expiry][strike] = tk.BooleanVar()
+                self.otype_selector[expiry][strike] = tk.StringVar()
                 self.strike_selector[expiry][strike] = tk.BooleanVar()
-                if fwd < strike:
-                    self.otype_selector[expiry][strike].set(True)
-                    self.strike_selector[expiry][strike].set(True)
-                else:
-                    self.otype_selector[expiry][strike].set(False)
-                    self.strike_selector[expiry][strike].set(True)
                 iv = self.volgrid.volnode[expiry].GetVolByStrike(strike)
                 self.stringvars['TheoryVol'][expiry][strike] = get_type_var('float')
                 self.stringvars['TheoryVol'][expiry][strike].set(keepdigit(iv, 4))
@@ -108,6 +105,17 @@ class OptVolgridGui(object):
             for key, ylim in zip(['YLow', 'YHigh'], [0.05, 0.5]):
                 self.stringvars['FigSetup'][exp][key].set(ylim)
 
+    def select_otype_vol(self, expiry, strike):
+        print expiry, strike
+        val = self.otype_selector[expiry][strike].get()
+        keys = val.split('-')
+        ix = self.expiries.index(expiry)
+        cont_mth = self.cont_mth[ix]
+        key = (cont_mth, keys[0], strike)
+        inst = self.opt_dict[key]
+        iv = self.stringvars[inst][keys[1]].get()
+        self.stringvars['NewVol'][expiry][strike].set(keepdigit(iv, 4))
+
     def reset_newvol(self, expiry):
         vn = self.volgrid.volnode[expiry]
         self.new_volnode[expiry] = pyktlib.Delta5VolNode(vn.expiry_(), vn.fwd_(), vn.atmVol_(), vn.d90Vol_(),
@@ -117,9 +125,9 @@ class OptVolgridGui(object):
             self.stringvars['NewVolParam'][expiry][vlbl].set(keepdigit(vol_data, 4))
 
     def vol_marker(self, expiry, root):
-        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
+        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','T2expiry', 'Updated']
         vol_params = ['Atm', 'V90', 'V75', 'V25', 'V10']
-        vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']        
+        vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float', 'float']
         top_level = tk.Toplevel(root)
         scr_frame = ScrolledFrame(top_level)
         row_id = col_id = 0
@@ -150,8 +158,12 @@ class OptVolgridGui(object):
                     idx += 1
                     ttk.Label(scr_frame.frame, textvariable = self.stringvars[op_inst][vlbl]).grid(row=row_id+idy, column=idx)
             idx += 1
-            ttk.Checkbutton(scr_frame.frame, variable = self.otype_selector[expiry][strike], \
-                                            onvalue = True, offvalue = False).grid(row=row_id+idy, column = idx)
+            self.cbbox[expiry][strike] = ttk.Combobox(scr_frame.frame, textvariable = self.otype_selector[expiry][strike], \
+                         values = self.combobox_choices)
+            self.cbbox[expiry][strike].current(1)
+            param_dict = {'expiry': expiry, 'strike': strike}
+            self.cbbox[expiry][strike].bind("<<ComboboxSelected>>", lambda event: self.select_otype_vol(expiry, strike))
+            self.cbbox[expiry][strike].grid(row=row_id+idy, column = idx)
             idx += 1
             ttk.Checkbutton(scr_frame.frame, variable = self.strike_selector[expiry][strike], \
                                             onvalue = True, offvalue = False).grid(row=row_id+idy, column = idx)
@@ -187,10 +199,9 @@ class OptVolgridGui(object):
         for strike in self.strikes[idx]:
             if self.strike_selector[expiry][strike]:
                 stk_list.append(strike)
-                if self.otype_selector[expiry][strike]:
-                    key = (cont_mth,  'C', strike)
-                else:
-                    key = (cont_mth, 'P', strike)
+                cbb_text = self.otype_selector[expiry][strike].get()
+                fields = cbb_text.split('-')
+                key = (cont_mth,  fields[0], strike)
                 inst = self.opt_dict[key]
                 bid_list.append(self.stringvars[inst]['BidIV'].get())
                 ask_list.append(self.stringvars[inst]['AskIV'].get())
@@ -395,8 +406,8 @@ class OptVolgridGui(object):
 
     def set_frame(self, root):
         scr_frame = ScrolledFrame(root)
-        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','Updated']
-        vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float']
+        vol_labels = ['Expiry', 'Under', 'Df', 'Fwd', 'Atm', 'V90', 'V75', 'V25', 'V10','T2expiry', 'Updated']
+        vol_types =  ['string', 'string', 'float','float','float','float','float','float','float','float', 'float']
         inst_labels = ['Name', 'Price', 'BidPrice', 'BidVol', 'BidIV', 'AskPrice','AskVol','AskIV', 'Volume', 'OI']
         under_labels = ['Name', 'Price','Updated', 'BidPrice','BidVol','AskPrice','AskVol','UpLimit','DownLimit', 'Volume', 'OI']
         row_id = 0

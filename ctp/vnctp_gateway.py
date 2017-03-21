@@ -734,7 +734,7 @@ class VnctpTdApi(TdApi):
     def onRtnExecOrder(self, data):
         """"""
         # 更新最大报单编号
-        event = Event(type=EVENT_RTNEXECORDER + self.gatewayName)
+        event = Event(type=EVENT_RTNORDER + self.gatewayName)
         event.dict['data'] = data
         self.gateway.eventEngine.put(event)
     
@@ -1059,9 +1059,9 @@ class VnctpTdApi(TdApi):
         req['OffsetFlag'] = exec_order.action_type
         req['HedgeFlag'] = defineDict['THOST_FTDC_HF_Speculation']
         req['ActionType'] = defineDict["THOST_FTDC_ACTP_Exec"]
-        req['PositionDirection'] = defineDict["THOST_FTDC_PD_Long"] if iorder.direction == defineDict["THOST_FTDC_D_Buy"] \
+        req['PositionDirection'] = defineDict["THOST_FTDC_PD_Long"] if exec_order.direction == defineDict["THOST_FTDC_D_Buy"] \
                                  else defineDict["THOST_FTDC_PD_Short"]
-        if iorder.exchange == "CFFEX':
+        if exec_order.exchange == 'CFFEX':
             close_flag = defineDict['THOST_FTDC_EOCF_AutoClose']
             reserve_flag = defineDict["THOST_FTDC_EOPF_UnReserve"]
         else:
@@ -1081,9 +1081,9 @@ class VnctpTdApi(TdApi):
         req['ExecOrderActionRef'] = ''
         req['ExecOrderRef'] = str(exec_order.local_id)
         if len(exec_order.sys_id) >0:
-            req['ExecOrderSysID'] = iorder.sys_id
+            req['ExecOrderSysID'] = exec_order.sys_id
         else:
-            req['ExecOrderRef'] = str(iorder.local_id)
+            req['ExecOrderRef'] = str(exec_order.local_id)
             req['FrontID'] = self.frontID
             req['SessionID'] = self.sessionID 
         req['ExchangeID'] = exec_order.exchange

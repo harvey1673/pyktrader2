@@ -549,7 +549,7 @@ class CtpGateway(GrossGateway):
             event = Event(type=EVENT_ETRADEUPDATE)
             event.dict['trade_ref'] = myorder.trade_ref
             self.eventEngine.put(event)
-        logContent = 'OrderInsert is not accepted by CTP, local_id=%s, instrument=%s, error=%s. ' % (local_id, inst, error['ErrorMsg'])
+        logContent = 'OrderInsert is not accepted by CTP, local_id=%s, instrument=%s, error=%s. ' % (local_id, inst, error['ErrorMsg'].decode('utf-8'))
         if inst not in self.order_stats:
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
         self.order_stats[inst]['failure'] += 1
