@@ -178,7 +178,7 @@ def tradepos2dict(tradepos):
 class Strategy(object):
     common_params = {'name': 'test_strat', 'email_notify':'', 'data_func': [], 'pos_scaler': 1.0, \
                      'daily_close_buffer': 3, 'pos_class': 'TradePos', 'pos_args': {},\
-                     'exec_class': 'ExecAlgo1DFixT'}
+                     'exec_class': 'ExecAlgo1DFixT', 'is_disabled': False}
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.01, 'price_unit': None, \
                     'close_tday': False, 'last_min_id': 2057, 'trail_loss': 0, \
                     'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
@@ -364,6 +364,7 @@ class Strategy(object):
         self.curr_prices[idx] = self.underlying[idx].mid_price
 
     def run_tick(self, ctick):
+        if is_disabled: return
         save_status = False
         inst = ctick.instID
         idx_list = self.inst2idx[inst]
@@ -377,6 +378,7 @@ class Strategy(object):
             self.save_state()
 
     def run_min(self, inst, freq):
+        if is_disabled: return
         save_status = False
         idx_list = self.inst2idx[inst]
         for idx in idx_list:
