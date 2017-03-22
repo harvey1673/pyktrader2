@@ -156,7 +156,7 @@ class ExecAlgoFixTimer(ExecAlgoBase):
                 unfilled = abs(self.xtrade.working_vol * unit) - self.xtrade.order_filled[seq]
                 if unfilled > 0:
                     next_inst = instID
-                    next_vol = unfilled * sign(self.xtrade.working_vol * unit)
+                    next_vol = int(unfilled * sign(self.xtrade.working_vol * unit))
                     next_price = inst_obj.shift_price(next_vol, self.tick_num)
                     if instID in self.xtrade.order_dict:
                         traded_prices = [iorder.filled_price for iorder in self.xtrade.order_dict[instID] if iorder.filled_volume > 0]
