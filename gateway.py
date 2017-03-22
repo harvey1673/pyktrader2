@@ -69,7 +69,6 @@ class Gateway(object):
             pos = self.positions[inst]
             eod_pos[inst] = [pos.curr_pos.long, pos.curr_pos.short]
         self.id2order  = {}
-        self.working_orders = []
         self.positions = {}
         self.order_stats = {'total_submit': 0, 'total_failure': 0, 'total_cancel':0 }
         for inst in self.instruments:
@@ -174,7 +173,7 @@ class Gateway(object):
         # 通用事件
         event = Event(type=EVENT_LOG)
         event.dict['data'] = log_content
-        event.dict['gateway'] = self.gatewayName
+        event.dict['owner'] = "gateway_" + self.gatewayName
         event.dict['level'] = level
         self.eventEngine.put(event)
         
@@ -198,20 +197,21 @@ class Gateway(object):
                     inst = row[3]
                     order_class = eval('order.' + str(row[14]))
                     filled_orders = {}
-                    if ':' in row[7]:
-                        filled_str = row[7].split('|')
-                        for fstr in filled_str:
-                            if (':' not in fstr) or ('_' not in fstr):
-                                continue
+                    if ':' not in row[7]:
+                        continue
+                    filled_str = row[7].split('|')                                        
+                    for fstr in filled_str:
+                        if (':' not in fstr) or ('_' not in fstr):
+                            continue
                         forder = fstr.split(':')
                         pair_str = forder[1].split('_')
                         filled_orders[forder[0]] = [float(pair_str[0]), int(pair_str[1])]
-                    iorder = order_class(inst, float(row[11]), int(row[4]), int(row[12]),
-                                   row[8], row[9], row[10], int(row[15]))
-                    iorder.local_id = int(row[1])
-                    iorder.sys_id = row[2]
+                    iorder = order_class(inst, float(row[11]), int(float(row[4])), \
+                                int(float(row[12])), row[8], row[9], row[10], int(float(row[15])))
+                    iorder.sys_id = row[1]
+                    iorder.local_id = row[2]
                     iorder.filled_orders = filled_orders
-                    iorder.filled_volume = int(row[5])
+                    iorder.filled_volume = int(float(row[5]))
                     iorder.filled_price = float(row[6])
                     iorder.order_ref = int(row[0])
                     iorder.status = int(row[13])
