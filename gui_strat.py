@@ -1,7 +1,7 @@
 #-*- coding:utf-8 -*-
 import Tkinter as tk
 import ttk
-from gui_misc import *
+from gui_agent import *
 
 class StratGui(object):
     def __init__(self, strat, app, master):
@@ -15,10 +15,6 @@ class StratGui(object):
         self.status_fields = []
         self.shared_fields = []
         self.field_types = {}
-        self.lblframe = None
-        self.canvas = None
-        self.vsby = None
-        self.vsbx = None
                 
     def get_params(self):
         fields = self.entry_fields + self.status_fields
@@ -72,41 +68,30 @@ class StratGui(object):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
             
     def set_frame(self, root):
-        self.canvas = tk.Canvas(root)
-        self.lblframe = tk.Frame(self.canvas)
-        self.vsby = tk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
-        self.vsbx = tk.Scrollbar(root, orient="horizontal", command=self.canvas.xview)
-        self.canvas.configure(yscrollcommand=self.vsby.set, xscrollcommand=self.vsbx.set)
-        self.vsbx.pack(side="bottom", fill="x")
-        self.vsby.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((4,4), window=self.lblframe, anchor="nw", tags="self.lblframe")
-        self.lblframe.bind("<Configure>", self.OnFrameConfigure)        
-        #self.lblframe = ttk.Frame(root)        
-        #self.lblframe.grid_columnconfigure(1, weight=1)     
+        scr_frame = ScrolledFrame(root)
         entries = {}
         stringvars = {}
         row_id = 0
-        set_btn = ttk.Button(self.lblframe, text='Set', command=self.set_params)
+        set_btn = ttk.Button(scr_frame.frame, text='Set', command=self.set_params)
         set_btn.grid(row=row_id, column=3, sticky="ew")
-        refresh_btn = ttk.Button(self.lblframe, text='Refresh', command=self.get_params)
+        refresh_btn = ttk.Button(scr_frame.frame, text='Refresh', command=self.get_params)
         refresh_btn.grid(row=row_id, column=4, sticky="ew")
-        recalc_btn = ttk.Button(self.lblframe, text='Recalc', command=self.recalc)
+        recalc_btn = ttk.Button(scr_frame.frame, text='Recalc', command=self.recalc)
         recalc_btn.grid(row=row_id, column=5, sticky="ew")
-        save_btn = ttk.Button(self.lblframe, text='SaveConfig', command=self.save_config)
+        save_btn = ttk.Button(scr_frame.frame, text='SaveConfig', command=self.save_config)
         save_btn.grid(row=row_id, column=6, sticky="ew")
         row_id += 1
         for idx, field in enumerate(self.shared_fields):
-            lbl = ttk.Label(self.lblframe, text = field, anchor='w', width = 8)
+            lbl = ttk.Label(scr_frame.frame, text = field, anchor='w', width = 8)
             lbl.grid(row=row_id, column=idx+2, sticky="ew")
             if field in self.entry_fields:
-                ent = ttk.Entry(self.lblframe, width=4)
+                ent = ttk.Entry(scr_frame.frame, width=4)
                 ent.grid(row=row_id+1, column=idx+2, sticky="ew")
                 ent.insert(0, "0")
                 entries[field] = ent
             elif field in self.status_fields:
                 v= get_type_var(self.field_types[field])
-                lab = ttk.Label(self.lblframe, textvariable = v, anchor='w', width = 8)
+                lab = ttk.Label(scr_frame.frame, textvariable = v, anchor='w', width = 8)
                 lab.grid(row=row_id+1, column=idx+2, sticky="ew")
                 v.set('0')
                 stringvars[field] = v                   
@@ -115,17 +100,17 @@ class StratGui(object):
         local_status_fields = [ f for f in self.status_fields if f not in self.shared_fields]
         fields = ['assets'] + local_entry_fields + local_status_fields
         for idx, field in enumerate(fields):
-            lbl = ttk.Label(self.lblframe, text = field, anchor='w', width = 8)
+            lbl = ttk.Label(scr_frame.frame, text = field, anchor='w', width = 8)
             lbl.grid(row=row_id, column=idx, sticky="ew")
         row_id += 1
         for underlier in self.underliers:
             under_key = ','.join(underlier)
-            inst_lbl = ttk.Label(self.lblframe, text=under_key, anchor="w", width = 8)
+            inst_lbl = ttk.Label(scr_frame.frame, text=under_key, anchor="w", width = 8)
             inst_lbl.grid(row=row_id, column=0, sticky="ew")
             col_id = 1
             entries[under_key] = {}
             for idx, field in enumerate(local_entry_fields):
-                ent = ttk.Entry(self.lblframe, width=5)
+                ent = ttk.Entry(scr_frame.frame, width=5)
                 ent.grid(row=row_id, column=col_id+idx, sticky="ew")
                 ent.insert(0, "0")
                 entries[under_key][field] = ent
@@ -133,14 +118,13 @@ class StratGui(object):
             stringvars[under_key] = {}            
             for idx, field in enumerate(local_status_fields):
                 v= get_type_var(self.field_types[field])
-                lab = ttk.Label(self.lblframe, textvariable = v, anchor='w', width = 8)
+                lab = ttk.Label(scr_frame.frame, textvariable = v, anchor='w', width = 8)
                 lab.grid(row=row_id, column=col_id+idx, sticky="ew")
                 v.set('0')
                 stringvars[under_key][field] = v       
             row_id +=1
         self.entries = entries
         self.stringvars = stringvars        
-        #self.lblframe.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         self.get_params()
     
     def recalc(self):
@@ -152,15 +136,16 @@ class StratGui(object):
 class DTStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
-        self.shared_fields = ['PosScaler']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int', 
                             'Ratios': 'float',
                             'Factors': 'float',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
                             'TdayOpen': 'float',
                             'CurrPrices': 'float',
                             'CurRng':'float',
@@ -174,14 +159,15 @@ class DTStratGui(StratGui):
 class DTSplitDChanStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TdayOpen', 'OpenIdx', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['PosScaler']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
                             'TdayOpen': 'float',
                             'OpenIdx': 'int',
                             'CurrPrices': 'float',
@@ -198,16 +184,17 @@ class DTSplitDChanStratGui(StratGui):
 class DTSplitChanAddonStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['PosScaler']
-        self.field_types = {'RunFlag':'int',
+        self.shared_fields = ['PosScaler', 'IsDisabled']
+        self.field_types = {'RunFlag':'int',                                
                             'TradeUnit':'int',
                             'Lookbacks':'int',
                             'Ratios': 'float',
                             'VolRatio': 'floatlist',
                             'PriceMode': 'str',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
                             'TdayOpen': 'float',
                             'OpenIdx': 'int',
                             'CurrPrices': 'float',
@@ -224,13 +211,15 @@ class DTSplitChanAddonStratGui(StratGui):
 class BBandPChanStratGui(StratGui):   
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'BandWin', 'UpperBand', 'MidBand', 'LowerBand', 'Channels', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['PosScaler']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
+                            'IsDisabled': 'bool',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
                             'CurrPrices': 'float',
                             'MidBand': 'float',
                             'UpperBand': 'float',
@@ -247,13 +236,14 @@ class BBandPChanStratGui(StratGui):
 class MASystemStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaFast', 'MaMedm', 'MaSlow', 'Channels', 'ChanHigh', 'ChanLow']
-        self.shared_fields = ['PosScaler']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool', 
                             'CurrPrices': 'float',
                             'MaWin': 'intlist',
                             'MaFast': 'float',
@@ -270,14 +260,15 @@ class MASystemStratGui(StratGui):
 class AsctrendStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiWin', 'RsiLevel', 'WprWin', 'WprLevel', \
                               'SarParam', ]
-        self.shared_fields = ['PosScaler']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
                             'CurrPrices': 'float',
                             'RsiWin': 'int',
                             'RsiLevel': 'intlist',
@@ -293,11 +284,12 @@ class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['PosScaler', 'RunFlag', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
-        self.shared_fields = ['PosScaler', 'EntryLimit', 'DailyCloseBuffer']
+        self.shared_fields = ['PosScaler', 'EntryLimit', 'DailyCloseBuffer', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'AllocW': 'float',
+                            'IsDisabled': 'bool',
                             'PosScaler': 'float',
                             'TradeUnit':'int',
                             'MinRng':'float', 
@@ -318,11 +310,12 @@ class TLStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss', 'IsDisabled']
         self.status_fields = ['TradingFreq', 'TradeUnit', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow']
-        self.shared_fields = ['PosScaler']
-        self.field_types = {'RunFlag':'int',
+        self.shared_fields = ['PosScaler', 'IsDisabled']
+        self.field_types = {'RunFlag':'int',        
                             'TradeUnit':'int',
+                            'IsDisabled': 'bool',
                             'TradingFreq': 'str',
                             'TrailLoss': 'float',
                             'MaxPos': 'int',
@@ -340,11 +333,12 @@ class OptionArbStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.root = master
-        self.entry_fields = ['RunFlag', 'ProfitRatio', 'ExitRatio']
+        self.entry_fields = ['RunFlag', 'ProfitRatio', 'ExitRatio', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'BidPrices', 'AskPrices', 'DaysToExpiry', 'TradeMargin'] 
-        self.shared_fields = ['ProfitRatio', 'ExitRatio']
-        self.field_types = {'RunFlag':'int',
+        self.shared_fields = ['ProfitRatio', 'ExitRatio', 'IsDisabled']
+        self.field_types = {'RunFlag':'int',        
                            'TradeUnit':'int',
+                           'IsDisabled': 'bool',
                             'BidPrices': 'float',
                             'AskPrices': 'float',
                             'DaysToExpiry':'int',
