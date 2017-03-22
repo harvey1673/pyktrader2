@@ -69,6 +69,7 @@ class Gateway(object):
             pos = self.positions[inst]
             eod_pos[inst] = [pos.curr_pos.long, pos.curr_pos.short]
         self.id2order  = {}
+        self.working_orders = []
         self.positions = {}
         self.order_stats = {'total_submit': 0, 'total_failure': 0, 'total_cancel':0 }
         for inst in self.instruments:

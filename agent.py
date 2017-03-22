@@ -469,7 +469,7 @@ class Agent(MktDataMixin):
             daily_end = self.scur_day
             ddf = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)            
             if len(ddf) > 0:
-                self.instruments[inst].price = ddf['close'].iloc[-1]
+                self.instruments[inst].price = self.instruments[inst].mid_price = ddf['close'].iloc[-1]
                 self.instruments[inst].last_update = 0
                 self.instruments[inst].prev_close = ddf['close'].iloc[-1]
                 for fobj in self.day_data_func[inst]:
@@ -513,7 +513,7 @@ class Agent(MktDataMixin):
                     self.cur_min[inst]['openInterest'] = self.cur_day[inst]['openInterest']
                     self.cur_min[inst]['min_id'] = int(mdf['min_id'].iloc[-1])
                     self.cur_min[inst]['bar_id'] = self.conv_bar_id(self.cur_min[inst]['min_id'])
-                    self.instruments[inst].price = float(mdf['close'].iloc[-1])
+                    self.instruments[inst].price = self.instruments[inst].mid_price = float(mdf['close'].iloc[-1])
                     self.instruments[inst].last_update = 0
                     #self.logger.debug('inst=%s tick data loaded for date=%s' % (inst, min_date))
                 if 1 not in self.min_data_func[inst]:

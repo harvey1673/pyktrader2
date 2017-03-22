@@ -9,9 +9,6 @@ import datetime
 from agent import *
 from misc import *
 
-def min2time(min_id):
-    return int((min_id/100-6)%24)/24.0 + (min_id % 100)/1440.0
-
 def discount(irate, dtoday, dexp):
     return np.exp(-irate * max(dexp - dtoday,0)/365.0)
                 

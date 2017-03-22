@@ -392,7 +392,7 @@ class MainApp(object):
                 inst_dict = {}
                 for inst in insts:
                     inst_obj = self.agent.instruments[inst]
-                    inst_dict[inst] = {'Name': inst, 'Price': inst_obj.price, 
+                    inst_dict[inst] = {'Name': inst, 'Price': inst_obj.price, 'MidPrice': inst_obj.mid_price,
                                  'BidPrice': inst_obj.bid_price1, 'BidVol': inst_obj.bid_vol1, 
                                  'AskPrice': inst_obj.ask_price1, 'AskVol': inst_obj.ask_vol1, 
                                  'PrevClose': inst_obj.prev_close, 'MarginRate': inst_obj.marginrate, 

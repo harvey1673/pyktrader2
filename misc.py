@@ -259,6 +259,9 @@ def time2exp(opt_expiry, curr_time):
         delta = opt_expiry - curr_time 
         return (delta.hour*3600+delta.min*60+delta.second)/3600.0/5.5/BDAYS_PER_YEAR
 
+def min2time(min_id):
+    return int((min_id/100-6)%24)/24.0 + (min_id % 100)/1440.0
+
 def get_tick_id(dt):
     return ((dt.hour+6)%24)*100000+dt.minute*1000+dt.second*10+dt.microsecond/100000
 

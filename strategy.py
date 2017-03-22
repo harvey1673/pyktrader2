@@ -364,7 +364,7 @@ class Strategy(object):
         self.curr_prices[idx] = self.underlying[idx].mid_price
 
     def run_tick(self, ctick):
-        if is_disabled: return
+        if self.is_disabled: return
         save_status = False
         inst = ctick.instID
         idx_list = self.inst2idx[inst]
@@ -378,7 +378,7 @@ class Strategy(object):
             self.save_state()
 
     def run_min(self, inst, freq):
-        if is_disabled: return
+        if self.is_disabled: return
         save_status = False
         idx_list = self.inst2idx[inst]
         for idx in idx_list:
