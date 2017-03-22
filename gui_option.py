@@ -269,7 +269,19 @@ class OptVolgridGui(object):
         new_vn.setD75Vol(vol_params[2])
         new_vn.setD25Vol(vol_params[3])
         new_vn.setD10Vol(vol_params[4])
-
+    
+    def check_arb(self, fwd, volnode, strike_list):
+        strikes = strike_list.sort()
+        iv = [volnode.GetVolByStrike(strike) for strike in strikes]
+        fv = pyktlib.BlackPrice(t2exp, vg.fwd[expiry], vg.volnode[expiry], self.strike, irate, 'C')
+        pv = np.array(fv)
+        rr = pv[:-1]-pv[1:]
+        bfly = (pv[:-2] + pv[2:] - 2 * pv[1:-1])
+        if (False in (rr > 0)) or (False in (bfly > 0)):
+            return False
+        else:
+            return True
+        
     def remark_volgrid(self, expiry):
         vol_labels = ['Atm', 'V90', 'V75', 'V25', 'V10']
         vol_params = []
