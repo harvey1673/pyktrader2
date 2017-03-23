@@ -110,13 +110,7 @@ class OptionStrategy(object):
     
     def day_start(self):
         pass
-    
-    def get_fwd(self, idx):
-        return self.agent.instruments[self.underliers[idx]].price
-    
-    def get_DF(self, dtoday, dexp):
-        return np.exp(-self.irate * max(dexp - dtoday,0)/365.0)
-        
+           
     def initialize(self):
         self.load_state()
         dtoday = date2xl(self.agent.scur_day) + max(self.agent.tick_id - 600000, 0)/2400000.0
@@ -154,23 +148,6 @@ class OptionStrategy(object):
         self.update_group_risk()
         self.update_margin()
         self.is_initialized = True
-        return
-    
-    def set_volgrids(self, expiry, vol_params):
-        if self.volgrids[expiry] != None:
-            dtoday = date2xl(self.agent.scur_day) + max(self.agent.tick_id - 600000, 0)/2400000.0
-            fwd = vol_params['fwd']
-            self.volgrids[expiry].setFwd(fwd)
-            self.volgrids[expiry].setToday(dtoday)
-            self.volgrids[expiry].setAtm(vol_params['atm'])
-            self.volgrids[expiry].setD90Vol(vol_params['v90'])
-            self.volgrids[expiry].setD75Vol(vol_params['v75'])
-            self.volgrids[expiry].setD25Vol(vol_params['v25'])
-            self.volgrids[expiry].setD10Vol(vol_params['v10'])
-            self.volgrids[expiry].initialize()
-            self.last_updated[expiry]['fwd'] = fwd
-            self.last_updated[expiry]['dtoday'] = dtoday            
-        return 
     
     def update_margin(self):
         for inst in self.instIDs:
@@ -194,7 +171,6 @@ class OptionStrategy(object):
         df = self.option_map.loc[inst, 'df']
         opt_info = {'pv': pv, 'delta': delta/df, 'gamma': gamma/df/df, 'vega': vega, 'theta': theta}
         self.option_map.loc[inst, opt_info.keys()] = pd.Series(opt_info)
-        return 
     
     def update_pos_greeks(self):
         '''update position greeks according to current positions'''
@@ -202,7 +178,6 @@ class OptionStrategy(object):
         for key in keys:
             pos_key = 'p' + key
             self.option_map[pos_key] = self.option_map[key] * self.option_map['pos'] * self.option_map['multiple']
-        return 
         
     def risk_reval(self, expiry, is_recalib=True):
         '''recalibrate vol surface per fwd move, get greeks update for instrument greeks'''
@@ -222,7 +197,6 @@ class OptionStrategy(object):
             self.option_insts[inst].setFwd(fwd)
             self.option_insts[inst].setFwd(dtoday)
             self.update_greeks(inst)
-        return
     
     def reval_all(self):
         for expiry in self.expiries:
@@ -230,12 +204,10 @@ class OptionStrategy(object):
         self.update_pos_greeks()
         self.update_group_risk()
         self.update_margin()
-        return
     
     def update_group_risk(self):
         group_keys = ['cont_mth', 'ppv', 'pdelta', 'pgamma','pvega','ptheta']
         self.group_risk = self.option_map[group_keys].groupby('cont_mth').sum()
-        return
     
     def add_submitted_pos(self, etrade):
         is_added = False
@@ -245,33 +217,11 @@ class OptionStrategy(object):
                 return
         self.submitted_pos.append(etrade)
         return True
-    
-    def update_positions(self):
-#         save_status = False
-#         for etrade in self.submitted_pos:
-#             if etrade.status == order.ETradeStatus.Done:
-#                 for inst, fvol, fp in zip(etrade.instIDs, etrade.filled_vol, etrade.filled_price):
-#                     
-#                 if etrade.status != order.ETradeStatus.StratConfirm:
-#                     etrade.status = order.ETradeStatus.StratConfirm
-#                     save_status = True                    
-#                     self.logger.warning('the trade %s is done but not found in the strat=%s tradepos table' % (etrade.id, self.name))
-#             elif etrade.status == order.ETradeStatus.Cancelled:
-#                 if etrade.status != order.ETradeStatus.StratConfirm: 
-#                     print "WARNING:the trade %s is cancelled but not found in the strat=%s tradepos table, removing the trade" % (etrade.id, self.name)
-#                     self.logger.warning('the trade %s is cancelled but not found in the strat=%s tradepos table' % (etrade.id, self.name))
-#                     etrade.status = order.ETradeStatus.StratConfirm
-#                     save_status = True
-#         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]            
-#         self.submitted_pos[idx] = [etrade for etrade in self.submitted_pos[idx] if etrade.status!=order.ETradeStatus.StratConfirm]
-#         return save_status        
-        pass
 
     def day_finalize(self):    
         self.save_state()
         self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
         self.is_initialized = False
-        pass
         
     def get_option_map(self, underliers, expiries, strikes):
         opt_map = {}
@@ -293,52 +243,6 @@ class OptionStrategy(object):
 
     def run_min(self, inst):
         pass
-    
-    def save_state(self):
-        filename = self.folder + 'strat_status.csv'
-        self.logger.info('save state for strat = %s' % (self.name))
-        with open(filename,'wb') as log_file:
-            file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            for expiry in self.expiries:
-                if self.volgrids[expiry] != None:
-                    volnode = self.volgrids[expiry]
-                    row = [ 'VolNode', 
-                            expiry.strftime('%Y%m%d %H:%M:%S'), 
-                            volnode.fwd_(), 
-                            volnode.atmVol_(), 
-                            volnode.d90Vol_(),
-                            volnode.d75Vol_(),
-                            volnode.d25Vol_(),
-                            volnode.d10Vol_() ]
-                    file_writer.writerow(row)
-            for inst in self.option_map.index:
-                row = ['Pos', str(inst), self.option_map.loc[inst, 'pos']]
-                file_writer.writerow(row)
-        return
-    
-    def load_state(self):
-        logfile = self.folder + 'strat_status.csv'
-        if not os.path.isfile(logfile):
-            return 
-        self.logger.info('load state for strat = %s' % (self.name))
-        with open(logfile, 'rb') as f:
-            reader = csv.reader(f)
-            for idx, row in enumerate(reader):
-                if row[0] == 'VolNode':
-                    expiry = datetime.datetime.strptime(row[1], '%Y%m%d %H:%M:%S')
-                    fwd = float(row[2])
-                    atm = float(row[3])
-                    v90 = float(row[4])
-                    v75 = float(row[5])
-                    v25 = float(row[6])
-                    v10 = float(row[7])
-                    dtoday = datetime2xl(datetime.datetime.now())
-                    dexp   = datetime2xl(expiry)
-                    self.volgrids[expiry] = pyktlib.Delta5VolNode(dtoday, dexp, fwd, atm, v90, v75, v25, v10, self.accrual)
-                elif row[0]== 'Pos':
-                    instID = str(row[1])
-                    self.option_map.loc[instID, 'pos'] = int(row[2])
-        return
     
     def delta_hedger(self):
         tot_deltas = self.group_risk.pdelta.sum()
@@ -371,7 +275,6 @@ class OptionStrategy(object):
                                 valid_time, self.name, self.agent.name)
             self.submitted_pos[inst].append(etrade)
             self.agent.submit_trade(etrade)
-        return
         
 class EquityOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
@@ -417,7 +320,6 @@ class OptArbStrat(CommodOptStrat):
         
     def tick_run(self, ctick):         
         inst = ctick.instID
-        pass
 
 class OptSubStrat(object):
     def __init__(self, strat):
