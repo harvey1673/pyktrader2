@@ -32,36 +32,36 @@ def get_opt_margin(fut_price, strike, type):
     return 0.0
 
 class OptionStrategy(object):
-    common_params = {'name': 'test_strat', 'underliers':['m1705', 'm1709'], 'expiries': ['20170510', '20170910'], \
-                     'strikes':[2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200], \
-                     'underliers': [], 'accrual': 'COM', 'main_cont': 'm1705', \
-                     'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}
+    common_params = {'name': 'test_strat', 'underlier':['m1705', 'm1709'], 'cont_mth': ['201705', '201709'], \
+                     'strikes':[[2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200]]*2, \
+                     'accrual': 'COMN1', 'main_cont': 0, 'pos_scaler': 1.0, 'daily_close_buffer': 3, \
+                     'exec_class': 'ExecAlgo1DFixT'}
     def __init__(self, config, agent = None):
         self.load_config(config)
-        nlen = len(self.expiries)
-        self.DFs = [1.0] * nlen
-        self.opt_dict = self.get_option_map(self.underliers, self.expiries, self.strikes)
-        self.option_map = dh.DynamicRecArray(dtype = [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'),
-                                                      \
-                                                       ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'), \
-                                                       ('out_long', 'i8'), ('out_short', 'i8'), ('margin_long', 'f8'), ('margin_short', 'f8'), \
-                                                       ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
-                                                       ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8'), \
-                                                       ])
+        nlen = len(self.cont_mth)
+        self.opt_dict = self.get_option_map()
+        self.instIDs = self.underliers + self.option_insts.keys()
+        self.inst_idx =
+        self.risk_table = dh.DynamicRecArray(dtype = \
+                               [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'), \
+                                ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'),\
+                                ('out_long', 'i8'), ('out_short', 'i8'), \
+                                ('margin_long', 'f8'), ('margin_short', 'f8'), \
+                                ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
+                                ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8')])
         self.group_risk = None
         for inst in self.underliers:
-            self.option_map.loc[inst, 'underlier'] = inst
-            self.option_map.loc[inst, 'df'] = 1.0
+            self.risk_table[inst, 'underlier'] = inst
+            self.risk_table.loc[inst, 'df'] = 1.0
         for key in self.opt_dict:
             inst = self.opt_dict[key]
             opt_info = {'underlier': key[0], 'cont_mth': key[1], 'otype': key[2], 'strike': key[3], 'df':1.0}
             self.option_map.loc[inst, opt_info.keys()] = pd.Series(opt_info) 
-        self.instIDs = self.underliers + self.option_insts.keys()
+
         self.irate = 0.04
         self.agent = agent
         self.folder = ''
         self.logger = None
-        self.reset()
         self.submitted_pos = dict([(inst, []) for inst in self.instIDs])
         self.is_initialized = False
         self.proxy_flag = {'delta': False, 'gamma': True, 'vega': True, 'theta': True} 
@@ -70,9 +70,11 @@ class OptionStrategy(object):
         self.pricer = pyktlib.BlackPricer
         self.last_updated = dict([(expiry, {'dtoday':0, 'fwd':0.0}) for expiry in self.expiries])
 
-    def dep_instIDs(self):
-        return self.underliers + self.opt_dict.values()
-        
+    def load_config(self, config):
+        d = self.__dict__
+        for key in self.common_params:
+            d[key] = config.get(key, self.common_params[key])
+
     def save_config(self):
         config = {}
         d = self.__dict__
@@ -81,12 +83,28 @@ class OptionStrategy(object):
         config['assets'] = []
         fname = self.folder + 'config.json'
         with open(fname, 'w') as ofile:
-            json.dump(config, ofile)        
-    
-    def load_config(self, config):
-        d = self.__dict__
-        for key in self.common_params:
-            d[key] = config.get(key, self.common_params[key])
+            json.dump(config, ofile)
+
+    def get_option_map(self):
+        opt_map = {}
+        for under, cmth, ks in zip(self.underliers, self.cont_mth, self.strikes):
+            exch = inst2exch(under)
+            for otype in ['C', 'P']:
+                for strike in ks:
+                    # cont_mth = int(under[-4:]) + 200000
+                    key = (str(under), otype, strike)
+                    instID = under
+                    if instID[:2] == "IF":
+                        instID = instID.replace('IF', 'IO')
+                    if exch == 'CZCE':
+                        instID = instID + otype + str(strike)
+                    else:
+                        instID = instID + '-' + otype + '-' + str(strike)
+                    opt_map[key] = instID
+        return opt_map
+
+    def dep_instIDs(self):
+        return self.underliers + self.opt_dict.values()
 
     def set_agent(self, agent):
         self.agent = agent
@@ -97,19 +115,7 @@ class OptionStrategy(object):
             if len(under) > 1:
                 self.underlying[idx] = self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
             else:
-                self.underlying[idx] = self.agent.instruments[under[0]]             
-        
-    def reset(self):
-        if self.agent != None:
-            self.folder = self.agent.folder + self.name + '_'
-            self.logger = self.agent.logger
-            for inst in self.instIDs:
-                self.option_map.loc[inst, 'multiple'] = self.agent.instruments[inst].multiple
-                self.option_map.loc[inst, 'cont_mth'] = self.agent.instruments[inst].cont_mth
-        #self.load_state()
-    
-    def day_start(self):
-        pass
+                self.underlying[idx] = self.agent.instruments[under[0]]
            
     def initialize(self):
         self.load_state()

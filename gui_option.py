@@ -142,23 +142,29 @@ class OptVolgridGui(object):
         top_level.geometry('1200x600')
         scr_frame = ScrolledFrame(top_level)
         row_id = col_id = 0
+        under = self.volgrid.underlier[expiry]
         for idx, vlbl in enumerate(vol_labels):
             ttk.Label(scr_frame.frame, text=vlbl).grid(row=row_id, column=idx)
             ttk.Label(scr_frame.frame, textvariable = self.stringvars['Volgrid'][expiry][vlbl]).grid(row=row_id+1, column=idx)
             if vlbl in vol_params:
-                ttk.Entry(scr_frame.frame, width = 7, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
-        tk.Button(scr_frame.frame, text='Reset', width = 6,
-                  command=lambda: self.reset_newvol(expiry)).grid(row=row_id + 2, column=2)
-        tk.Button(scr_frame.frame, text='Mark', width = 6,
-                  command=lambda: self.remark_volgrid(expiry)).grid(row=row_id+2, column=3)
-        tk.Button(scr_frame.frame, text='Fit', width=6,
+                ttk.Entry(scr_frame.frame, width = 8, textvariable = self.stringvars['NewVolParam'][expiry][vlbl]).grid(row=row_id+2, column=idx)
+            elif vlbl == 'Fwd':
+                ttk.Label(scr_frame.frame, textvariable=self.stringvars[under]['MidPrice']).grid(row=row_id + 2,
+                                                                                                   column=idx)
+        ttk.Button(scr_frame.frame, text='Refresh', width = 8, \
+                   command=lambda: self.get_T_table(expiry)).grid(row=row_id+2, column=0)
+        ttk.Button(scr_frame.frame, text='Reset', width = 8,
+                  command=lambda: self.reset_newvol(expiry)).grid(row=row_id + 2, column=1)
+        ttk.Button(scr_frame.frame, text='Mark', width = 8,
+                  command=lambda: self.remark_volgrid(expiry)).grid(row=row_id+2, column=2)
+        ttk.Button(scr_frame.frame, text='Fit', width=8,
                   command=lambda: self.fit_volparam(expiry)).grid(row=row_id + 2, column=9)
-        tk.Button(scr_frame.frame, text='SetNew', width=6,
+        ttk.Button(scr_frame.frame, text='SetNew', width=8,
                   command=lambda: self.set_selected(expiry)).grid(row=row_id + 2, column=10)
-        tk.Button(scr_frame.frame, text='Plot', command=lambda: self.refresh_vm_figure(expiry), \
-                  width=7).grid(row=row_id + 2, column=11)
-        tk.Button(scr_frame.frame, text='CheckArb', command=lambda: self.check_arb(expiry), \
-                  width=7).grid(row=row_id + 2, column=12)
+        ttk.Button(scr_frame.frame, text='Plot', command=lambda: self.refresh_vm_figure(expiry), \
+                  width=8).grid(row=row_id + 2, column=11)
+        ttk.Button(scr_frame.frame, text='CheckArb', command=lambda: self.check_arb(expiry), \
+                  width=8).grid(row=row_id + 2, column=12)
         row_id += 3
         fields = ['Strike', 'C-BidIV', 'C-MidIV', 'C-AskIV', 'P-BidIV', 'P-MidIV', 'P-AskIV', 'C/P', 'UseCalib','Selected', 'TheoryVol', 'NewVol', 'DiffVol']
         for idx, f in enumerate(fields):

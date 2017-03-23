@@ -226,32 +226,32 @@ class Gui(tk.Tk):
         col_idx = 0
         row_idx += 1
         for gway in self.gateways:
-            lab = ttk.Label(lbl_frame, text=str(gway), anchor='w')
+            lab = ttk.Label(lbl_frame, width = 9, text=str(gway), anchor='w')
             lab.grid(column = col_idx, row = row_idx, sticky="ew")
             for field in self.account_fields:
                 col_idx += 1
                 v = tk.DoubleVar()
                 key = str(gway) + '.'+ field
                 self.stringvars['Account'][key] = v
-                lab = ttk.Label(lbl_frame, textvariable = v, anchor='w', width = 7)
+                lab = ttk.Label(lbl_frame, width = 9, textvariable = v, anchor='w')
                 lab.grid(column=col_idx, row=row_idx, sticky="ew")
             row_idx += 1
         agent_fields = entry_fields + label_fields
-        setup_qrybtn = ttk.Button(lbl_frame, text='QryInst', command= self.qry_agent_inst)
+        setup_qrybtn = ttk.Button(lbl_frame, text='QryInst', width = 9, command= self.qry_agent_inst)
         setup_qrybtn.grid(column=0, row=row_idx, sticky="ew")
-        setup_histbtn = ttk.Button(lbl_frame, text='QryHist', command= self.qry_agent_histdata)
+        setup_histbtn = ttk.Button(lbl_frame, text='QryHist', width = 9, command= self.qry_agent_histdata)
         setup_histbtn.grid(column=1, row=row_idx, sticky="ew")
-        setup_loadbtn = ttk.Button(lbl_frame, text='RunEOD', command= self.run_eod)
+        setup_loadbtn = ttk.Button(lbl_frame, text='RunEOD', width = 9, command= self.run_eod)
         setup_loadbtn.grid(column=2, row=row_idx, sticky="ew")
-        setup_setbtn = ttk.Button(lbl_frame, text='SetParam', command= lambda: self.set_agent_params(entry_fields))
+        setup_setbtn = ttk.Button(lbl_frame, text='SetParam', width = 9, command= lambda: self.set_agent_params(entry_fields))
         setup_setbtn.grid(column=3, row=row_idx, sticky="ew")
-        setup_loadbtn = ttk.Button(lbl_frame, text='LoadParam', command= lambda: self.get_agent_params(agent_fields))
+        setup_loadbtn = ttk.Button(lbl_frame, text='LoadParam', width = 9, command= lambda: self.get_agent_params(agent_fields))
         setup_loadbtn.grid(column=4, row=row_idx, sticky="ew")
-        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAcct', command= self.get_agent_account)
+        setup_loadbtn = ttk.Button(lbl_frame, text='LoadAcct', width = 9, command= self.get_agent_account)
         setup_loadbtn.grid(column=5, row=row_idx, sticky="ew")
         col_idx = 6
         for gway in self.gateways:
-            setup_loadbtn = ttk.Button(lbl_frame, text='Calc'+gway, command= lambda: self.recalc_margin(gway))
+            setup_loadbtn = ttk.Button(lbl_frame, text='Calc'+gway, width = 9, command= lambda: self.recalc_margin(gway))
             setup_loadbtn.grid(column=col_idx, row=row_idx, sticky="ew")
             col_idx += 1
         row_idx +=1
@@ -267,12 +267,12 @@ class Gui(tk.Tk):
         freqent = ttk.Entry(lbl_frame, width=4)
         freqent.grid(column=1, row=row_idx+1, sticky="ew")
         self.entries[field] = freqent
-        inst_fields = ['Price', 'PrevClose', 'Volume', 'OI', 'AskPrice', 'AskVol', 'BidPrice', 'BidVol', 'UpLimit', 'DownLimit']        
+        inst_fields = ['Price', 'PrevClose', 'Volume', 'OI', 'BidPrice', 'BidVol', 'AskPrice', 'AskVol', 'UpLimit', 'DownLimit']
         for idx, field in enumerate(inst_fields):
-            lab1 = ttk.Label(lbl_frame, text=field, anchor='w')
+            lab1 = ttk.Label(lbl_frame, width = 9, text=field, anchor='w')
             lab1.grid(column=idx+2, row=row_idx, sticky="ew")
             v = tk.DoubleVar()
-            lab2 = ttk.Label(lbl_frame, textvariable = v, anchor='w')
+            lab2 = ttk.Label(lbl_frame, width = 9, textvariable = v, anchor='w')
             self.stringvars['Insts.' + field] = v
             lab2.grid(column=idx+2, row=row_idx+1, sticky="ew")
         lbl_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)        
