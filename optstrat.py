@@ -32,43 +32,28 @@ def get_opt_margin(fut_price, strike, type):
     return 0.0
 
 class OptionStrategy(object):
-    common_params = {'name': 'test_strat', 'underlier':['m1705', 'm1709'], 'cont_mth': ['201705', '201709'], \
-                     'strikes':[[2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200]]*2, \
-                     'accrual': 'COMN1', 'main_cont': 0, 'pos_scaler': 1.0, 'daily_close_buffer': 3, \
-                     'exec_class': 'ExecAlgo1DFixT'}
+    common_params = {'name': 'opt_m', 'products':{'m1705': {201705: [2800, 2850, 2900, 2950, 3000]}, \
+                                                  'm1709': {201709: [2800, 2850, 2900, 2950, 3000]}}, \                     
+                     'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}
     def __init__(self, config, agent = None):
         self.load_config(config)
-        nlen = len(self.cont_mth)
-        self.opt_dict = self.get_option_map()
-        self.instIDs = self.underliers + self.option_insts.keys()
-        self.inst_idx =
+        self.underliers = self.products.keys()                
+        self.option_insts = self.get_option_map(self.products)
+        self.instIDs = self.underliers + self.option_insts.values()
+        self.inst_map = dict([(instID, i) for i, instID in enumerate(self.instIDs)])        
+        self.underlying = [None] * len(self.instIDs)
         self.risk_table = dh.DynamicRecArray(dtype = \
-                               [('name', '|S50'), ('underlier', '|S50'), ('cont_mth', 'i8'), \
+                               [('name', '|S50'), ('product', '|S50'), ('underlying', '|S50'), ('cont_mth', 'i8'), \
                                 ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'),\
-                                ('out_long', 'i8'), ('out_short', 'i8'), \
+                                ('pos_long', 'i8'), ('pos_short', 'i8'), ('out_short', 'i8'), ('out_short', 'i8'), \
                                 ('margin_long', 'f8'), ('margin_short', 'f8'), \
                                 ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
-                                ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8')])
-        self.group_risk = None
-        for inst in self.underliers:
-            self.risk_table[inst, 'underlier'] = inst
-            self.risk_table.loc[inst, 'df'] = 1.0
-        for key in self.opt_dict:
-            inst = self.opt_dict[key]
-            opt_info = {'underlier': key[0], 'cont_mth': key[1], 'otype': key[2], 'strike': key[3], 'df':1.0}
-            self.option_map.loc[inst, opt_info.keys()] = pd.Series(opt_info) 
-
-        self.irate = 0.04
+                                ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8')])                 
         self.agent = agent
         self.folder = ''
-        self.logger = None
         self.submitted_pos = dict([(inst, []) for inst in self.instIDs])
-        self.is_initialized = False
         self.proxy_flag = {'delta': False, 'gamma': True, 'vega': True, 'theta': True} 
-        self.hedge_config = {'order_type': OPT_MARKET_ORDER, 'num_tick':1}
-        self.spot_model = False
-        self.pricer = pyktlib.BlackPricer
-        self.last_updated = dict([(expiry, {'dtoday':0, 'fwd':0.0}) for expiry in self.expiries])
+        self.hedge_config = {'order_type': OPT_LIMIT_ORDER, 'num_tick':1}        
 
     def load_config(self, config):
         d = self.__dict__
@@ -85,75 +70,59 @@ class OptionStrategy(object):
         with open(fname, 'w') as ofile:
             json.dump(config, ofile)
 
-    def get_option_map(self):
-        opt_map = {}
-        for under, cmth, ks in zip(self.underliers, self.cont_mth, self.strikes):
-            exch = inst2exch(under)
-            for otype in ['C', 'P']:
-                for strike in ks:
-                    # cont_mth = int(under[-4:]) + 200000
-                    key = (str(under), otype, strike)
-                    instID = under
-                    if instID[:2] == "IF":
-                        instID = instID.replace('IF', 'IO')
-                    if exch == 'CZCE':
-                        instID = instID + otype + str(strike)
-                    else:
-                        instID = instID + '-' + otype + '-' + str(strike)
-                    opt_map[key] = instID
-        return opt_map
-
     def dep_instIDs(self):
-        return self.underliers + self.opt_dict.values()
+        return self.instIDs
 
     def set_agent(self, agent):
         self.agent = agent
-        self.folder = self.agent.folder + self.name + '_'        
-        for idx, under in enumerate(self.tradables):        
-            under_key = '_'.join(under)
-            self.under2idx[under_key] = idx
-            if len(under) > 1:
-                self.underlying[idx] = self.agent.add_spread(under, self.volumes[idx], self.price_unit[idx])
-            else:
-                self.underlying[idx] = self.agent.instruments[under[0]]
-           
+        self.folder = self.agent.folder + self.name + '_'
+        self.underlying = [self.agent.instruments[instID] for instID in self.instIDs]   
+        for inst in self.underlying:
+            data_dict = {'name': inst.name, 'product': inst.product, 'underlying': inst.name, 'cont_mth': inst.cont_mth, \
+                        'otype': '', 'strike': 0, 'multiple': inst.multiple, 'df': 1.0, \
+                        'delta': 1.0, 'gamma': 0.0, 'vega': 0.0, 'theta': 0.0, }
+            if inst not in self.underliers:
+                for key in ['underlying', 'otype', 'strike']:
+                    data_dict[key] = getaatr(inst, key)
+            self.risk_table.append_by_dict(data_dict)
+        self.register_func_freq()
+        self.register_bar_freq()
+
+    def register_func_freq(self):
+        pass
+
+    def register_bar_freq(self):
+        pass
+
+    def on_log(self, text, level = logging.INFO, args = {}):    
+        event = Event(type=EVENT_LOG)
+        event.dict['data'] = text
+        event.dict['owner'] = "strategy_" + self.name
+        event.dict['level'] = level
+        self.agent.eventEngine.put(event)
+        
     def initialize(self):
         self.load_state()
-        dtoday = date2xl(self.agent.scur_day) + max(self.agent.tick_id - 600000, 0)/2400000.0
-        for idx, expiry in enumerate(self.expiries):
-            dexp = datetime2xl(expiry)
-            self.DFs[idx] = self.get_DF(dtoday, dexp)
-            fwd = self.get_fwd(idx) 
-            self.last_updated[expiry]['fwd'] = fwd
-            self.last_updated[expiry]['dtoday'] = dtoday
+        for inst in self.underlying:
+            if inst.name in self.underliers:
+                for key in ['delta', '
+
             if self.spot_model:
                 self.option_map.loc[self.underliers[0], 'delta'] = 1.0
                 self.option_map.loc[self.underliers[0], 'df'] = 1.0
             else:
                 self.option_map.loc[self.underliers[idx], 'delta'] = self.DFs[idx]
                 self.option_map.loc[self.underliers[idx], 'df'] = self.DFs[idx]
-            if self.volgrids[expiry] == None:
-                self.volgrids[expiry] = pyktlib.Delta5VolNode(dtoday, dexp, fwd, 0.24, 0.0, 0.0, 0.0, 0.0, self.accrual)                
-            self.volgrids[expiry].setFwd(fwd)
-            self.volgrids[expiry].setToday(dtoday)
-            self.volgrids[expiry].setExp(dexp)
-            self.volgrids[expiry].initialize()
-            if self.spot_model:
-                cont_mth = expiry.year * 100 + expiry.month
-            else:
-                cont_mth = self.agent.instruments[self.underliers[idx]].cont_mth
             indices = self.option_map[(self.option_map.cont_mth == cont_mth) & (self.option_map.otype != 0)].index
             for inst in indices:
                 strike = self.option_map.loc[inst].strike
                 otype  = self.option_map.loc[inst].otype
                 if not self.spot_model:
                     self.option_map.loc[inst, 'df'] = self.DFs[idx]
-                self.option_insts[inst] = self.pricer(dtoday, dexp, fwd, self.volgrids[expiry], strike, self.irate, otype)
-                self.update_greeks(inst)
         self.update_pos_greeks()
         self.update_group_risk()
         self.update_margin()
-        self.is_initialized = True
+        self.update_trade_unit()
     
     def update_margin(self):
         for inst in self.instIDs:
@@ -227,23 +196,24 @@ class OptionStrategy(object):
     def day_finalize(self):    
         self.save_state()
         self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
-        self.is_initialized = False
         
-    def get_option_map(self, underliers, expiries, strikes):
-        opt_map = {}
-        for under, expiry, ks in zip(underliers, expiries, strikes):
-            exch = inst2exch(under)
-            for otype in ['C', 'P']:
-                for strike in ks:
-                    cont_mth = int(under[-4:]) + 200000
-                    key = (str(under), cont_mth, otype, strike)
-                    instID = under
-                    if instID[:2] == "IF":
-                        instID = instID.replace('IF', 'IO')
-                    instID = instID + '-' + otype + '-' + str(strike)
-                    opt_map[key] = instID
-        return opt_map
-    
+    def get_option_map(self, products):
+        option_map = {}
+        for under in self.products:
+            for cont_mth in self.products[under]:
+                for strike in self.products[under][cont_mth]:
+                    for otype in ['C', 'P']:
+                        key = (str(under), cont_mth, otype, strike)
+                        instID = under
+                        if instID[:2] == "IF":
+                            instID = instID.replace('IF', 'IO')
+                        if exch == 'CZCE':
+                            instID = instID + otype + str(strike)
+                        else:
+                            instID = instID + '-' + otype + '-' + str(strike)
+                        option_map[key] = instID
+        return option_map
+ 
     def tick_run(self, ctick):
         pass
 
@@ -284,10 +254,8 @@ class OptionStrategy(object):
         
 class EquityOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
-        OptionStrategy.__init__(self, name, underliers, expiries, strikes, agent)
-        self.accrual = 'SSE'
+        OptionStrategy.__init__(self, name, underliers, expiries, strikes, agent)        
         self.proxy_flag = {'delta': True, 'gamma': True, 'vega': True, 'theta': True}
-        self.spot_model = True
         self.dividends = [(datetime.date(2015,4,20), 0.0), (datetime.date(2015,11,20), 0.10)]
         
     def get_option_map(self, underliers, expiries, strikes):
@@ -305,17 +273,12 @@ class EquityOptStrat(OptionStrategy):
 class IndexFutOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
         OptionStrategy.__init__(self, name, underliers, expiries, strikes, agent)
-        self.accrual = 'CFFEX'
         self.proxy_flag = {'delta': True, 'gamma': True, 'vega': True, 'theta': True} 
-        self.spot_model = False
 
 class CommodOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
         OptionStrategy.__init__(self, name, underliers, expiries, strikes, agent)
-        self.accrual = 'COMN1'
         self.proxy_flag = {'delta': False, 'gamma': False, 'vega': True, 'theta': True} 
-        self.spot_model = False
-        self.pricer = pyktlib.AmericanFutPricer  
         
 class OptArbStrat(CommodOptStrat):
     def __init__(self, name, underliers, expiries, strikes, agent = None):
