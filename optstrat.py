@@ -103,22 +103,13 @@ class OptionStrategy(object):
         
     def initialize(self):
         self.load_state()
-        for inst in self.underlying:
-            if inst.name in self.underliers:
-                for key in ['delta', '
-
-            if self.spot_model:
-                self.option_map.loc[self.underliers[0], 'delta'] = 1.0
-                self.option_map.loc[self.underliers[0], 'df'] = 1.0
-            else:
-                self.option_map.loc[self.underliers[idx], 'delta'] = self.DFs[idx]
-                self.option_map.loc[self.underliers[idx], 'df'] = self.DFs[idx]
-            indices = self.option_map[(self.option_map.cont_mth == cont_mth) & (self.option_map.otype != 0)].index
-            for inst in indices:
-                strike = self.option_map.loc[inst].strike
-                otype  = self.option_map.loc[inst].otype
-                if not self.spot_model:
-                    self.option_map.loc[inst, 'df'] = self.DFs[idx]
+        for idx, inst in enumerate(self.underlying):
+            if inst.ptype == ProductType.Option:
+                for key in ['pv', 'delta', 'gamma', 'vega', 'theta']
+                    self.risk_table[key][idx] = getattr(inst, key)
+                prod = inst.product
+                expiry = inst.expiry
+                self.risk_table['df'][idx] = self.agent.volgrid[prod].df[expiry]
         self.update_pos_greeks()
         self.update_group_risk()
         self.update_margin()
