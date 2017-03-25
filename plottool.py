@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import backtest
 import misc
 import datetime

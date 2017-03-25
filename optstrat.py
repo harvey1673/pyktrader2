@@ -1,4 +1,4 @@
-#-*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
 '''
 optstrat.py
 Created on Feb 03, 2015
@@ -10,26 +10,13 @@ import csv
 import pyktlib
 import mysqlaccess
 import trade
+import instrument
 import numpy as np
 import pandas as pd
 import data_handler as dh
+from eventType import *
+from eventEngine import Event
 from misc import *
-
-def fut2opt(fut_inst, expiry, otype, strike):
-    product = inst2product(fut_inst)
-    if product == 'IF':
-        optkey = fut_inst.replace('IF','IO')
-    else:
-        optkey = product
-    if product == 'Stock':
-        optkey = optkey + otype + expiry.strftime('%y%m')
-    else:
-        optkey + '-' + otype.upper() + '-'
-    opt_inst = optkey + str(int(strike))
-    return opt_inst
-
-def get_opt_margin(fut_price, strike, type):
-    return 0.0
 
 class OptionStrategy(object):
     common_params = {'name': 'opt_m', 'products':{'m1705': {201705: [2800, 2850, 2900, 2950, 3000]}, \
@@ -40,8 +27,13 @@ class OptionStrategy(object):
         self.underliers = self.products.keys()                
         self.option_insts = self.get_option_map(self.products)
         self.instIDs = self.underliers + self.option_insts.values()
-        self.inst_map = dict([(instID, i) for i, instID in enumerate(self.instIDs)])        
+        self.inst_map = dict([(instID, i) for i, instID in enumerate(self.instIDs)])
         self.underlying = [None] * len(self.instIDs)
+        self.expiry_map = {}
+        for inst in self.underlying:
+            if inst.ptype == instrument.ProductType.Option:
+               if (inst.underlying, inst.cont_mth) not in self.expiry_map:
+                   self.expiry_map[(inst.underlying, inst.cont_mth)] = inst.expiry
         self.risk_table = dh.DynamicRecArray(dtype = \
                                [('name', '|S50'), ('product', '|S50'), ('underlying', '|S50'), ('cont_mth', 'i8'), \
                                 ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'),\
@@ -83,7 +75,7 @@ class OptionStrategy(object):
                         'delta': 1.0, 'gamma': 0.0, 'vega': 0.0, 'theta': 0.0, }
             if inst not in self.underliers:
                 for key in ['underlying', 'otype', 'strike']:
-                    data_dict[key] = getaatr(inst, key)
+                    data_dict[key] = getattr(inst, key)
             self.risk_table.append_by_dict(data_dict)
         self.register_func_freq()
         self.register_bar_freq()
@@ -104,42 +96,31 @@ class OptionStrategy(object):
     def initialize(self):
         self.load_state()
         for idx, inst in enumerate(self.underlying):
-            if inst.ptype == ProductType.Option:
-                for key in ['pv', 'delta', 'gamma', 'vega', 'theta']
+            if inst.ptype == instrument.ProductType.Option:
+                for key in ['pv', 'delta', 'gamma', 'vega', 'theta']:
                     self.risk_table[key][idx] = getattr(inst, key)
                 prod = inst.product
                 expiry = inst.expiry
-                self.risk_table['df'][idx] = self.agent.volgrid[prod].df[expiry]
+                under = self.agent.volgrid[prod].underlier[expiry]
+                self.risk_table['df'][idx] = self.risk_table['df'][self.inst_map[under]] = self.agent.volgrid[prod].df[expiry]
         self.update_pos_greeks()
-        self.update_group_risk()
         self.update_margin()
         self.update_trade_unit()
     
     def update_margin(self):
         for inst in self.instIDs:
             if inst in self.underliers:
-                self.option_map.loc[inst, 'margin_long'] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY)
-                self.option_map.loc[inst, 'margin_short'] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL)
+                self.risk_table['margin_long'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY)
+                self.risk_table['margin_short'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL)
             else:
                 under = self.agent.instruments[inst].underlying
-                under_price = self.agent.instruments[under].price
-                self.option_map.loc[inst, 'margin_long'] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY, under_price)
-                self.option_map.loc[inst, 'margin_short'] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL, under_price)
-                 
-    def update_greeks(self, inst): 
-        '''update option instrument greeks'''
-        #multiple = self.option_map.loc[inst, 'multiple']
-        pv = self.option_insts[inst].price() 
-        delta = self.option_insts[inst].delta()
-        gamma = self.option_insts[inst].gamma()
-        vega  = self.option_insts[inst].vega()/100.0
-        theta = self.option_insts[inst].theta()
-        df = self.option_map.loc[inst, 'df']
-        opt_info = {'pv': pv, 'delta': delta/df, 'gamma': gamma/df/df, 'vega': vega, 'theta': theta}
-        self.option_map.loc[inst, opt_info.keys()] = pd.Series(opt_info)
+                under_price = self.agent.instruments[under].mid_price
+                self.risk_table['margin_long'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY, under_price)
+                self.risk_table['margin_short'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL, under_price)
     
-    def update_pos_greeks(self):
+    def update_pos_greeks(self, prod):
         '''update position greeks according to current positions'''
+
         keys = ['pv', 'delta', 'gamma', 'vega', 'theta']
         for key in keys:
             pos_key = 'p' + key
@@ -249,17 +230,13 @@ class EquityOptStrat(OptionStrategy):
         self.proxy_flag = {'delta': True, 'gamma': True, 'vega': True, 'theta': True}
         self.dividends = [(datetime.date(2015,4,20), 0.0), (datetime.date(2015,11,20), 0.10)]
         
-    def get_option_map(self, underliers, expiries, strikes):
-        cont_mths = [expiry.year*100 + expiry.month for expiry in expiries]
-        all_map = {}
-        for under in underliers:
-            map = mysqlaccess.get_stockopt_map(under, cont_mths, strikes)
-            all_map.update(map)
-        return all_map
-    
-    def get_fwd(self, idx):
-        spot = self.agent.instruments[self.underliers[0]].price
-        return spot*self.DFs[idx]
+    def get_option_map(self, products):
+        option_map = {}
+        for under in self.products:
+            for cont_mth in self.products[under]:
+                map = mysqlaccess.get_stockopt_map(under, [cont_mth], self.products[under][cont_mth])
+                option_map.update(map)
+        return option_map
     
 class IndexFutOptStrat(OptionStrategy):
     def __init__(self, name, underliers, expiries, strikes, agent = None):

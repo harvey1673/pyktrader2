@@ -1,8 +1,4 @@
-'''
-Created on Jun 07, 2014
-@author: Harvey
-'''
-
+# -*- coding: utf-8 -*-
 import datetime
 import numpy
 import mysql.connector

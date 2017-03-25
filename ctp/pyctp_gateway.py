@@ -1,4 +1,4 @@
-# encoding: UTF-8
+# -*- coding: utf-8 -*-
 import os
 import pyctp.futures as py_ctp
 from base import *
