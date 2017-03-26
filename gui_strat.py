@@ -136,13 +136,14 @@ class StratGui(object):
 class DTStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'CloseTday', 'IsDisabled']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'PriceMode', 'CloseTday', 'IsDisabled']
         self.status_fields = ['TradeUnit', 'TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int', 
                             'Ratios': 'float',
+                            'PriceMode': 'str',
                             'Factors': 'float',
                             'CloseTday': 'bool',
                             'IsDisabled': 'bool',

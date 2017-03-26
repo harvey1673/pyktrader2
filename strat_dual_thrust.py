@@ -5,7 +5,8 @@ import logging
  
 class DTTrader(Strategy):
     common_params =  dict({'price_limit_buffer': 5,}, **Strategy.common_params)
-    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, 'daily_close': False, 'factors': 0.0, }, **Strategy.asset_params)
+    asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'min_rng': 0.004, 'cur_ma': 0.0, 'ma_win': 20, \
+                         'daily_close': False, 'factors': 0.0, 'price_mode': 'HL', }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
@@ -65,26 +66,39 @@ class DTTrader(Strategy):
             if self.agent.cur_min[inst]['min_id'] < 300:
                 return
             min_data = self.agent.min_data[inst][freq].data
-            self.check_trigger(idx, min_data['high'][-1], min_data['low'][-1])
+            if self.price_mode[idx] == 'HL':
+                buy_p = min_data['high'][-1]
+                sell_p = min_data['low'][-1]
+            elif self.price_mode[idx] == 'C':
+                buy_p = min_data['close'][-1]
+                sell_p = buy_p
+            elif self.price_mode[idx] == 'TP':
+                buy_p = (min_data['high'][-1] + min_data['low'][-1] + min_data['close'][-1])/3.0
+                sell_p = buy_p
+            else:
+                self.on_log('Unsupported price type for strat=%s inst=%s' % (self.name, inst), level = logging.WARNING)
+            save_status = self.check_trigger(idx, buy_p, sell_p)
+            return save_status
             
     def on_tick(self, idx, ctick):
         if self.freq[idx] == 0:
             self.check_trigger(idx, self.curr_prices[idx], self.curr_prices[idx])
     
-    def check_trigger(self, idx, buy_price, sell_price): 
+    def check_trigger(self, idx, buy_price, sell_price):
+        save_status = False
         if len(self.submitted_trades[idx]) > 0:
-            return
+            return save_status
         inst = self.underliers[idx][0]
         self.tday_open[idx] = self.agent.cur_day[inst]['open']
         if (self.tday_open[idx] <= 0.0) or (self.cur_rng[idx] <= 0) or (self.curr_prices[idx] <= 0.001):
             self.on_log("warning: open price =0.0 or range = 0.0 or curr_price=0 for inst=%s for stat = %s" % (inst, self.name), level = logging.WARNING)
-            return
+            return save_status
         min_id = self.agent.tick_id/1000.0
         num_pos = len(self.positions[idx])
         buysell = 0
         if num_pos > 1:
             self.on_log('something wrong with position management - submitted trade is empty but trade position is more than 1', level = logging.WARNING)
-            return
+            return save_status
         elif num_pos == 1:
             buysell = self.positions[idx][0].direction
         tick_base = self.tick_base[idx]
@@ -105,18 +119,17 @@ class DTTrader(Strategy):
                         % (inst, buysell, self.trade_unit[idx], min_id)
                 self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
-                self.save_state()
-            return
-
+                save_status = True
+            return save_status
         if ((buy_price >= buy_trig) and (buysell <=0)) or ((sell_price <= sell_trig) and (buysell >=0)):
             if buysell!=0:
                 msg = 'DT to close position for inst = %s, open= %s, buy_trig=%s, sell_trig=%s, curr_price= %s, direction=%s, volume=%s' \
                                     % (inst, self.tday_open[idx], buy_trig, sell_trig, self.curr_prices[idx], buysell, self.trade_unit[idx])
                 self.close_tradepos(idx, self.positions[idx][0], self.curr_prices[idx] - buysell * self.num_tick * tick_base)
                 self.status_notifier(msg)
-                self.save_state()
+                save_status = True
             if self.trade_unit[idx] <= 0:
-                return
+                return save_status
             if  (buy_price >= buy_trig):
                 buysell = 1
             else:
@@ -125,4 +138,5 @@ class DTTrader(Strategy):
                                     % (inst, self.tday_open[idx], buy_trig, sell_trig, self.curr_prices[idx], buysell, self.trade_unit[idx])
             self.open_tradepos(idx, buysell, self.curr_prices[idx] + buysell * self.num_tick * tick_base)
             self.status_notifier(msg)
-            self.save_state()
+            save_status = True
+        return save_status

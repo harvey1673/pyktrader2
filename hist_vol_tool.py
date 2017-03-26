@@ -172,15 +172,16 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
                     'delta_func': 'bsopt.BSDelta',
                     }
     for cont, expiry in zip(contlist, exp_dates):
-        if expiry > end_d:
+        expiry_d = expiry.date()
+        if expiry_d > end_d:
             break
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
-        d_start = day_shift(expiry, p_str)
-        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry, database = 'hist_data')
-        option_input['expiry'] = expiry
+        d_start = day_shift(expiry_d, p_str)
+        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database = 'hist_data')
+        option_input['expiry'] = expiry_d
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
-        print cont, expiry, vol_df
+        print cont, expiry_d, vol_df
 
 def variance_ratio(ts, freqs):
     data = ts.values
