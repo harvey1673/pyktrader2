@@ -19,7 +19,7 @@ YEARLY_DAYS = 365.25
 def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
     CF = 0.0
     strike = option_input['strike']
-    otype = option_input.get('otype', 1)
+    otype = option_input.get('otype', True)
     expiry = option_input['expiry']
     rd = option_input['rd']
     rf = option_input.get('rf', rd)
@@ -38,11 +38,10 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
 
 def realized_vol(df, option_input, calib_input, column = 'close'):
     strike = option_input['strike']
-    otype = option_input.get('otype', 1)
+    otype = option_input.get('otype', True)
     expiry = option_input['expiry']
     rd = option_input['rd']
     rf = option_input.get('rf', rd)
-    
     ref_vol = calib_input.get('ref_vol', 0.5)
     opt_payoff = calib_input.get('opt_payoff', 0.0)
     rehedge_period = calib_input.get('rehedge_period', 1)
@@ -91,6 +90,7 @@ def realized_termstruct(option_input, data):
     column = data.get('data_column', 'close')
     xs = data.get('xs', [0.5])
     xs_cols = data.get('xs_names', ['atm'])
+    use_bootstrap = data.get('use_bootstrap', False)
     xs_func = data.get('xs_func', 'bs_delta_to_ratio')
     xs_func = eval(xs_func)
     term_tenor = data.get('term_tenor', '-1m')
@@ -98,11 +98,12 @@ def realized_termstruct(option_input, data):
     calib_input = {}
     calib_input['rehedge_period'] = data.get('rehedge_period', 1)
     expiry = option_input['expiry']
-    otype = option_input.get('otype', 1)
+    otype = option_input.get('otype', True)
     ref_vol = option_input.get('ref_vol', 0.5)
     rd = option_input['rd']
     rf = option_input.get('rf', rd)
     end_vol = option_input.get('end_vol', 0.0)
+    vol = end_vol
     pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSOpt'))
     if is_dtime:
         datelist = df['date']
@@ -113,12 +114,19 @@ def realized_termstruct(option_input, data):
     xdf = df[datelist <= dexp]
     datelist = datelist[datelist <= dexp]    
     end_d  = datelist[-1]
+    start_d = end_d
     final_value = 0.0
     vol_ts = pd.DataFrame(columns = xs_cols )
     roll_idx = 0
-    while end_d > datelist[0]:
+    while start_d > datelist[0]:
+        if use_bootstrap:
+            end_vol = vol
+            end_d = start_d
+            start_d = day_shift(end_d, term_tenor)
+        else:
+            end_vol = 0
+            start_d = day_shift(start_d, term_tenor)
         roll_idx += 1
-        start_d = day_shift(end_d, term_tenor)
         sub_df = xdf[(datelist <= end_d) & (datelist > start_d)]
         if len(sub_df) < 2:
             break
@@ -127,7 +135,7 @@ def realized_termstruct(option_input, data):
             strike = sub_df[column][0]
             texp = (expiry - start_d).days/YEARLY_DAYS
             if idx > 0:
-                strike *= xs_func(xs[idx], vols[0], texp)
+                strike = strike / xs_func(xs[idx], vols[0], texp)
             option_input['strike'] = strike
             if end_vol > 0:
                 tau = (expiry - end_d).days/YEARLY_DAYS
@@ -144,8 +152,6 @@ def realized_termstruct(option_input, data):
             calib_input['opt_payoff'] = final_value
             vol = realized_vol(sub_df, option_input, calib_input, column)
             vols.append(vol)
-            end_vol = vol
-            end_d = start_d
         tenor_str = str(roll_idx * int(term_tenor[-2])) + term_tenor[-1]
         vol_ts.ix[tenor_str, :] = vols
     return vol_ts
@@ -157,17 +163,17 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
     data = {'is_dtime': False,
             'data_column': 'close',
-            'xs': [0.5, 0.25, 0.75],
-            'xs_names': ['atm', 'd25', 'd75'],
+            'xs': [0.5],
+            'xs_names': ['atm'],
             'xs_func': 'bs_delta_to_ratio',
             'rehedge_period': 1,
             'term_tenor': tenor,
             }
-    option_input = {'otype': 1,
+    option_input = {'otype': True,
                     'rd': 0.0,
                     'rf': 0.0,
                     'end_vol': 0.0,
-                    'ref_vol': 0.2,
+                    'ref_vol': 0.5,
                     'pricer_func': 'bsopt.BSOpt',
                     'delta_func': 'bsopt.BSDelta',
                     }
@@ -177,7 +183,7 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
             break
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
         d_start = day_shift(expiry_d, p_str)
-        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database = 'hist_data')
+        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database = 'blueshale')
         option_input['expiry'] = expiry_d
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
