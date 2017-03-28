@@ -114,7 +114,7 @@ def realized_termstruct(option_input, data):
     xdf = df[datelist <= dexp]
     datelist = datelist[datelist <= dexp]    
     end_d  = datelist[-1]
-    start_d = end_d
+    start_d = end_d    
     final_value = 0.0
     vol_ts = pd.DataFrame(columns = xs_cols )
     roll_idx = 0
@@ -124,7 +124,7 @@ def realized_termstruct(option_input, data):
             end_d = start_d
             start_d = day_shift(end_d, term_tenor)
         else:
-            end_vol = 0
+            end_vol = 0.0
             start_d = day_shift(start_d, term_tenor)
         roll_idx += 1
         sub_df = xdf[(datelist <= end_d) & (datelist > start_d)]
@@ -148,7 +148,7 @@ def realized_termstruct(option_input, data):
                     final_value = max((strike - sub_df[column][-1]), 0)
             elif end_vol == None:
                 raise ValueError, 'no vol is found to match PnL'
-            calib_input['ref_vol'] = ref_vol
+            calib_input['ref_vol'] = 0.5
             calib_input['opt_payoff'] = final_value
             vol = realized_vol(sub_df, option_input, calib_input, column)
             vols.append(vol)
