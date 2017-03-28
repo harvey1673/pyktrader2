@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import math
 import mysqlaccess
+import backtest
+import data_handler as dh
 from scipy.stats import norm
 from misc import *
 
@@ -148,7 +150,7 @@ def realized_termstruct(option_input, data):
                     final_value = max((strike - sub_df[column][-1]), 0)
             elif end_vol == None:
                 raise ValueError, 'no vol is found to match PnL'
-            calib_input['ref_vol'] = 0.5
+            calib_input['ref_vol'] = 0.8
             calib_input['opt_payoff'] = final_value
             vol = realized_vol(sub_df, option_input, calib_input, column)
             vols.append(vol)
@@ -159,15 +161,16 @@ def realized_termstruct(option_input, data):
 def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
     cont_mth, exch = mysqlaccess.prod_main_cont_exch(prodcode)
     contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
-    print contlist
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
-    data = {'is_dtime': False,
+    data = {'is_dtime': True,
             'data_column': 'close',
-            'xs': [0.5],
-            'xs_names': ['atm'],
+            'data_freq': '30min',
+            'xs': [0.5, 0.1, 0.25, 0.75, 0.9],
+            'xs_names': ['atm', 'v10', 'v25', 'v75', 'v90'],
             'xs_func': 'bs_delta_to_ratio',
             'rehedge_period': 1,
             'term_tenor': tenor,
+            'database': 'hist_data'
             }
     option_input = {'otype': True,
                     'rd': 0.0,
@@ -177,14 +180,22 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
                     'pricer_func': 'bsopt.BSOpt',
                     'delta_func': 'bsopt.BSDelta',
                     }
+    freq = data['data_freq']
     for cont, expiry in zip(contlist, exp_dates):
         expiry_d = expiry.date()
         if expiry_d > end_d:
             break
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
         d_start = day_shift(expiry_d, p_str)
-        df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database = 'blueshale')
-        option_input['expiry'] = expiry_d
+        if freq == 'd':
+            df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database=data['database'])
+        else:
+            mdf = mysqlaccess.load_min_data_to_df('fut_min', cont, d_start, expiry_d, minid_start=300,
+                                                  minid_end=2115, database = data['database'])
+            mdf = backtest.cleanup_mindata(mdf, prodcode)
+            mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
+            df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'])
+        option_input['expiry'] = expiry
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry_d, vol_df
