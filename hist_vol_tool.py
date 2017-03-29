@@ -1,6 +1,7 @@
 import bsopt
 import copy
 import dateutil
+import pyktlib
 import pandas as pd
 import numpy as np
 import math
@@ -33,7 +34,7 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         nxt_idx = min((pidx + 1) * rehedge_period, nlen)
         if nxt_idx >= nlen -1:
             break
-        tau = (expiry - df.index[idx]).days/YEARLY_DAYS
+        tau = ((expiry - df.index[idx]).days + 1 - pyktlib.GetDayFraction(datetime2xl(df.index[idx]), "COMN1"))/YEARLY_DAYS
         opt_delta = delta_func(otype, df[column][idx], strike, vol, tau, rd, rf)
         CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
     return CF
