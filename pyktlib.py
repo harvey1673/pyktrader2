@@ -696,6 +696,102 @@ class HistVolCalculator(_object):
 HistVolCalculator_swigregister = _pyktlib.HistVolCalculator_swigregister
 HistVolCalculator_swigregister(HistVolCalculator)
 
+
+def xl2weekday(xldate):
+    return _pyktlib.xl2weekday(xldate)
+xl2weekday = _pyktlib.xl2weekday
+
+def isweekday(xldate):
+    return _pyktlib.isweekday(xldate)
+isweekday = _pyktlib.isweekday
+
+def businessDays(startD, endD, hols):
+    return _pyktlib.businessDays(startD, endD, hols)
+businessDays = _pyktlib.businessDays
+
+def NumBusDays(startD, endD, hols):
+    return _pyktlib.NumBusDays(startD, endD, hols)
+NumBusDays = _pyktlib.NumBusDays
+
+def NextBusDay(startD, hols):
+    return _pyktlib.NextBusDay(startD, hols)
+NextBusDay = _pyktlib.NextBusDay
+
+def GetDayFraction(dExp, accrual):
+    return _pyktlib.GetDayFraction(dExp, accrual)
+GetDayFraction = _pyktlib.GetDayFraction
+
+def norm_rand():
+    return _pyktlib.norm_rand()
+norm_rand = _pyktlib.norm_rand
+
+def ExcelSerialDateToDMY(nSerialDate, nDay, nMonth, nYear):
+    return _pyktlib.ExcelSerialDateToDMY(nSerialDate, nDay, nMonth, nYear)
+ExcelSerialDateToDMY = _pyktlib.ExcelSerialDateToDMY
+
+def DMYToExcelSerialDate(nDay, nMonth, nYear):
+    return _pyktlib.DMYToExcelSerialDate(nDay, nMonth, nYear)
+DMYToExcelSerialDate = _pyktlib.DMYToExcelSerialDate
+
+def resizeMatrix(*args):
+    return _pyktlib.resizeMatrix(*args)
+resizeMatrix = _pyktlib.resizeMatrix
+
+def size1(*args):
+    return _pyktlib.size1(*args)
+size1 = _pyktlib.size1
+
+def size2(*args):
+    return _pyktlib.size2(*args)
+size2 = _pyktlib.size2
+
+def transpose(m):
+    return _pyktlib.transpose(m)
+transpose = _pyktlib.transpose
+
+def range(*args):
+    return _pyktlib.range(*args)
+range = _pyktlib.range
+
+def zeros(n):
+    return _pyktlib.zeros(n)
+zeros = _pyktlib.zeros
+
+def ones(n):
+    return _pyktlib.ones(n)
+ones = _pyktlib.ones
+
+def add(*args):
+    return _pyktlib.add(*args)
+add = _pyktlib.add
+
+def subtract(*args):
+    return _pyktlib.subtract(*args)
+subtract = _pyktlib.subtract
+
+def multItems(*args):
+    return _pyktlib.multItems(*args)
+multItems = _pyktlib.multItems
+
+def matrixMult(result, m1, m2):
+    return _pyktlib.matrixMult(result, m1, m2)
+matrixMult = _pyktlib.matrixMult
+
+def sum(m):
+    return _pyktlib.sum(m)
+sum = _pyktlib.sum
+
+def divItems(*args):
+    return _pyktlib.divItems(*args)
+divItems = _pyktlib.divItems
+
+def applyFun(*args):
+    return _pyktlib.applyFun(*args)
+applyFun = _pyktlib.applyFun
+
+def matrixVectorMult(result, m, v):
+    return _pyktlib.matrixVectorMult(result, m, v)
+matrixVectorMult = _pyktlib.matrixVectorMult
 class IntVector(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, IntVector, name, value)
@@ -808,6 +904,9 @@ class IntVector(_object):
     __del__ = lambda self: None
 IntVector_swigregister = _pyktlib.IntVector_swigregister
 IntVector_swigregister(IntVector)
+cvar = _pyktlib.cvar
+Yearly_Accrual_Days = cvar.Yearly_Accrual_Days
+CHN_Holidays = cvar.CHN_Holidays
 
 class DblVector(_object):
     __swig_setmethods__ = {}

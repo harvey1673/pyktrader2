@@ -28,15 +28,19 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
     rf = option_input.get('rf', rd)
     dfunc_name = option_input.get('delta_func', 'bsopt.BSDelta')
     delta_func = eval(dfunc_name)
+    is_dtime = option_input.get('is_dtime', False)
+    day_frac = 1.0
     nlen = len(df.index)
     for pidx in range(int(nlen/rehedge_period)):
         idx = pidx * rehedge_period
         nxt_idx = min((pidx + 1) * rehedge_period, nlen)
         if nxt_idx >= nlen -1:
             break
-        tau = ((expiry - df.index[idx]).days + 1 - pyktlib.GetDayFraction(datetime2xl(df.index[idx]), "COMN1"))/YEARLY_DAYS
-        opt_delta = delta_func(otype, df[column][idx], strike, vol, tau, rd, rf)
-        CF = CF + opt_delta * (df[column][nxt_idx] - df[column][idx])
+        if is_dtime:
+            day_frac = 1.0 - pyktlib.GetDayFraction(datetime2xl(df['datetime'].iat[idx]), 'COMN1')
+        tau = max((expiry.date() - df['date'].iat[idx].date()).days, day_frac)/YEARLY_DAYS
+        opt_delta = delta_func(otype, df[column].iat[idx], strike, vol, tau, rd, rf)
+        CF = CF + opt_delta * (df[column].iat[nxt_idx] - df[column].iat[idx])
     return CF
 
 def realized_vol(df, option_input, calib_input, column = 'close'):
@@ -48,18 +52,14 @@ def realized_vol(df, option_input, calib_input, column = 'close'):
     ref_vol = calib_input.get('ref_vol', 0.5)
     opt_payoff = calib_input.get('opt_payoff', 0.0)
     rehedge_period = calib_input.get('rehedge_period', 1)
-    fwd = df[column][0]
-    is_dtime = calib_input.get('is_dtime', False)
+    fwd = df[column].iat[0]
     pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSOpt'))
-
-    if expiry < df.index[-1]:
+    if expiry.date() < df['date'].iat[-1].date():
         raise ValueError, 'Expiry time must be no earlier than the end of the time series'
     numTries = 0
     diff = 1000.0
-    start_d = df.index[0]
-    if is_dtime:
-        start_d = start_d.date()
-    tau = (expiry - start_d).days/YEARLY_DAYS
+    start_d = df['date'].iat[0].date()
+    tau = max((expiry.date() - start_d).days, 1.0)/YEARLY_DAYS
     vol = ref_vol
     def func(x):
         return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, rehedge_period, column) - opt_payoff
@@ -112,16 +112,16 @@ def realized_termstruct(option_input, data):
         datelist = df['date']
         dexp = expiry.date()
     else:
-        datelist = df.index
+        datelist = df['date']
         dexp = expiry
     xdf = df[datelist <= dexp]
-    datelist = datelist[datelist <= dexp]    
-    end_d  = datelist[-1]
-    start_d = end_d    
+    datelist = datelist[datelist <= dexp]
+    end_d  = datelist.iat[-1].date()
+    start_d = end_d
     final_value = 0.0
     vol_ts = pd.DataFrame(columns = xs_cols )
     roll_idx = 0
-    while start_d > datelist[0]:
+    while start_d > datelist.iat[0].date():
         if use_bootstrap:
             end_vol = vol
             end_d = start_d
@@ -135,23 +135,23 @@ def realized_termstruct(option_input, data):
             break
         vols = []
         for idx, x in enumerate(xs):
-            strike = sub_df[column][0]
-            texp = (expiry - start_d).days/YEARLY_DAYS
+            strike = sub_df[column].iat[0]
+            texp = (expiry.date() - start_d).days/YEARLY_DAYS
             if idx > 0:
                 strike = strike / xs_func(xs[idx], vols[0], texp)
             option_input['strike'] = strike
             if end_vol > 0:
-                tau = (expiry - end_d).days/YEARLY_DAYS
-                final_value = pricer_func(otype, sub_df[column][-1], strike, end_vol, tau, rd, rf)
+                tau = max((expiry.date() - end_d).days, 1.0)/YEARLY_DAYS
+                final_value = pricer_func(otype, sub_df[column].iat[-1], strike, end_vol, tau, rd, rf)
                 ref_vol = end_vol
             elif end_vol == 0:
                 if otype:
-                    final_value = max((sub_df[column][-1] - strike), 0)
+                    final_value = max((sub_df[column].iat[-1] - strike), 0)
                 else:
-                    final_value = max((strike - sub_df[column][-1]), 0)
+                    final_value = max((strike - sub_df[column].iat[-1]), 0)
             elif end_vol == None:
                 raise ValueError, 'no vol is found to match PnL'
-            calib_input['ref_vol'] = 0.8
+            calib_input['ref_vol'] = 0.5
             calib_input['opt_payoff'] = final_value
             vol = realized_vol(sub_df, option_input, calib_input, column)
             vols.append(vol)
@@ -166,8 +166,8 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
     data = {'is_dtime': True,
             'data_column': 'close',
             'data_freq': '30min',
-            'xs': [0.5, 0.1, 0.25, 0.75, 0.9],
-            'xs_names': ['atm', 'v10', 'v25', 'v75', 'v90'],
+            'xs': [0.5, 0.25, 0.75],
+            'xs_names': ['atm', 'v25', 'v75'],
             'xs_func': 'bs_delta_to_ratio',
             'rehedge_period': 1,
             'term_tenor': tenor,
@@ -180,6 +180,7 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
                     'ref_vol': 0.5,
                     'pricer_func': 'bsopt.BSOpt',
                     'delta_func': 'bsopt.BSDelta',
+                    'is_dtime': data['is_dtime'],
                     }
     freq = data['data_freq']
     for cont, expiry in zip(contlist, exp_dates):
@@ -189,13 +190,13 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
         d_start = day_shift(expiry_d, p_str)
         if freq == 'd':
-            df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database=data['database'])
+            df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, d_start, expiry_d, database=data['database'], index_col = None)
         else:
             mdf = mysqlaccess.load_min_data_to_df('fut_min', cont, d_start, expiry_d, minid_start=300,
-                                                  minid_end=2115, database = data['database'])
-            mdf = backtest.cleanup_mindata(mdf, prodcode)
+                                                  minid_end=2115, database = data['database'], index_col = None)
+            mdf = backtest.cleanup_mindata(mdf, prodcode, index_col = None)
             mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
-            df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'])
+            df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'], index_col = None)
         option_input['expiry'] = expiry
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)

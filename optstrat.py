@@ -171,12 +171,13 @@ class OptionStrategy(object):
         
     def get_option_map(self, products):
         option_map = {}
-        for under in self.products:
-            for cont_mth in self.products[under]:
-                for strike in self.products[under][cont_mth]:
+        for under in products:
+            for cont_mth in products[under]:
+                for strike in products[under][cont_mth]:
                     for otype in ['C', 'P']:
                         key = (str(under), cont_mth, otype, strike)
                         instID = under
+                        exch = inst2exch(instID)
                         if instID[:2] == "IF":
                             instID = instID.replace('IF', 'IO')
                         if exch == 'CZCE':
