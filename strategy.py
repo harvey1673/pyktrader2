@@ -475,7 +475,7 @@ class Strategy(object):
                     else:
                         entry_time = datetime.datetime.strptime(row[6], '%Y%m%d %H:%M:%S %f')
                         entry_price = float(row[5])
-                    tradepos.open(entry_price, pos, entry_time)
+                        tradepos.open(entry_price, pos, entry_time)
                     tradepos.entry_tradeid = int(row[8])
                     tradepos.exit_tradeid = int(row[12])
                     if row[10] in ['', '19700101 00:00:00 000000']:
@@ -484,7 +484,7 @@ class Strategy(object):
                     else:
                         exit_time = datetime.datetime.strptime(row[10], '%Y%m%d %H:%M:%S %f')
                         exit_price = float(row[9])
-                    tradepos.close(exit_price, exit_time)
+                        tradepos.close(exit_price, exit_time)
                     is_added = False
                     if row[0] == 'unwind':
                         idx = self.unwind_key[0]
