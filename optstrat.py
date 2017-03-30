@@ -11,7 +11,6 @@ import pyktlib
 import mysqlaccess
 import trade
 import instrument
-import numpy as np
 import pandas as pd
 import data_handler as dh
 from eventType import *
@@ -22,25 +21,23 @@ class OptionStrategy(object):
     common_params = {'name': 'opt_m', 'products':{'m1705': {201705: [2800, 2850, 2900, 2950, 3000]}, \
                                                   'm1709': {201709: [2800, 2850, 2900, 2950, 3000]}}, \                     
                      'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}
+                     
     def __init__(self, config, agent = None):
         self.load_config(config)
         self.underliers = self.products.keys()                
-        self.option_insts = self.get_option_map(self.products)
-        self.instIDs = self.underliers + self.option_insts.values()
-        self.inst_map = dict([(instID, i) for i, instID in enumerate(self.instIDs)])
+        self.option_map = self.get_option_map(self.products)
+        self.option_insts = self.option_map.values()
+        self.instIDs = self.underliers + self.option_insts        
         self.underlying = [None] * len(self.instIDs)
-        self.expiry_map = {}
-        for inst in self.underlying:
-            if inst.ptype == instrument.ProductType.Option:
-               if (inst.underlying, inst.cont_mth) not in self.expiry_map:
-                   self.expiry_map[(inst.underlying, inst.cont_mth)] = inst.expiry
-        self.risk_table = dh.DynamicRecArray(dtype = \
-                               [('name', '|S50'), ('product', '|S50'), ('underlying', '|S50'), ('cont_mth', 'i8'), \
-                                ('otype', '|S10'), ('strike', 'f8'), ('multiple', 'i8'), ('df', 'f8'),\
-                                ('pos_long', 'i8'), ('pos_short', 'i8'), ('out_short', 'i8'), ('out_short', 'i8'), \
-                                ('margin_long', 'f8'), ('margin_short', 'f8'), \
-                                ('pv', 'f8'), ('delta', 'f8'), ('gamma', 'f8'), ('vega', 'f8'), ('theta', 'f8'), \
-                                ('ppv', 'f8'), ('pdelta', 'f8'), ('pgamma', 'f8'), ('pvega', 'f8'), ('ptheta', 'f8')])                 
+        self.expiry_map = {}        
+        self.risk_table = pd.DataFrame(0, index = self.instIDs(), 
+                                          columns = ['product', 'underlying', 'cont_mth', 'otype', 'strike', \
+                                                     'multiple', 'df', 'margin_long', 'margin_short', \
+                                                     'pos_long', 'pos_short', 'out_long', 'out_short', 'under_price',\
+                                                     'pv', 'delta', 'gamma', 'vega', 'theta', \
+                                                     'ppv', 'pdelta', 'pgamma', 'pvega', 'ptheta'])     
+        self.risk_table['underlying'] = self.risk_table.index
+        self.risk_table['df'] = 1.0
         self.agent = agent
         self.folder = ''
         self.submitted_pos = dict([(inst, []) for inst in self.instIDs])
@@ -62,6 +59,18 @@ class OptionStrategy(object):
         with open(fname, 'w') as ofile:
             json.dump(config, ofile)
 
+    def save_state(self):
+        filename = self.folder + 'strat_status.csv'
+        self.on_log('save state for strat = %s' % self.name, level = logging.DEBUG)
+        out_df = self.risk_table(['pos_long', 'pos_short', 'out_long', 'out_short'])
+        out_df.to_csv(filename, sep = ',')
+            
+    def load_state(self):
+        self.on_log('load state for strat = %s' % self.name, level = logging.DEBUG)
+        filename = self.folder + 'strat_status.csv'
+        out_df = pd.read_csv(filename)
+        self.risk_table.update(out_df)
+    
     def dep_instIDs(self):
         return self.instIDs
 
@@ -70,13 +79,16 @@ class OptionStrategy(object):
         self.folder = self.agent.folder + self.name + '_'
         self.underlying = [self.agent.instruments[instID] for instID in self.instIDs]   
         for inst in self.underlying:
-            data_dict = {'name': inst.name, 'product': inst.product, 'underlying': inst.name, 'cont_mth': inst.cont_mth, \
-                        'otype': '', 'strike': 0, 'multiple': inst.multiple, 'df': 1.0, \
-                        'delta': 1.0, 'gamma': 0.0, 'vega': 0.0, 'theta': 0.0, }
-            if inst not in self.underliers:
-                for key in ['underlying', 'otype', 'strike']:
-                    data_dict[key] = getattr(inst, key)
-            self.risk_table.append_by_dict(data_dict)
+            if inst.ptype == instrument.ProductType.Option:
+               if (inst.underlying, inst.cont_mth) not in self.expiry_map:
+                   self.expiry_map[(inst.underlying, inst.cont_mth)] = inst.expiry
+        for key in ['product', 'cont_mth', 'multiple']:
+            self.risk_table[key] = [ getattr(inst, key) for inst in self.underlying ]         
+        idx = len(self.underliers)
+        for key in ['underlying', 'otype', 'strike', 'pv', 'delta', 'gamma', 'vega', 'theta']:
+            self.risk_table[key][idx:] = [ getattr(inst, key) for inst in self.underlying[idx:] ]
+        for under, inst in zip(self.underliers, self.underlying[:idx]):
+            self.risk_table[self.risk_table['underlying'] == under]['under_price'] = inst.mid_price
         self.register_func_freq()
         self.register_bar_freq()
 
@@ -95,32 +107,21 @@ class OptionStrategy(object):
         
     def initialize(self):
         self.load_state()
-        for idx, inst in enumerate(self.underlying):
-            if inst.ptype == instrument.ProductType.Option:
-                for key in ['pv', 'delta', 'gamma', 'vega', 'theta']:
-                    self.risk_table[key][idx] = getattr(inst, key)
-                prod = inst.product
-                expiry = inst.expiry
-                under = self.agent.volgrid[prod].underlier[expiry]
-                self.risk_table['df'][idx] = self.risk_table['df'][self.inst_map[under]] = self.agent.volgrid[prod].df[expiry]
+        idx = len(self.underliers)
+        for key in ['pv', 'delta', 'gamma', 'vega', 'theta']:
+            self.risk_table[key][idx:] = [getattr(inst, key) for inst in self.underlying[idx:]]
+        
+            self.risk_table['df'][idx] = self.risk_table['df'][self.inst_map[under]] = self.agent.volgrid[prod].df[expiry]
         self.update_pos_greeks()
         self.update_margin()
         self.update_trade_unit()
     
     def update_margin(self):
-        for inst in self.instIDs:
-            if inst in self.underliers:
-                self.risk_table['margin_long'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY)
-                self.risk_table['margin_short'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL)
-            else:
-                under = self.agent.instruments[inst].underlying
-                under_price = self.agent.instruments[under].mid_price
-                self.risk_table['margin_long'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_BUY, under_price)
-                self.risk_table['margin_short'][self.inst_map[inst]] = self.agent.instruments[inst].calc_margin_amount(ORDER_SELL, under_price)
-    
+        for key in ['margin_long', 'margin_short']:
+            self.risk_table[key] = [ inst.calc_margin_amount(ORDER_BUY, price) for inst, price in zip(self.underlying, self.risk_table['under_price'])]
+
     def update_pos_greeks(self, prod):
         '''update position greeks according to current positions'''
-
         keys = ['pv', 'delta', 'gamma', 'vega', 'theta']
         for key in keys:
             pos_key = 'p' + key
@@ -233,9 +234,9 @@ class EquityOptStrat(OptionStrategy):
         
     def get_option_map(self, products):
         option_map = {}
-        for under in self.products:
-            for cont_mth in self.products[under]:
-                map = mysqlaccess.get_stockopt_map(under, [cont_mth], self.products[under][cont_mth])
+        for under in products:
+            for cont_mth in products[under]:
+                map = mysqlaccess.get_stockopt_map(under, [cont_mth], products[under][cont_mth])
                 option_map.update(map)
         return option_map
     
