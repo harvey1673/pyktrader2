@@ -121,7 +121,7 @@ class Gui(tk.Tk):
                     tk.Label(pos_frame.frame, text = txt).grid(row=row_idx, column=idx)
 
     def tradepos_view(self):
-        params = self.app.get_agent_params(['Risk.pos'])
+        params = self.app.get_agent_params(['Risk.ppos'])
         res = params['Risk']
         sum_risk = {}
         sum_risk['total'] = res['total']

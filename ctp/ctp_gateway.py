@@ -440,7 +440,7 @@ class CtpGateway(GrossGateway):
     def rsp_qry_instrument(self, event):
         data = event.dict['data']
         last = event.dict['last']
-        if data['ProductClass'] == '1' and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
+        if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
             cont = {}
             cont['instID'] = data['InstrumentID']			
             cont['margin_l'] = data['LongMarginRatio']

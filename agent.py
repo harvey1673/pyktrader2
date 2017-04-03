@@ -448,7 +448,7 @@ class Agent(MktDataMixin):
                 iorder.gateway = gway
                 self.ref2order[iorder.order_ref] = iorder
 
-    def risk_by_strats(self, risk_list = ['pos']):
+    def risk_by_strats(self, risk_list = ['ppos']):
         # position = lots, delta, gamma, vega, theta in price
         risk_dict = {}
         sum_risk = dict([(inst, dict([(risk, 0) for risk in risk_list])) for inst in self.instruments])

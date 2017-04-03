@@ -518,7 +518,8 @@ class Strategy(object):
             sum_risk[inst] = dict([(risk, 0) for risk in risk_list])
             for risk in risk_list:
                 try:
-                    inst_risk[inst][risk] = getattr(self.agent.instruments[inst], risk)
+                    prisk = risk[1:]
+                    inst_risk[inst][risk] = getattr(self.agent.instruments[inst], prisk)
                 except:
                     continue
         for idx, under in enumerate(self.tradables):

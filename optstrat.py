@@ -20,8 +20,8 @@ from misc import *
 class OptionStrategy(object):
     common_params = {'name': 'opt_m', 'products':{'m1705': {201705: [2800, 2850, 2900, 2950, 3000]}, \
                                                   'm1709': {201709: [2800, 2850, 2900, 2950, 3000]}}, \                     
-                     'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT'}
-                     
+                     'pos_scaler': 1.0, 'daily_close_buffer': 3, 'exec_class': 'ExecAlgo1DFixT', \
+                     'is_disabled': True,}
     def __init__(self, config, agent = None):
         self.load_config(config)
         self.underliers = self.products.keys()                
@@ -35,14 +35,15 @@ class OptionStrategy(object):
                                                      'multiple', 'df', 'margin_long', 'margin_short', \
                                                      'pos_long', 'pos_short', 'out_long', 'out_short', 'under_price',\
                                                      'pv', 'delta', 'gamma', 'vega', 'theta', \
-                                                     'ppv', 'pdelta', 'pgamma', 'pvega', 'ptheta'])     
+                                                     'ppos', 'ppv', 'pdelta', 'pgamma', 'pvega', 'ptheta'])
         self.risk_table['underlying'] = self.risk_table.index
         self.risk_table['df'] = 1.0
+        self.group_risk = None
         self.agent = agent
         self.folder = ''
         self.submitted_pos = dict([(inst, []) for inst in self.instIDs])
         self.proxy_flag = {'delta': False, 'gamma': True, 'vega': True, 'theta': True} 
-        self.hedge_config = {'order_type': OPT_LIMIT_ORDER, 'num_tick':1}        
+        self.hedge_config = {'order_type': OPT_LIMIT_ORDER, 'num_tick': 1}
 
     def load_config(self, config):
         d = self.__dict__
@@ -63,7 +64,7 @@ class OptionStrategy(object):
         filename = self.folder + 'strat_status.csv'
         self.on_log('save state for strat = %s' % self.name, level = logging.DEBUG)
         out_df = self.risk_table(['pos_long', 'pos_short', 'out_long', 'out_short'])
-        out_df.to_csv(filename, sep = ',')
+        out_df.to_csv(filename)
             
     def load_state(self):
         self.on_log('load state for strat = %s' % self.name, level = logging.DEBUG)
@@ -98,7 +99,7 @@ class OptionStrategy(object):
     def register_bar_freq(self):
         pass
 
-    def on_log(self, text, level = logging.INFO, args = {}):    
+    def on_log(self, text, level = logging.INFO):
         event = Event(type=EVENT_LOG)
         event.dict['data'] = text
         event.dict['owner'] = "strategy_" + self.name
@@ -110,66 +111,50 @@ class OptionStrategy(object):
         idx = len(self.underliers)
         for key in ['pv', 'delta', 'gamma', 'vega', 'theta']:
             self.risk_table[key][idx:] = [getattr(inst, key) for inst in self.underlying[idx:]]
-        
-            self.risk_table['df'][idx] = self.risk_table['df'][self.inst_map[under]] = self.agent.volgrid[prod].df[expiry]
         self.update_pos_greeks()
         self.update_margin()
-        self.update_trade_unit()
     
     def update_margin(self):
         for key in ['margin_long', 'margin_short']:
             self.risk_table[key] = [ inst.calc_margin_amount(ORDER_BUY, price) for inst, price in zip(self.underlying, self.risk_table['under_price'])]
 
-    def update_pos_greeks(self, prod):
+    def update_pos_greeks(self):
         '''update position greeks according to current positions'''
         keys = ['pv', 'delta', 'gamma', 'vega', 'theta']
+        self.risk_table['ppos'] = self.risk_table['pos_long'] - self.risk_table['pos_short']
         for key in keys:
             pos_key = 'p' + key
-            self.option_map[pos_key] = self.option_map[key] * self.option_map['pos'] * self.option_map['multiple']
-        
-    def risk_reval(self, expiry, is_recalib=True):
-        '''recalibrate vol surface per fwd move, get greeks update for instrument greeks'''
-        dtoday = date2xl(self.agent.scur_day) + max(self.agent.tick_id - 600000, 0)/2400000.0
-        cont_mth = expiry.year * 100 + expiry.month
-        indices = self.option_map[(self.option_map.cont_mth == cont_mth) & (self.option_map.otype != 0)].index
-        dexp = datetime2xl(expiry)
-        idx = self.expiries.index(expiry)
-        fwd = self.get_fwd(idx)
-        if is_recalib:
-            self.last_updated[expiry]['fwd'] = fwd
-            self.last_updated[expiry]['dtoday'] = dtoday
-            self.volgrids[expiry].setFwd(fwd)
-            self.volgrids[expiry].setToday(dtoday)            
-            self.volgrids[expiry].initialize()                
-        for inst in indices:
-            self.option_insts[inst].setFwd(fwd)
-            self.option_insts[inst].setFwd(dtoday)
-            self.update_greeks(inst)
-    
-    def reval_all(self):
-        for expiry in self.expiries:
-            self.risk_reval(expiry, is_recalib=True)
-        self.update_pos_greeks()
-        self.update_group_risk()
-        self.update_margin()
-    
-    def update_group_risk(self):
-        group_keys = ['cont_mth', 'ppv', 'pdelta', 'pgamma','pvega','ptheta']
-        self.group_risk = self.option_map[group_keys].groupby('cont_mth').sum()
-    
-    def add_submitted_pos(self, etrade):
-        is_added = False
-        for trade in self.submitted_pos:
-            if trade.id == etrade.id:
-                is_added = False
-                return
-        self.submitted_pos.append(etrade)
+            self.risk_table[pos_key] = self.risk_table[key] * self.risk_table['ppos'] * self.risk_table['multiple']
+        group_keys = ['underlying', 'cont_mth', 'ppv', 'pdelta', 'pgamma','pvega','ptheta']
+        self.group_risk = self.risk_table[group_keys].groupby(['underlying', 'cont_mth']).sum()
+
+    def risk_agg(self, risk_list):
+        risks = [ r for r in list(self.risk_table) if str(r) in risk_list]
+        risk_df = self.risk_table[risks]
+        return risk_df.to_dict('index')
+
+    def submit_trade(self, xtrade):
+        book = xtrade.book
+        exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[book])
+        xtrade.set_algo(exec_algo)
+        self.submitted_trades[book].append(xtrade)
+        self.agent.submit_trade(xtrade)
+
+    def add_submitted_pos(self, xtrade):
+        book = xtrade.book
+        if book in self.submitted_pos:
+            for trade in self.submitted_pos[book]:
+                if trade.id == xtrade.id:
+                    return False
+        self.submitted_pos[book].append(xtrade)
         return True
 
-    def day_finalize(self):    
-        self.save_state()
+    def day_finalize(self):
         self.logger.info('strat %s is finalizing the day - update trade unit, save state' % self.name)
-        
+        self.update_pos_greeks()
+        self.update_margin()
+        self.save_state()
+
     def get_option_map(self, products):
         option_map = {}
         for under in products:
@@ -187,12 +172,12 @@ class OptionStrategy(object):
                             instID = instID + '-' + otype + '-' + str(strike)
                         option_map[key] = instID
         return option_map
- 
-    def tick_run(self, ctick):
-        pass
 
-    def run_min(self, inst):
-        pass
+    def run_tick(self, ctick):
+        if self.is_disabled: return
+
+    def run_min(self, inst, freq):
+        if self.is_disabled: return
     
     def delta_hedger(self):
         tot_deltas = self.group_risk.pdelta.sum()
@@ -201,8 +186,8 @@ class OptionStrategy(object):
             for idx, inst in enumerate(self.underliers):
                 if idx == self.main_cont: 
                     continue
-                multiple = self.option_map[inst, 'multiple']
-                cont_mth = self.option_map[inst, 'cont_mth']
+                multiple = self.risk_table.get_value(inst, 'multiple')
+                cont_mth = self.risk_table.get_value(inst, 'cont_mth')
                 pdelta = self.group_risk[cont_mth, 'delta'] 
                 volume = int( - pdelta/multiple + 0.5)
                 cum_vol += volume
@@ -210,10 +195,10 @@ class OptionStrategy(object):
                     curr_price = self.agent.instruments[inst].price
                     buysell = 1 if volume > 0 else -1
                     valid_time = self.agent.tick_id + 600
-                    etrade = trade.XTrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
+                    xtrade = trade.XTrade( [inst], [volume], [self.hedge_config['order_type']], curr_price*buysell, [self.hedge_config['num_tick']], \
                                                valid_time, self.name, self.agent.name)
-                    self.submitted_pos[inst].append(etrade)
-                    self.agent.submit_trade(etrade)
+                    self.submitted_pos[inst].append(xtrade)
+                    self.agent.submit_trade(xtrade)
         inst = self.underliers[self.main_cont]
         multiple = self.option_map[inst, 'multiple']
         tot_deltas += cum_vol
@@ -256,9 +241,6 @@ class OptArbStrat(CommodOptStrat):
         self.callspd = dict([(exp, dict([(s, {'upbnd':0.0, 'lowbnd':0.0, 'pos':0.0}) for s in ss])) for exp, ss in zip(expiries, strikes)])
         self.putspd = dict([(exp, dict([(s, {'upbnd':0.0, 'lowbnd':0.0, 'pos':0.0}) for s in ss])) for exp, ss in zip(expiries, strikes)])
         self.bfly = dict([(exp, dict([(s, {'upbnd':0.0, 'lowbnd':0.0, 'pos':0.0}) for s in ss])) for exp, ss in zip(expiries, strikes)])
-        
-    def tick_run(self, ctick):         
-        inst = ctick.instID
 
 class OptSubStrat(object):
     def __init__(self, strat):
