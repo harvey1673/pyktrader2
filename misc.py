@@ -337,6 +337,19 @@ def inst_to_exch(inst):
     cnx.close()
     return str(out[0][0])
 
+def get_opt_name(fut_inst, otype, strike):
+    cont_mth = inst2contmth(fut_inst)
+    key = (str(fut_inst), cont_mth, otype, strike)
+    instID = fut_inst
+    exch = inst2exch(instID)
+    if instID[:2] == "IF":
+        instID = instID.replace('IF', 'IO')
+    if exch == 'CZCE':
+        instID = instID + otype + str(int(strike))
+    else:
+        instID = instID + '-' + otype + '-' + str(int(strike))
+    return instID
+
 def get_opt_expiry(fut_inst, cont_mth, exch = ''):
     cont_yr  = int(cont_mth/100)
     cont_mth = cont_mth % 100

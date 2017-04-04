@@ -202,6 +202,38 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry_d, vol_df
 
+def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1', ir = 0.03, ostyle = 'EU', \
+                       iv_tol=1e-5, iv_steps = 100):
+    if ostyle == 'EU':
+        iv_func = pyktlib.BlackImpliedVol
+    else:
+        iv_func = pyktlib.AmericanImpliedVol
+    df = mysqlaccess.load_tick_to_df('fut_tick', underlier, curr_date, curr_date, start_tick=300000, end_tick = tick_id)
+    slice_tick = df['tick_id'].iat[-1]
+    under_bid = df['bidPrice1'].iat[-1]
+    under_ask = df['askPrice1'].iat[-1]
+    under_mid = (under_bid + under_ask)/2.0
+    opt_expiry = get_opt_expiry(underlier, inst2contmth(underlier), inst2exch(underlier))
+    nBusDays = pyktlib.NumBusDays(date2xl(curr_date), date2xl(opt_expiry.date()), pyktlib.CHN_Holidays)
+    day_frac = pyktlib.GetDayFraction(min2time(tick_id / 1000), accr)
+    time2exp = (nBusDays - day_frac)/BDAYS_PER_YEAR
+    res = {}
+    for strike in strike_list:
+        res[strike] = {}
+        for otype in ['C', 'P']:
+            opt_inst = get_opt_name(underlier, otype, strike)
+            xdf = mysqlaccess.load_tick_to_df('fut_tick', opt_inst, curr_date, curr_date, start_tick=300000,
+                                             end_tick=slice_tick)
+            for lbl, tag in zip(['bidPrice1', 'askPrice1'], ['bvol', 'avol']):
+                quote_p = xdf[lbl].iat[-1]
+                iv_args = (quote_p, under_mid, strike, ir, time2exp, otype, iv_tol)
+                if ostyle == 'AM':
+                    iv_args = tuple(list(iv_args) + [iv_steps])
+                ivol = iv_func(*iv_args)
+                key = otype + '-' + tag
+                res[strike][key] = ivol
+    return pd.DataFrame.from_dict(res, orient = 'index')
+
 def variance_ratio(ts, freqs):
     data = ts.values
     nlen = len(data)

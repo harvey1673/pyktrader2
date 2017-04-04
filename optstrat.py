@@ -162,15 +162,7 @@ class OptionStrategy(object):
                 for strike in products[under][cont_mth]:
                     for otype in ['C', 'P']:
                         key = (str(under), cont_mth, otype, strike)
-                        instID = under
-                        exch = inst2exch(instID)
-                        if instID[:2] == "IF":
-                            instID = instID.replace('IF', 'IO')
-                        if exch == 'CZCE':
-                            instID = instID + otype + str(strike)
-                        else:
-                            instID = instID + '-' + otype + '-' + str(strike)
-                        option_map[key] = instID
+                        option_map[key] = get_opt_name(under, otype, strike)
         return option_map
 
     def run_tick(self, ctick):
@@ -179,7 +171,7 @@ class OptionStrategy(object):
     def run_min(self, inst, freq):
         if self.is_disabled: return
     
-    def delta_hedger(self):
+    def delta_hedger(self, ):
         tot_deltas = self.group_risk.pdelta.sum()
         cum_vol = 0
         if (self.spot_model == False) and (self.proxy_flag['delta']== False):
