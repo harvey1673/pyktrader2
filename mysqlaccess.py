@@ -131,7 +131,7 @@ def insert_cont_data(cont):
     col_list = cont.keys()
     stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s) ".format(table='contract_list',variables=','.join(col_list))
     args = tuple([cont[col] for col in col_list])
-    #print stmt, args
+    print stmt, args
     cursor.execute(stmt, args)
     cnx.commit()
     cnx.close()

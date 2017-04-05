@@ -79,10 +79,43 @@ CHN_Holidays = [datetime.date(2014,1,1),  datetime.date(2014,1,2), datetime.date
                 datetime.date(2018,9,24), datetime.date(2018,10,1),datetime.date(2018,10,2),
                 datetime.date(2018,10,3), datetime.date(2018,10,4),datetime.date(2018,10,5)]        
 
+WASDE_Dates = [ datetime.date(2010, 1, 12), datetime.date(2010, 2, 9), datetime.date(2010, 3, 10), \
+                datetime.date(2010, 4, 9), datetime.date(2010, 5, 11), datetime.date(2010, 6, 10), \
+                datetime.date(2010, 7, 9), datetime.date(2010, 8, 12), datetime.date(2010, 9, 10), \
+                datetime.date(2010, 10, 8), datetime.date(2010, 11, 9), datetime.date(2010, 12, 10),\
+                datetime.date(2011, 1, 12), datetime.date(2011, 2, 9), datetime.date(2011, 3, 10),\
+                datetime.date(2011, 4, 8), datetime.date(2011, 5, 11), datetime.date(2011, 6, 9),\
+                datetime.date(2011, 7, 12), datetime.date(2011, 8, 11), datetime.date(2011, 9, 12),\
+                datetime.date(2011, 10, 12), datetime.date(2011, 11, 9), datetime.date(2011, 12, 9),\
+                datetime.date(2012, 1, 12), datetime.date(2012, 2, 9), datetime.date(2012, 3, 9), \
+                datetime.date(2012, 4, 10), datetime.date(2012, 5, 10), datetime.date(2012, 6, 12), \
+                datetime.date(2012, 7, 11), datetime.date(2012, 8, 10), datetime.date(2012, 9, 12), \
+                datetime.date(2012, 10, 11), datetime.date(2012, 11, 9), datetime.date(2012, 12, 11), \
+                datetime.date(2013, 1, 11), datetime.date(2013, 2, 8), datetime.date(2013, 3, 8), \
+                datetime.date(2013, 4, 10), datetime.date(2013, 5, 10), datetime.date(2013, 6, 12), \
+                datetime.date(2013, 7, 11), datetime.date(2013, 8, 12), datetime.date(2013, 9, 12), \
+                datetime.date(2013, 11, 8), datetime.date(2013, 12, 10), datetime.date(2014, 1, 10), \
+                datetime.date(2014, 2, 10), datetime.date(2014, 3, 10), datetime.date(2014, 4, 9), \
+                datetime.date(2014, 5, 9), datetime.date(2014, 6, 11), datetime.date(2014, 7, 11), \
+                datetime.date(2014, 8, 12), datetime.date(2014, 9, 11), datetime.date(2014, 10, 10), \
+                datetime.date(2014, 11, 10), datetime.date(2014, 12, 10), datetime.date(2015, 1, 12), \
+                datetime.date(2015, 2, 10), datetime.date(2015, 3, 10), datetime.date(2015, 4, 9), \
+                datetime.date(2015, 5, 12), datetime.date(2015, 6, 10), datetime.date(2015, 7, 10), \
+                datetime.date(2015, 8, 12), datetime.date(2015, 9, 11), datetime.date(2015, 10, 9), \
+                datetime.date(2015, 11, 10), datetime.date(2015, 12, 9), datetime.date(2016, 1, 12), \
+                datetime.date(2016, 2, 9), datetime.date(2016, 3, 9), datetime.date(2016, 4, 12), \
+                datetime.date(2016, 5, 10), datetime.date(2016, 6, 10), datetime.date(2016, 7, 12), \
+                datetime.date(2016, 8, 12), datetime.date(2016, 9, 12), datetime.date(2016, 10, 12), \
+                datetime.date(2016, 11, 9), datetime.date(2016, 12, 9), datetime.date(2017, 1, 12), \
+                datetime.date(2017, 2, 9), datetime.date(2017, 3, 9), datetime.date(2017, 4, 11), \
+                datetime.date(2017, 5, 10), datetime.date(2017, 6, 9), datetime.date(2017, 7, 12), \
+                datetime.date(2017, 8, 10), datetime.date(2017, 9, 12), datetime.date(2017, 10, 12), \
+                datetime.date(2017, 11, 9), datetime.date(2017, 12, 12)]
+
 product_code = {'SHFE':['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', 'hc', 'ag', 'au', 'sn', 'ni'],
                 'CFFEX': ['IF', 'TF', 'IO', 'T', 'IH', 'IC'],
-                'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
-                'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF',  'SR', 'TA', 'OI', 'RI', 'ME', 'FG', 'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC']}
+                'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'm_Opt', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
+                'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF',  'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG', 'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC']}
 
 CHN_Stock_Exch = { 'SSE': ["000300", "510180", "510050", "11000011", "11000016", "11000021", "11000026", "000002", "000003", "000004", "000005", "000006", "11000031", "11000036", "10000036"], 
                    'SZE': ['399001', '399004', '399007'] }
@@ -105,6 +138,7 @@ night_session_markets = {'cu': 1,
                          'a' : 4,
                          'b' : 4,
                          'm' : 4,
+                         'm_Opt': 4,
                          'y' : 4,
                          'jm': 4,
                          'i' : 4,
@@ -148,6 +182,7 @@ product_lotsize = {'zn': 5,
                    'PM': 50, 
                    'CF': 5,
                    'SR': 10,
+                   'SR_Opt': 10,
                    'TA': 5,
                    'OI': 10,
                    'RI': 20,
@@ -168,6 +203,7 @@ product_lotsize = {'zn': 5,
                    'a' : 10,
                    'b' : 10,
                    'm' : 10,
+                   'm_Opt' : 10,
                    'y' : 10,
                    'p' : 10,
                    'l' : 5,
@@ -201,6 +237,7 @@ product_ticksize = {'zn': 5,
                    'PM': 1, 
                    'CF': 5,
                    'SR': 1,
+                   'SR_Opt': 0.5,
                    'TA': 2,
                    'OI': 2,
                    'RI': 1,
@@ -221,6 +258,7 @@ product_ticksize = {'zn': 5,
                    'a' : 1,
                    'b' : 1,
                    'm' : 1,
+                   'm_Opt': 0.5,
                    'y' : 2,
                    'p' : 2,
                    'l' : 5,

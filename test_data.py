@@ -8,6 +8,7 @@ import os
 import talib
 import urllib2
 import pytz
+import csv
 import patoolib
 import mysqlaccess as db
 import json
@@ -363,6 +364,22 @@ def talib_get_functions_df():
     df_absf = pd.DataFrame(lst_info)
     df_absf = df_absf.set_index('name')
     return(df_absf)
+
+def load_dates_from_csv(filename):
+    with open(filename, 'rb') as f:
+        reader = csv.reader(f)
+        datelist = []
+        for i, row in enumerate(reader):
+            if i > 0:
+                year = int(row[0])
+                for j in range(1, len(row)):
+                    try:
+                        dd = int(row[j])
+                        xdate = datetime.date(year, j, dd)
+                        datelist.append(xdate)
+                    except:
+                        continue
+    return datelist
 
 if __name__ == '__main__':
     print

@@ -387,7 +387,6 @@ class CtpGateway(GrossGateway):
         tick.exchange = exchangeMapReverse.get(data['ExchangeID'], u'未知')
         product = inst2product(tick.instID)
         hrs = trading_hours(product, tick.exchange)
-        tick_status = True
         bad_tick = True
         for ptime in hrs:
             if (tick_id>=ptime[0]*1000-self.md_data_buffer) and (tick_id< ptime[1]*1000+self.md_data_buffer):

@@ -224,14 +224,17 @@ def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1
             opt_inst = get_opt_name(underlier, otype, strike)
             xdf = mysqlaccess.load_tick_to_df('fut_tick', opt_inst, curr_date, curr_date, start_tick=300000,
                                              end_tick=slice_tick)
-            for lbl, tag in zip(['bidPrice1', 'askPrice1'], ['bvol', 'avol']):
-                quote_p = xdf[lbl].iat[-1]
-                iv_args = (quote_p, under_mid, strike, ir, time2exp, otype, iv_tol)
-                if ostyle == 'AM':
-                    iv_args = tuple(list(iv_args) + [iv_steps])
-                ivol = iv_func(*iv_args)
-                key = otype + '-' + tag
-                res[strike][key] = ivol
+            if len(xdf) == 0:
+                print opt_inst
+            else:
+                for lbl, tag in zip(['bidPrice1', 'askPrice1'], ['bvol', 'avol']):
+                    quote_p = xdf[lbl].iat[-1]
+                    iv_args = (quote_p, under_mid, strike, ir, time2exp, otype, iv_tol)
+                    if ostyle == 'AM':
+                        iv_args = tuple(list(iv_args) + [iv_steps])
+                    ivol = iv_func(*iv_args)
+                    key = otype + '-' + tag
+                    res[strike][key] = ivol
     return pd.DataFrame.from_dict(res, orient = 'index')
 
 def variance_ratio(ts, freqs):
