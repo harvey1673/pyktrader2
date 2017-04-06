@@ -442,8 +442,14 @@ class CtpGateway(GrossGateway):
         if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
             cont = {}
             cont['instID'] = data['InstrumentID']			
-            cont['margin_l'] = data['LongMarginRatio']
-            cont['margin_s'] = data['ShortMarginRatio']
+            margin_l = data['LongMarginRatio']
+            if margin_l >= 1.0:
+                margin_l = 0.0
+            cont['margin_l'] = margin_l
+            margin_s = data['ShortMarginRatio']
+            if margin_s >= 1.0:
+                margin_s = 0.0
+            cont['margin_s'] = margin_s
             cont['start_date'] =data['OpenDate']
             cont['expiry'] = data['ExpireDate']
             cont['product_code'] = data['ProductID']
