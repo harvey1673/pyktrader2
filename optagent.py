@@ -15,7 +15,7 @@ def discount(irate, dtoday, dexp):
 class OptAgentMixin(object):
     def __init__(self, name, tday=datetime.date.today(), config = {}):
         self.volgrids = {}
-        self.irate = config.get('irate', {'CNY': 0.02, 'USD': 0.00})
+        self.irate = config.get('irate', {'CNY': 0.03, 'USD': 0.01})
         self.option_insts = [inst for inst in self.instruments.values() if inst.ptype == instrument.ProductType.Option]
         self.option_map = dict([((inst.underlying, inst.cont_mth, inst.otype, inst.strike), inst.name) for inst in self.option_insts])
 

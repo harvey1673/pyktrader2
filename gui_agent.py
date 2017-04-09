@@ -138,7 +138,7 @@ class Gui(tk.Tk):
                     txt = inst
                 else:
                     inst_risk = sum_risk[field].get(inst, {})
-                    txt = str(inst_risk.get('pos', 0))
+                    txt = str(inst_risk.get('ppos', 0))
                 tk.Label(tp_frame.frame, text = txt).grid(row=idy+1, column=idx)
 
     def qry_agent_inst(self):

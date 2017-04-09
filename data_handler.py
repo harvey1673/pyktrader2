@@ -20,14 +20,14 @@ def date_datetime64(d):
     return np.datetime64(dt)
 
 class DynamicRecArray(object):
-    def __init__(self, dtype = [], dataframe = None, size_ratio = 1.5):
+    def __init__(self, dtype = [], dataframe = None, size_ratio = 1.5, nlen = 100):
         self.size_ratio = size_ratio
         if isinstance(dataframe, pd.DataFrame) and (len(dataframe) > 0):
             self.create_from_df(dataframe)
         else:
             self.dtype = np.dtype(dtype)
-            self.length = 0
-            self.size = 100
+            self.length = nlen
+            self.size = int(nlen * size_ratio)
             self._data = np.empty(self.size, dtype=self.dtype)
 
     def __len__(self):

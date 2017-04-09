@@ -267,7 +267,7 @@ class Strategy(object):
         event.dict['level'] = level
         self.agent.eventEngine.put(event)
 
-    def add_unwind(self, pair):
+    def add_unwind(self, pair, book=''):
         instID = pair[0]
         vol = pair[1]
         price = pair[2]

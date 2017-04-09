@@ -375,6 +375,16 @@ def inst_to_exch(inst):
     cnx.close()
     return str(out[0][0])
 
+def get_option_map(products):
+    option_map = {}
+    for under in products:
+        for cont_mth in products[under]:
+            for strike in products[under][cont_mth]:
+                for otype in ['C', 'P']:
+                    key = (str(under), cont_mth, otype, strike)
+                    option_map[key] = get_opt_name(under, otype, strike)
+    return option_map
+
 def get_opt_name(fut_inst, otype, strike):
     cont_mth = inst2contmth(fut_inst)
     key = (str(fut_inst), cont_mth, otype, strike)
