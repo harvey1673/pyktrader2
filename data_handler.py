@@ -377,7 +377,7 @@ def stochf(df, n = 14, fastd_period = 3):
     df[key2][-1] = df[key2][-2] * (1- alpha) + df[key1][-1] * alpha
     
 def STOCHRSI(df, n=14, fastk_period=5, fastd_period=3):
-    fastk, fastd = STOCHRSI(df['close'].valkues, timeperiod = n, fastk_period= fastk_period, fastd_period=fastd_period)
+    fastk, fastd = talib.STOCHRSI(df['close'].valkues, timeperiod = n, fastk_period= fastk_period, fastd_period=fastd_period)
     fk = pd.Series(fastk, index = df.index, name = "STOCRSI_FK_%s" % (str(n)))
     fd = pd.Series(fastd, index = df.index, name = "STOCRSI_FD_%s" % (str(n)))   
     return pd.concat([fk,fd], join='outer', axis=1)
