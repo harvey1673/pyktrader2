@@ -235,7 +235,7 @@ def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1
                     ivol = iv_func(*iv_args)
                     key = otype + '-' + tag
                     res[strike][key] = ivol
-    return pd.DataFrame.from_dict(res, orient = 'index')
+    return pd.DataFrame.from_dict(res, orient = 'index')[['C-bvol','C-avol','P-bvol','P-avol']]
 
 def variance_ratio(ts, freqs):
     data = ts.values

@@ -88,7 +88,7 @@ class StratSim(object):
     def on_bar(self, sim_data, n):
         pass
 
-    def get_tradepos_exit(self, sim_data, n):
+    def get_tradepos_exit(self, tradepos, sim_data, n):
         return 0
 
     def run_loop_sim(self):
@@ -103,8 +103,7 @@ class StratSim(object):
             if self.scur_day != sim_data['date'][n]:
                 self.scur_day = sim_data['date'][n]
                 self.daily_initialize(sim_data, n)
-            exit_gap = self.get_tradepos_exit(sim_data, n)
-            self.check_curr_pos([sim_data['open'][n], sim_data['high'][n], sim_data['low'][n], sim_data['close'][n]], exit_gap)
+            self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
             sim_data['traded_price'][n] = self.traded_price
@@ -144,13 +143,14 @@ class StratSim(object):
         self.traded_vol += new_pos.pos
         self.traded_cost += abs(new_pos.pos) * (self.offset + price * self.tcost)
 
-    def check_curr_pos(self, ohlc, exit_gap = 0):
+    def check_curr_pos(self, sim_data, n):
         pos = cost = 0
         for tradepos in self.positions:
-            ep =  ohlc[2] if tradepos.pos > 0 else ohlc[1]
+            exit_gap = self.get_tradepos_exit(tradepos, sim_data, n)
+            ep =  sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
             if tradepos.check_exit(ep, exit_gap):
-                if tradepos.check_exit(ohlc[0], exit_gap):
-                    traded_price = ohlc[0]
+                if tradepos.check_exit(sim_data['open'][n], exit_gap):
+                    traded_price = sim_data['open'][n]
                 else:
                     tp = (tradepos.exit_target - tradepos.direction * exit_gap)/self.offset
                     traded_price = int(tp) * self.offset if tp > 0 else (int(tp)-1) * self.offset
