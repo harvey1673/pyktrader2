@@ -53,12 +53,13 @@ class RSIATRSim(StratSim):
         return (sim_data['atr'][n] == 0) or (sim_data['atrma'][n] == 0) or (sim_data['rsi'][n] == 0) \
                or (sim_data['date'][n] != sim_data['date'][n + 1])
 
-    def get_tradepos_exit(self, sim_data, n):
-        return self.SL * sim_data['atr'][n]
+    def get_tradepos_exit(self, tradepos, sim_data, n):
+        return self.SL * tradepos.exit_target
 
     def on_bar(self, sim_data, n):
-        self.pos_args = {'reset_margin': sim_data['atr'][n]}        
-        target_pos = (sim_data['rsi'][n] > 100 - self.rsi_trigger) - (sim_data['rsi'][n] < self.sell_trig)
+        self.pos_args = {'reset_margin': sim_data['ATR'][n]}
+        target_pos = ((sim_data['RSI'][n]>(100-self.rsi_trigger)) - (sim_data['RSI'][n]<self.self.rsi_trigger)) \
+                        * (sim_data['ATR'][n] >= sim_data['ATRMA'][n])
         curr_pos = 0
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos

@@ -87,7 +87,7 @@ class DTStopSim(StratSim):
         return (sim_data['ma'][n] == 0) or (sim_data['chanh'][n] == 0) or (sim_data['dopen'][n] == 0) \
                or (sim_data['date'][n] != sim_data['date'][n + 1])
 
-    def get_tradepos_exit(self, sim_data, n):
+    def get_tradepos_exit(self, tradepos, sim_data, n):
         return self.SL * sim_data['atr'][n]
 
     def on_bar(self, sim_data, n):
