@@ -58,7 +58,7 @@ class RSIATRSim(StratSim):
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': sim_data['ATR'][n]}
-        target_pos = ((sim_data['RSI'][n]>(100-self.rsi_trigger)) - (sim_data['RSI'][n]<self.self.rsi_trigger)) \
+        target_pos = ((sim_data['RSI'][n]>(50+self.rsi_trigger)) - (sim_data['RSI'][n]<50-self.self.rsi_trigger)) \
                         * (sim_data['ATR'][n] >= sim_data['ATRMA'][n])
         curr_pos = 0
         if len(self.positions)>0:
