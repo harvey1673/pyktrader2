@@ -124,6 +124,7 @@ class StratSim(object):
         return False
 
     def close_tradepos(self, tradepos, traded_price):
+        #print "close", tradepos.direction, traded_price, self.timestamp
         tradepos.close(traded_price - self.offset * tradepos.direction, self.timestamp)
         tradepos.exit_tradeid = self.tradeid
         self.tradeid += 1
@@ -134,6 +135,7 @@ class StratSim(object):
 
     def open_tradepos(self, contracts, price, traded_pos):
         traded_price = price + misc.sign(traded_pos) * self.offset
+        #print "open", contracts, self.unit * traded_pos, traded_price, self.timestamp
         new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price, traded_price, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
@@ -152,11 +154,11 @@ class StratSim(object):
                 if tradepos.check_exit(sim_data['open'][n], exit_gap):
                     traded_price = sim_data['open'][n]
                 else:
-                    tp = (tradepos.exit_target - tradepos.direction * exit_gap)/self.offset
-                    traded_price = int(tp) * self.offset if tp > 0 else (int(tp)-1) * self.offset
+                    traded_price = tradepos.exit_target - tradepos.direction * exit_gap
                 self.close_tradepos(tradepos, traded_price)
             elif self.pos_update:
-                tradepos.update_price(ep)
+                up = sim_data['low'][n] if tradepos.pos < 0 else sim_data['high'][n]
+                tradepos.update_price(up)
         self.positions = [pos for pos in self.positions if not pos.is_closed]
 
     def daily_initialize(self):
@@ -1077,8 +1079,6 @@ class BacktestManager(object):
                     self.config[key] = self.scen_param[key][seq]
                 self.prepare_data(idx, cont_idx = 0)
                 sim_strat = self.sim_class(self.config)
-                #sim_strat.process_config()
-                # sim_strat.process_data()
                 sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                 (res_pnl, ts) = self.get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
                 res_trade = self.get_trade_stats(closed_trades)
@@ -1102,12 +1102,12 @@ class BacktestManager(object):
             res = res.reset_index()
             res.set_index(['asset', 'scenario'])
             out_res = res[self.output_columns()]
-            if len(summary_df):
-                summary_df = out_res[:30].copy(deep = True)
+            if len(self.summary_df)==0:
+                self.summary_df = out_res[:30].copy(deep = True)
             else:
-                summary_df = summary_df.append(out_res[:30])
+                self.summary_df = self.summary_df.append(out_res[:30])
             fname = self.file_prefix + 'summary.csv'
-            summary_df.to_csv(fname)
+            self.summary_df.to_csv(fname)
 
 class ContBktestManager(BacktestManager):
     def __init__(self, config_file):
