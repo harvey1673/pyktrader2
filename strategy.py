@@ -80,7 +80,7 @@ class TradePos(object):
     def close(self, price, end_time):
         self.exit_time = end_time
         self.exit_price = price
-        self.profit = (self.exit_price - self.entry_price) * self.direction * self.pos * self.multiple
+        self.profit = (self.exit_price - self.entry_price) *  self.pos * self.multiple
         self.is_closed = True
         return self
 
