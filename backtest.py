@@ -888,11 +888,12 @@ class BacktestManager(object):
                  'all_profit', 'tot_cost', 'win_ratio', 'num_win', 'num_loss', \
                  'profit_per_win', 'profit_per_loss']
 
-    def restart(self):
-        self.summary_df = pd.DataFrame()
+    def restart(self):        
         fname = self.file_prefix + 'summary.csv'
         if os.path.isfile(fname):
             self.summary_df = pd.DataFrame.from_csv(fname)
+        else:
+            self.summary_df = pd.DataFrame()
 
     def set_config(self, idx):
         assets = self.sim_assets[idx]
