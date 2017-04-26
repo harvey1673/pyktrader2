@@ -95,7 +95,7 @@ class StratSim(object):
         dra = dh.DynamicRecArray(dataframe=self.df)
         sim_data = dra.data
         nlen = len(dra)
-        for n in range(1, nlen-1):
+        for n in range(1, nlen):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
             sim_data['pos'][n] = sim_data['pos'][n - 1]
             if self.check_data_invalid(sim_data, n):
@@ -108,8 +108,9 @@ class StratSim(object):
             sim_data['cost'][n] = self.traded_cost
             sim_data['traded_price'][n] = self.traded_price
             self.traded_vol = self.traded_cost = 0
-            self.traded_price = sim_data['close'][n]
-            self.on_bar(sim_data, n)
+            self.traded_price = 0
+            if n < nlen - 1:
+                self.on_bar(sim_data, n)
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
@@ -123,27 +124,28 @@ class StratSim(object):
     def check_data_invalid(self, sim_data, n):
         return False
 
-    def close_tradepos(self, tradepos, traded_price):
+    def close_tradepos(self, tradepos, price):        
         #print "close", tradepos.direction, traded_price, self.timestamp
-        tradepos.close(traded_price - self.offset * tradepos.direction, self.timestamp)
+        tp = price - self.offset * tradepos.direction
+        tradepos.close(tp, self.timestamp)
         tradepos.exit_tradeid = self.tradeid
         self.tradeid += 1
-        self.closed_trades.append(tradepos)
-        self.traded_price = (self.traded_price * self.traded_vol - traded_price * tradepos.pos)/(self.traded_vol - tradepos.pos)
+        self.closed_trades.append(tradepos)        
+        self.traded_price = (self.traded_price * self.traded_vol - tp * tradepos.pos)/(self.traded_vol - tradepos.pos)
         self.traded_vol -= tradepos.pos
-        self.traded_cost += abs(tradepos.pos) * (self.offset + traded_price * self.tcost)
+        self.traded_cost += abs(tradepos.pos) * (self.offset + tp * self.tcost)
 
     def open_tradepos(self, contracts, price, traded_pos):
-        traded_price = price + misc.sign(traded_pos) * self.offset
+        tp = price + misc.sign(traded_pos) * self.offset
         #print "open", contracts, self.unit * traded_pos, traded_price, self.timestamp
-        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, traded_price, traded_price, multiple = 1, **self.pos_args)
+        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, tp, tp, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
         new_pos.open(traded_price, self.unit * traded_pos, self.timestamp)
         self.positions.append(new_pos)
-        self.traded_price = (self.traded_price * self.traded_vol + traded_price * new_pos.pos)/(self.traded_vol + new_pos.pos)
+        self.traded_price = (self.traded_price * self.traded_vol + tp * new_pos.pos)/(self.traded_vol + new_pos.pos)
         self.traded_vol += new_pos.pos
-        self.traded_cost += abs(new_pos.pos) * (self.offset + price * self.tcost)
+        self.traded_cost += abs(new_pos.pos) * (self.offset + tp * self.tcost)
 
     def check_curr_pos(self, sim_data, n):
         pos = cost = 0
@@ -152,10 +154,10 @@ class StratSim(object):
             ep =  sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
             if tradepos.check_exit(ep, exit_gap):
                 if tradepos.check_exit(sim_data['open'][n], exit_gap):
-                    traded_price = sim_data['open'][n]
+                    order_price = sim_data['open'][n]
                 else:
-                    traded_price = tradepos.exit_target - tradepos.direction * exit_gap
-                self.close_tradepos(tradepos, traded_price)
+                    order_price = tradepos.exit_target - tradepos.direction * exit_gap
+                self.close_tradepos(tradepos, order_price)
             elif self.pos_update:
                 up = sim_data['low'][n] if tradepos.pos < 0 else sim_data['high'][n]
                 tradepos.update_price(up)
