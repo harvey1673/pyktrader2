@@ -95,7 +95,7 @@ class StratSim(object):
         dra = dh.DynamicRecArray(dataframe=self.df)
         sim_data = dra.data
         nlen = len(dra)
-        for n in range(1, nlen):
+        for n in range(1, nlen-1):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
             sim_data['pos'][n] = sim_data['pos'][n - 1]
             if self.check_data_invalid(sim_data, n):
@@ -106,16 +106,24 @@ class StratSim(object):
             self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
-            sim_data['traded_price'][n] = self.traded_price
+            if self.traded_price == 0:
+                sim_data['traded_price'][n] = sim_data['close'][n]
+            else:
+                sim_data['traded_price'][n] = self.traded_price
             self.traded_vol = self.traded_cost = 0
             self.traded_price = 0
-            if n < nlen - 1:
+            if n < nlen - 2:
                 self.on_bar(sim_data, n)
+            elif len(self.positions) > 0:
+                for tradepos in self.positions:
+                    self.close_tradepos(tradepos, sim_data['open'][n+1])
+                self.positions = []
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
         out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, pos, tp, cost], \
                            join='outer', axis = 1)
+        #print out_df
         return out_df, self.closed_trades
 
     def run_vec_sim(self):
@@ -141,7 +149,7 @@ class StratSim(object):
         new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, tp, tp, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
-        new_pos.open(traded_price, self.unit * traded_pos, self.timestamp)
+        new_pos.open(tp, self.unit * traded_pos, self.timestamp)
         self.positions.append(new_pos)
         self.traded_price = (self.traded_price * self.traded_vol + tp * new_pos.pos)/(self.traded_vol + new_pos.pos)
         self.traded_vol += new_pos.pos
