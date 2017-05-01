@@ -95,6 +95,7 @@ class StratSim(object):
         dra = dh.DynamicRecArray(dataframe=self.df)
         sim_data = dra.data
         nlen = len(dra)
+        self.scur_day = sim_data['date'][0]
         for n in range(1, nlen-1):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
             sim_data['pos'][n] = sim_data['pos'][n - 1]
@@ -123,7 +124,6 @@ class StratSim(object):
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
         out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, pos, tp, cost], \
                            join='outer', axis = 1)
-        #print out_df
         return out_df, self.closed_trades
 
     def run_vec_sim(self):
@@ -141,7 +141,7 @@ class StratSim(object):
         self.closed_trades.append(tradepos)        
         self.traded_price = (self.traded_price * self.traded_vol - tp * tradepos.pos)/(self.traded_vol - tradepos.pos)
         self.traded_vol -= tradepos.pos
-        self.traded_cost += abs(tradepos.pos) * (self.offset + tp * self.tcost)
+        self.traded_cost += abs(tradepos.pos) * (self.offset + tp * 0.0)
 
     def open_tradepos(self, contracts, price, traded_pos):
         tp = price + misc.sign(traded_pos) * self.offset
@@ -398,7 +398,7 @@ def get_trade_stats(trade_list):
     res['n_trades'] = len(trade_list)
     res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
     res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit>0]))
-    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit<0]))
+    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit<=0]))
     sorted_profit = sorted([trade.profit for trade in trade_list])
     if len(sorted_profit)>5:
         res['largest_profit'] = float(sorted_profit[-1])
@@ -972,7 +972,7 @@ class BacktestManager(object):
             index_col = ['date']
         for df in df_list:
             xdf = df.reset_index().set_index(index_col)
-            pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf['close'] - xdf['close'].shift(1)).fillna(0.0)
+            pnl = (xdf['pos'].shift(1).fillna(0.0) * (xdf['close'] - xdf['close'].shift(1))).fillna(0.0)
             if 'traded_price' in xdf.columns:
                 pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
             if len(sum_pnl) == 0:
@@ -1033,7 +1033,7 @@ class BacktestManager(object):
         res['n_trades'] = len(trade_list)
         res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
         res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit > 0]))
-        res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit < 0]))
+        res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit <= 0]))
         sorted_profit = sorted([trade.profit for trade in trade_list])
         if len(sorted_profit) > 5:
             res['largest_profit'] = float(sorted_profit[-1])
@@ -1060,7 +1060,7 @@ class BacktestManager(object):
         else:
             res['third_loss'] = 0
         res['num_win'] = len([trade.profit for trade in trade_list if trade.profit > 0])
-        res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit < 0])
+        res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit <= 0])
         res['win_ratio'] = 0
         if res['n_trades'] > 0:
             res['win_ratio'] = float(res['num_win']) / float(res['n_trades'])
@@ -1081,7 +1081,7 @@ class BacktestManager(object):
             self.set_config(idx)
             self.load_data(idx)
             for ix, s in enumerate(self.scenarios):
-                if ix in output:
+                if str(ix) in output:
                     continue
                 file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
                 fname1 = file_prefix + '_'+ str(ix) + '_trades.csv'
@@ -1104,7 +1104,7 @@ class BacktestManager(object):
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
-                fname = file_prefix + 'stats.json'
+                fname = file_prefix + '_stats.json'
                 with open(fname, 'w') as ofile:
                     json.dump(output, ofile)
             res = pd.DataFrame.from_dict(output, orient = 'index')
@@ -1206,7 +1206,8 @@ class ContBktestManager(BacktestManager):
                 for idy in range(abs(min(cont_map)), len(self.contlist[asset[0]]) - max(cont_map)):
                     cont = self.contlist[asset[0]][idy]
                     self.prepare_data(idx, cont_idx = idy)
-                    sim_df, closed_trades = self.sim_func(self.config)
+                    sim_strat = self.sim_class(self.config)
+                    sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                     df_list.append(sim_df)
                     trade_list = trade_list + closed_trades
                     (res_pnl, ts) = self.get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
@@ -1231,7 +1232,7 @@ class ContBktestManager(BacktestManager):
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
-                fname = file_prefix + 'stats.json'
+                fname = file_prefix + '_stats.json'
                 with open(fname, 'w') as ofile:
                     json.dump(output, ofile)
             cont_df = pd.DataFrame()

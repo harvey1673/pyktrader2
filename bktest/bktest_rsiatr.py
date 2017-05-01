@@ -37,7 +37,10 @@ class RSIATRSim(StratSim):
         self.sell_trig = 0.0
      
     def process_data(self, mdf):
-        xdf = dh.conv_ohlc_freq(mdf, self.freq, extra_cols = ['contract'])
+        if int(self.freq[:-3]) == 1:
+            xdf = mdf
+        else:
+            xdf = dh.conv_ohlc_freq(mdf, self.freq, extra_cols = ['contract'])
         xdf['ATR'] = dh.ATR(xdf, n = self.atr_len).shift(1)
         xdf['ATRMA'] = dh.MA(xdf, n=self.atrma_len, field = 'ATR')
         xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len).shift(1).fillna(0)        
@@ -55,7 +58,7 @@ class RSIATRSim(StratSim):
                or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, tradepos, sim_data, n):
-        gap = (int((self.SL * sim_data['close'][n]) / self.tick_base) + 1) * self.tick_base
+        gap = (int((self.SL * sim_data['close'][n]) / float(self.tick_base)) + 1) * float(self.tick_base)
         return gap
 
     def on_bar(self, sim_data, n):
@@ -66,7 +69,7 @@ class RSIATRSim(StratSim):
         if len(self.positions)>0:
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
             for tradepos in self.positions:
-                if need_close or (tradepos.pos * target_pos < 0):
+                if need_close:
                     self.close_tradepos(tradepos, sim_data['open'][n+1])
             self.positions = [pos for pos in self.positions if not pos.is_closed]
             if need_close:
