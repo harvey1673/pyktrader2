@@ -156,7 +156,7 @@ def bar_conv_func2(min_ts):
         return bar_id
 
 def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = bar_conv_func2, extra_cols = []):
-    df = mdf.copy(deep=True)
+    df = mdf
     min_func = lambda df: min2daily(df, extra_cols)
     if index_col == None:
         df = df.set_index('datetime')

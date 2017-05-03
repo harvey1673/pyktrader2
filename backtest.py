@@ -96,15 +96,22 @@ class StratSim(object):
         sim_data = dra.data
         nlen = len(dra)
         self.scur_day = sim_data['date'][0]
-        for n in range(1, nlen-1):
+        for n in range(1, nlen):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
             sim_data['pos'][n] = sim_data['pos'][n - 1]
-            if self.check_data_invalid(sim_data, n):
-                continue
             if self.scur_day != sim_data['date'][n]:
                 self.scur_day = sim_data['date'][n]
                 self.daily_initialize(sim_data, n)
-            self.check_curr_pos(sim_data, n)
+            if self.check_data_invalid(sim_data, n):
+                continue
+            if (n >= nlen - 2) or (sim_data['contract'][n]!=sim_data['contract'][n+1]):
+                if (len(self.positions) > 0):
+                    for tradepos in self.positions:
+                        self.close_tradepos(tradepos, sim_data['open'][n])
+                    self.positions = []
+                continue
+            else:
+                self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
             if self.traded_price == 0:
@@ -113,12 +120,8 @@ class StratSim(object):
                 sim_data['traded_price'][n] = self.traded_price
             self.traded_vol = self.traded_cost = 0
             self.traded_price = 0
-            if n < nlen - 2:
+            if n < nlen - 3:
                 self.on_bar(sim_data, n)
-            elif len(self.positions) > 0:
-                for tradepos in self.positions:
-                    self.close_tradepos(tradepos, sim_data['open'][n+1])
-                self.positions = []
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
@@ -132,8 +135,7 @@ class StratSim(object):
     def check_data_invalid(self, sim_data, n):
         return False
 
-    def close_tradepos(self, tradepos, price):        
-        #print "close", tradepos.direction, traded_price, self.timestamp
+    def close_tradepos(self, tradepos, price):
         tp = price - self.offset * tradepos.direction
         tradepos.close(tp, self.timestamp)
         tradepos.exit_tradeid = self.tradeid
@@ -141,11 +143,11 @@ class StratSim(object):
         self.closed_trades.append(tradepos)        
         self.traded_price = (self.traded_price * self.traded_vol - tp * tradepos.pos)/(self.traded_vol - tradepos.pos)
         self.traded_vol -= tradepos.pos
-        self.traded_cost += abs(tradepos.pos) * (self.offset + tp * 0.0)
+        self.traded_cost += abs(tradepos.pos) * (self.offset + tp * self.tcost)
+        # print "close", self.timestamp, tp, self.traded_price, self.traded_vol
 
     def open_tradepos(self, contracts, price, traded_pos):
         tp = price + misc.sign(traded_pos) * self.offset
-        #print "open", contracts, self.unit * traded_pos, traded_price, self.timestamp
         new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, tp, tp, multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
@@ -154,9 +156,9 @@ class StratSim(object):
         self.traded_price = (self.traded_price * self.traded_vol + tp * new_pos.pos)/(self.traded_vol + new_pos.pos)
         self.traded_vol += new_pos.pos
         self.traded_cost += abs(new_pos.pos) * (self.offset + tp * self.tcost)
+        # print "open", self.timestamp, tp, self.traded_price, self.traded_vol
 
     def check_curr_pos(self, sim_data, n):
-        pos = cost = 0
         for tradepos in self.positions:
             exit_gap = self.get_tradepos_exit(tradepos, sim_data, n)
             ep =  sim_data['low'][n] if tradepos.pos > 0 else sim_data['high'][n]
@@ -845,6 +847,7 @@ class BacktestManager(object):
             sim_class = getattr(sim_class, bktest_split[i])
         self.sim_class = sim_class
         self.sim_func = sim_config['sim_func']
+        self.need_shift = sim_config.get('need_shift', True)
         dir_name = config_file.split('.')[0]
         dir_name = dir_name.split(os.path.sep)[-1]
         test_folder = self.get_bktest_folder()
@@ -949,7 +952,7 @@ class BacktestManager(object):
         asset = self.sim_assets[idx]
         for prod in asset:
             mdf = misc.nearby(prod, self.config['nearby'], self.config['start_date'], self.config['end_date'],
-                          self.config['rollrule'], 'm', need_shift=True, database='hist_data')
+                          self.config['rollrule'], 'm', need_shift = self.need_shift, database='hist_data')
             mdf = cleanup_mindata(mdf, prod)
             self.min_data[prod] = mdf
         #if self.config['need_daily']:
@@ -972,9 +975,12 @@ class BacktestManager(object):
             index_col = ['date']
         for df in df_list:
             xdf = df.reset_index().set_index(index_col)
-            pnl = (xdf['pos'].shift(1).fillna(0.0) * (xdf['close'] - xdf['close'].shift(1))).fillna(0.0)
             if 'traded_price' in xdf.columns:
-                pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
+                field = 'traded_price'
+            else:
+                field  = 'close'
+            pnl = (xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1))).fillna(0.0)
+            # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
             if len(sum_pnl) == 0:
                 sum_pnl = pd.Series(pnl, name='pnl')
             else:

@@ -32,7 +32,7 @@ class RSIATRSim(StratSim):
         self.SL = config['stoploss']
         self.no_trade_set = config['no_trade_set']
         self.pos_freq = config.get('pos_freq', 1)
-        self.exit_min = config.get('exit_min', 2058)
+        self.exit_min = config.get('exit_min', 2060 - int(self.freq[:-3]) * 2)
         self.buy_trig = 0.0
         self.sell_trig = 0.0
      
@@ -41,21 +41,21 @@ class RSIATRSim(StratSim):
             xdf = mdf
         else:
             xdf = dh.conv_ohlc_freq(mdf, self.freq, extra_cols = ['contract'])
-        xdf['ATR'] = dh.ATR(xdf, n = self.atr_len).shift(1)
+        xdf['ATR'] = dh.ATR(xdf, n = self.atr_len)
         xdf['ATRMA'] = dh.MA(xdf, n=self.atrma_len, field = 'ATR')
-        xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len).shift(1).fillna(0)        
-        self.df = xdf.fillna(method='ffill')
+        xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len)
+        self.df = xdf
         self.df['datetime'] = self.df.index
-        self.df['cost'] = 0
-        self.df['pos'] = 0
+        self.df['cost'] = 0.0
+        self.df['pos'] = 0.0
         self.df['traded_price'] = self.df['open']
 
     def daily_initialize(self, sim_data, n):
         pass
 
     def check_data_invalid(self, sim_data, n):
-        return (sim_data['ATR'][n] == 0) or (sim_data['ATRMA'][n] == 0) or (sim_data['RSI'][n] == 0) \
-               or (sim_data['date'][n] != sim_data['date'][n + 1])
+        return np.isnan(sim_data['ATR'][n]) or np.isnan(sim_data['ATRMA'][n]) or np.isnan(sim_data['RSI'][n])
+        # or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, tradepos, sim_data, n):
         gap = (int((self.SL * sim_data['close'][n]) / float(self.tick_base)) + 1) * float(self.tick_base)
@@ -63,20 +63,18 @@ class RSIATRSim(StratSim):
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
-        target_pos = ((sim_data['RSI'][n]>(50+self.rsi_trigger))*1 - (sim_data['RSI'][n]<50-self.rsi_trigger)*1) \
-                        * (sim_data['ATR'][n] >= sim_data['ATRMA'][n])
+        target_pos = ((sim_data['RSI'][n]>50.0 + self.rsi_trigger)*1.0 - (sim_data['RSI'][n]<50.0-self.rsi_trigger)*1.0) \
+                        * (sim_data['ATR'][n] > sim_data['ATRMA'][n])
         curr_pos = 0
         if len(self.positions)>0:
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
-            for tradepos in self.positions:
-                if need_close:
-                    self.close_tradepos(tradepos, sim_data['open'][n+1])
-            self.positions = [pos for pos in self.positions if not pos.is_closed]
             if need_close:
+                for tradepos in self.positions:
+                    self.close_tradepos(tradepos, sim_data['open'][n+1])
+                self.positions = [pos for pos in self.positions if not pos.is_closed]
                 return
             else:
-                if len(self.positions) > 0:
-                    curr_pos = self.positions[0].pos
+                curr_pos = self.positions[0].pos
         if target_pos != 0 and (curr_pos == 0):
             #if curr_pos != 0:
                 #self.close_tradepos(tradepos, sim_data['open'][n+1])
