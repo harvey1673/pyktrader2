@@ -74,8 +74,8 @@ class StratSim(object):
         self.closed_trades = []
         self.tradeid = 0
         self.timestamp = 0
-        self.traded_vol = 0
-        self.traded_cost = 0
+        self.traded_vol = 0.0
+        self.traded_cost = 0.0
         self.traded_price = 0.0
         self.scur_day = None
 
@@ -105,10 +105,9 @@ class StratSim(object):
             if self.check_data_invalid(sim_data, n):
                 continue
             if (n >= nlen - 2) or (sim_data['contract'][n]!=sim_data['contract'][n+1]):
-                if (len(self.positions) > 0):
-                    for tradepos in self.positions:
-                        self.close_tradepos(tradepos, sim_data['open'][n])
-                    self.positions = []
+                for tradepos in self.positions:
+                    self.close_tradepos(tradepos, sim_data['open'][n])
+                self.positions = []
                 continue
             else:
                 self.check_curr_pos(sim_data, n)
@@ -979,7 +978,7 @@ class BacktestManager(object):
                 field = 'traded_price'
             else:
                 field  = 'close'
-            pnl = (xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1))).fillna(0.0)
+            pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
             # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
             if len(sum_pnl) == 0:
                 sum_pnl = pd.Series(pnl, name='pnl')
