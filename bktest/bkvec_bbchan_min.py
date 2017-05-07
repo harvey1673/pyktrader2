@@ -14,16 +14,12 @@ import sys
 
 def bband_chan_sim( mdf, config):
     offset = config['offset']
-    pos_class = config['pos_class']
-    pos_args  = config['pos_args']
-    pos_update = config.get('pos_update', False)
-    stoploss = config.get('stoploss', 0.0)
+    exit_min = config['exit_min']
     param = config['param']
     bar_func = config.get('bar_conv_func', 'dh.bar_conv_func2')
     bar_func = eval(bar_func)
     std_func = eval(config['std_func'])
     ma_func = eval(config['ma_func'])
-    #tick_base = config['tick_base']
     close_daily = config['close_daily']
     win = param[0]
     k = param[1]
@@ -43,41 +39,44 @@ def bband_chan_sim( mdf, config):
     xdf['up_exit'] = xdf['boll_ma'] + xdf['boll_std'] * k_e
     xdf['dn_exit'] = xdf['boll_ma'] - xdf['boll_std'] * k_e
     if chan > 0:
-        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(2)
-        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(2)
+        xdf['chan_h'] = eval(chan_func['high']['func'])(xdf, chan, **chan_func['high']['args']).shift(1)
+        xdf['chan_l'] = eval(chan_func['low']['func'])(xdf, chan, **chan_func['low']['args']).shift(1)
     else:
         xdf['chan_h'] = -10000000
         xdf['chan_l'] = 10000000
     xdf['high_band'] = xdf[['chan_h', 'upbnd']].max(axis=1)
     xdf['low_band'] = xdf[['chan_l', 'lowbnd']].min(axis=1)
-    xdf['prev_close'] = xdf['close'].shift(1)
-    xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
+    xdata = pd.concat([xdf['high_band'], xdf['low_band'],
+                       xdf['up_exit'], xdf['dn_exit'], xdf['boll_ma']],
+                      axis=1, keys=['high_band','low_band', 'up_exit', 'dn_exit', 'boll_ma'])
+    mdf = mdf.join(xdata, how = 'left').fillna(method='ffill')
+    # mdf['prev_close'] = mdf['close'].shift(1)
+    mdf['close_ind'] = np.isnan(mdf['close'].shift(-3))
     if close_daily:
-        daily_end = (xdf['date']!=xdf['date'].shift(-1))
-        xdf['close_ind'] = xdf['close_ind'] | daily_end
-    long_signal = pd.Series(np.nan, index = xdf.index)
-    long_signal[(xdf['open']>=xdf['high_band']) & (xdf['boll_ma'].notnull())] = 1
-    long_signal[(xdf['open']<=xdf['dn_exit']) & (xdf['boll_ma'].notnull())] = 0
-    long_signal[xdf['close_ind']] = 0
+        mdf['close_ind'] = (mdf['min_id'] >= exit_min) | mdf['close_ind']
+    long_signal = pd.Series(np.nan, index = mdf.index)
+    long_signal[(mdf['open']>=mdf['high_band']) & (mdf['boll_ma'].notnull())] = 1
+    long_signal[(mdf['open']<=mdf['dn_exit']) & (mdf['boll_ma'].notnull())] = 0
+    long_signal[mdf['close_ind']] = 0
     long_signal = long_signal.fillna(method='ffill').fillna(0)
-    short_signal = pd.Series(np.nan, index = xdf.index)
-    short_signal[(xdf['open']<=xdf['low_band']) & (xdf['boll_ma'].notnull())] = -1
-    short_signal[(xdf['open']>=xdf['up_exit']) & (xdf['boll_ma'].notnull())] = 0
-    short_signal[xdf['close_ind']] = 0
+    short_signal = pd.Series(np.nan, index = mdf.index)
+    short_signal[(mdf['open']<=mdf['low_band']) & (mdf['boll_ma'].notnull())] = -1
+    short_signal[(mdf['open']>=mdf['up_exit']) & (mdf['boll_ma'].notnull())] = 0
+    short_signal[mdf['close_ind']] = 0
     short_signal = short_signal.fillna(method='ffill').fillna(0)
-    if len(xdf[(long_signal>0) & (short_signal<0)])>0:
-        print xdf[(long_signal > 0) & (short_signal < 0)]
+    if len(mdf[(long_signal>0) & (short_signal<0)])>0:
+        print mdf[(long_signal > 0) & (short_signal < 0)]
         print "something wrong with the position as long signal and short signal happen the same time"
-    xdf['pos'] = long_signal + short_signal
-    xdf['cost'] = abs(xdf['pos'] - xdf['pos'].shift(1)) * (offset + xdf['open'] * tcost)
-    xdf['cost'] = xdf['cost'].fillna(0.0)
-    xdf['traded_price'] = xdf.open + (xdf['pos'] - xdf['pos'].shift(1)) * offset
-    closed_trades = backtest.simdf_to_trades1(xdf, slippage = offset )
-    return (xdf, closed_trades)
+    mdf['pos'] = long_signal + short_signal
+    mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (offset + mdf['open'] * tcost)
+    mdf['cost'] = mdf['cost'].fillna(0.0)
+    mdf['traded_price'] = mdf.open + (mdf['pos'] - mdf['pos'].shift(1)) * offset
+    closed_trades = backtest.simdf_to_trades1(mdf, slippage = offset )
+    return (mdf, closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest.bkvec_bband_chan.bband_chan_sim'
+    sim_config['sim_func']  = 'bktest.bkvec_bbchan_min.bband_chan_sim'
     sim_config['scen_keys'] = ['param']
     sim_config['sim_name']   = 'BandChan_30min_HL_2y'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', 'cs', 'jd', \
