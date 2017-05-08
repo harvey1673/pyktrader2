@@ -646,12 +646,12 @@ class Agent(MktDataMixin):
                 self.logger.warning('the tick timestamp has more than 10sec diff from the system time, inst=%s, ticknum= %s, now_ticknum=%s' % (tick.instID, cur_ticknum, now_ticknum))
         if not self.update_instrument(tick):
             return
-        self.update_min_bar(tick)
-        inst = tick.instID
         if inst in self.inst2spread:
             for key in self.inst2spread[inst]:
                 self.trade_manager.check_pending_trades(key)
-        self.trade_manager.check_pending_trades(inst)
+        self.trade_manager.check_pending_trades(inst)            
+        self.update_min_bar(tick)
+        inst = tick.instID        
         if inst in self.inst2spread:
             for key in self.inst2spread[inst]:
                 self.trade_manager.process_trades(key)
