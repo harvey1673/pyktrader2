@@ -354,18 +354,17 @@ class TradeManager(object):
         if key not in self.pending_trades:
             return
         for xtrade in self.pending_trades[key]:
-            curr_price = xtrade.underlying.ask_price1 if xtrade.vol > 0 else xtrade.underlying.ask_price1 
+            curr_price = xtrade.underlying.ask_price1 if xtrade.vol > 0 else xtrade.underlying.bid_price1 
             if (curr_price - xtrade.limit_price) * xtrade.vol >= 0:
                 xtrade.status = TradeStatus.Ready
                 alive_trades.append(xtrade)
         self.pending_trades[key] = [xtrade for xtrade in self.pending_trades[key] if xtrade.status == TradeStatus.Pending]
         [self.add_trade(xtrade) for xtrade in alive_trades]
-        if key in self.tradebooks:
-            self.tradebooks[key].match_trades()
 
     def process_trades(self, key):
         if key not in self.tradebooks:
             return
+        self.tradebooks[key].match_trades()
         for trade_id in self.tradebooks[key].get_all_trades():
             xtrade = self.ref2trade[trade_id]
             xtrade.execute()
