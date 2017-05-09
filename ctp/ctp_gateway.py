@@ -14,6 +14,7 @@ from ctpDataType import *
 import logging
 import datetime
 import position
+import order
 
 # 以下为一些VT类型和CTP类型的映射字典
 # 价格类型映射
@@ -190,7 +191,7 @@ class CtpGateway(GrossGateway):
         self.order_stats[iorder.instrument]['cancel'] += 1
         self.order_stats['total_cancel'] += 1
         self.onLog( u'A_CC:取消命令: OrderRef=%s, OrderSysID=%s, instID=%s, volume=%s, filled=%s, cancelled=%s' % (iorder.local_id, \
-                            iorder.sys_id, iorder.instrument, iorder.volume, iorder.filled_volume, iorder.cancelled_volume), level = logging.DEBUG)     		
+                            iorder.sys_id, iorder.instrument, iorder.volume, iorder.filled_volume, iorder.cancelled_volume), level = logging.DEBUG)             
         
     #----------------------------------------------------------------------
     def qryAccount(self):
@@ -441,7 +442,7 @@ class CtpGateway(GrossGateway):
         last = event.dict['last']
         if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
             cont = {}
-            cont['instID'] = data['InstrumentID']			
+            cont['instID'] = data['InstrumentID']           
             margin_l = data['LongMarginRatio']
             if margin_l >= 1.0:
                 margin_l = 0.0
@@ -516,7 +517,7 @@ class CtpGateway(GrossGateway):
                 elif sorder['OrderStatus'] in ['3', '1', 'a']:
                     if iorder.status != order.OrderStatus.Sent:
                         iorder.status = order.OrderStatus.Sent                        
-                        logContent = 'order status for OrderSysID = %s, Inst=%s is set to %s, but should be waiting in exchange queue' % (iorder.sys_id, iorder.instrument.name, iorder.status)
+                        logContent = 'order status for OrderSysID = %s, Inst=%s is set to %s, but should be waiting in exchange queue' % (iorder.sys_id, iorder.instrument, iorder.status)
                         self.onLog(logContent, level = logging.INFO)
                 elif sorder['OrderStatus'] in ['5', '2', '4']:
                     if iorder.status != order.OrderStatus.Cancelled:
@@ -530,13 +531,13 @@ class CtpGateway(GrossGateway):
             for local_id in self.id2order:
                 if (local_id not in self.system_orders):
                     iorder = self.id2order[local_id]
-                    iorder.on_cancel()
-                    event = Event(type=EVENT_ETRADEUPDATE)
-                    event.dict['trade_ref'] = iorder.trade_ref
-                    self.eventEngine.put(event)
-                    logContent = 'order_ref = %s is canncelled by qryOrder' % (local_id, \
-                                    iorder.instrument.name, iorder.status)
-                    self.onLog(logContent, level=logging.WARNING)
+                    if iorder.status in order.Alive_Order_Status:
+                        iorder.on_cancel()
+                        event = Event(type=EVENT_ETRADEUPDATE)
+                        event.dict['trade_ref'] = iorder.trade_ref
+                        self.eventEngine.put(event)
+                        logContent = 'order_ref=%s (Inst=%s,status=%s)is canncelled by qryOrder' % (local_id, iorder.instrument, iorder.status)
+                        self.onLog(logContent, level=logging.WARNING)
             self.system_orders = []
 
     def err_order_insert(self, event):
