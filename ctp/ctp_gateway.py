@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# encoding: UTF-8
 
 '''
 vn.ctp的gateway接入
@@ -179,7 +179,7 @@ class CtpGateway(GrossGateway):
         if self.order_stats[inst.name]['submit'] >= self.order_constraints['submit_limit']:
             self.order_stats[inst.name]['status'] = False
         if self.order_stats['total_submit'] >= self.order_constraints['total_submit']:
-            for instID in self.order_stats:
+            for instID in self.instruments:
                 self.order_stats[instID]['status'] = False
         return
 
@@ -247,8 +247,8 @@ class CtpGateway(GrossGateway):
     def rsp_td_login(self, event):
         self.qry_commands.append(self.tdApi.qryAccount)
         self.qry_commands.append(self.tdApi.qryPosition)
-        self.qry_commands.append(self.tdApi.qryOrder)
-        self.qry_commands.append(self.tdApi.qryTrade)
+        #self.qry_commands.append(self.tdApi.qryOrder)
+        #self.qry_commands.append(self.tdApi.qryTrade)
 
     def onOrder(self, order):
         pass
@@ -387,6 +387,7 @@ class CtpGateway(GrossGateway):
         tick.exchange = exchangeMapReverse.get(data['ExchangeID'], u'未知')
         product = inst2product(tick.instID)
         hrs = trading_hours(product, tick.exchange)
+        tick_status = True
         bad_tick = True
         for ptime in hrs:
             if (tick_id>=ptime[0]*1000-self.md_data_buffer) and (tick_id< ptime[1]*1000+self.md_data_buffer):
@@ -439,17 +440,11 @@ class CtpGateway(GrossGateway):
     def rsp_qry_instrument(self, event):
         data = event.dict['data']
         last = event.dict['last']
-        if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
+        if data['ProductClass'] == '1' and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
             cont = {}
             cont['instID'] = data['InstrumentID']			
-            margin_l = data['LongMarginRatio']
-            if margin_l >= 1.0:
-                margin_l = 0.0
-            cont['margin_l'] = margin_l
-            margin_s = data['ShortMarginRatio']
-            if margin_s >= 1.0:
-                margin_s = 0.0
-            cont['margin_s'] = margin_s
+            cont['margin_l'] = data['LongMarginRatio']
+            cont['margin_s'] = data['ShortMarginRatio']
             cont['start_date'] =data['OpenDate']
             cont['expiry'] = data['ExpireDate']
             cont['product_code'] = data['ProductID']
@@ -524,9 +519,8 @@ class CtpGateway(GrossGateway):
                         event = Event(type=EVENT_ETRADEUPDATE)
                         event.dict['trade_ref'] = iorder.trade_ref
                         self.eventEngine.put(event)
-                        logContent = 'order status for OrderSysID = %s, Inst=%s is set to %s, but should be waiting in exchange queue' % (iorder.sys_id, iorder.instrument.name, iorder.status)
+                        logContent = 'order status for OrderSysID = %s, Inst=%s is set to %s, but should be cancelled in exchange queue' % (iorder.sys_id, iorder.instrument.name, iorder.status)
                         self.onLog(logContent, level = logging.INFO)
-
         if isLast:
             for local_id in self.id2order:
                 if (local_id not in self.system_orders):
@@ -535,6 +529,8 @@ class CtpGateway(GrossGateway):
                     event = Event(type=EVENT_ETRADEUPDATE)
                     event.dict['trade_ref'] = iorder.trade_ref
                     self.eventEngine.put(event)
+                    logContent = 'order_ref = %s is canncelled by qryOrder' % (local_id, iorder.instrument.name, iorder.status)
+                        self.onLog(logContent, level = logging.WARNING)
             self.system_orders = []
 
     def err_order_insert(self, event):
@@ -554,7 +550,8 @@ class CtpGateway(GrossGateway):
             event = Event(type=EVENT_ETRADEUPDATE)
             event.dict['trade_ref'] = myorder.trade_ref
             self.eventEngine.put(event)
-        logContent = 'OrderInsert is not accepted by CTP, local_id=%s, instrument=%s. ' % (local_id, inst)
+        logContent = 'OrderInsert is not accepted by CTP, local_id=%s, instrument=%s' % (local_id, inst)
+        print local_id, inst, error['ErrorMsg']
         if inst not in self.order_stats:
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
         self.order_stats[inst]['failure'] += 1
@@ -583,7 +580,8 @@ class CtpGateway(GrossGateway):
                 self.qry_commands.append(self.tdApi.qryOrder)
         else:
             self.qry_commands.append(self.tdApi.qryOrder)
-        logContent = 'Order Cancel is wrong, local_id=%s, instrument=%s. ' % (porder['OrderRef'], inst)
+        logContent = 'Order Cancel is wrong, local_id=%s, instrument=%s' % (porder['OrderRef'], inst)
+        print local_id, inst, error['ErrorMsg']
         if inst not in self.order_stats:
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
         self.order_stats[inst]['failure'] += 1
@@ -592,7 +590,6 @@ class CtpGateway(GrossGateway):
             self.order_stats[inst]['status'] = False
             logContent += 'Failed order reaches the limit, disable instrument = %s' % inst
         self.onLog(logContent, level = logging.WARNING)
-
 
 if __name__ == '__main__':
     pass
