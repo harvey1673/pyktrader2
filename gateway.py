@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# encoding: UTF-8
 import pandas as pd
 import time
 import os
@@ -232,7 +232,7 @@ class Gateway(object):
                  'action_type', 'direction', 'price_type',
                  'limitprice', 'order_time', 'status', 'order_class', 'trade_ref'])
             for iorder in order_list:
-                forders = [ str(key) + ':' + '_'.join([str(s) for s in iorder.filled_orders[key]]) for key in iorder.filled_orders ]
+                forders = [ str(key) + ':' + '_'.join([str(s) for s in iorder.filled_orders[key]]) for key in iorder.filled_orders if len(key) > 0 ]
                 filled_str = '|'.join(forders)
                 file_writer.writerow(
                     [iorder.order_ref, iorder.local_id, iorder.sys_id, iorder.instrument, iorder.volume,
@@ -400,25 +400,29 @@ class GrossGateway(Gateway):
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
         vol = abs(volume)
         pos = self.positions[instID]
-        can_close = pos.can_close.long if volume > 0 else pos.can_close.short
-        can_yclose = pos.can_yclose.long if volume > 0 else pos.can_yclose.short
-        n_orders = order_num        
+        if volume > 0:
+            can_close = pos.can_close.long
+            can_yclose = pos.can_yclose.long
+        else:
+            can_close = pos.can_close.short
+            can_yclose = pos.can_yclose.short        
+        n_orders = order_num
+        is_shfe = (pos.instrument.exchange == 'SHFE')
         res = []
-        if can_close > 0 and vol > 0:
-            if (n_orders > 1) or (can_close >= vol):
-                trade_vol = min(vol, can_close)
-                res.append((OF_CLOSE_TDAY if pos.instrument.exchange == 'SHFE' else OF_CLOSE, trade_vol))
-                vol -= trade_vol
-                n_orders -= 1
-        if can_yclose > 0 and vol > 0:
-            if (n_orders > 1) or (can_yclose >= vol):
-                trade_vol = min(vol, can_yclose)
-                res.append((OF_CLOSE_YDAY, trade_vol))
-                vol -= trade_vol
-                n_orders -= 1
+        if (can_close > 0) and (vol > 0) and ((n_orders > 1) or (can_close >= vol)):
+            trade_vol = min(vol, can_close)
+            offset = OF_CLOSE_TDAY if is_shfe else OF_CLOSE
+            res.append((offset, trade_vol))
+            vol -= trade_vol
+            n_orders -= 1
+        if (can_yclose > 0) and (vol > 0) and is_shfe and ((n_orders > 1) or (can_yclose >= vol)):
+            trade_vol = min(vol, can_yclose)
+            res.append((OF_CLOSE_YDAY, trade_vol))
+            vol -= trade_vol
+            n_orders -= 1
         if vol > 0:
             res.append((OF_OPEN, vol))
-        return res    
+        return res
 
     def book_spd_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
