@@ -1,4 +1,4 @@
-# encoding: UTF-8
+# -*- coding: utf-8 -*-
 import pandas as pd
 import time
 import os
@@ -232,7 +232,7 @@ class Gateway(object):
                  'action_type', 'direction', 'price_type',
                  'limitprice', 'order_time', 'status', 'order_class', 'trade_ref'])
             for iorder in order_list:
-                forders = [ str(key) + ':' + '_'.join([str(s) for s in iorder.filled_orders[key]]) for key in iorder.filled_orders if len(key) > 0 ]
+                forders = [ str(key) + ':' + '_'.join([str(s) for s in iorder.filled_orders[key]]) for key in iorder.filled_orders if len(str(key))>0 ]
                 filled_str = '|'.join(forders)
                 file_writer.writerow(
                     [iorder.order_ref, iorder.local_id, iorder.sys_id, iorder.instrument, iorder.volume,
@@ -323,6 +323,7 @@ class Gateway(object):
         new_orders = [order.Order(instID, limit_price, v, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref) \
                                                             for (action_type, v) in order_offsets]
         self.add_orders(new_orders)
+        self.positions[instID].re_calc()
         return new_orders
 
     def calc_margin(self):
@@ -405,9 +406,9 @@ class GrossGateway(Gateway):
             can_yclose = pos.can_yclose.long
         else:
             can_close = pos.can_close.short
-            can_yclose = pos.can_yclose.short        
-        n_orders = order_num
+            can_yclose = pos.can_yclose.short
         is_shfe = (pos.instrument.exchange == 'SHFE')
+        n_orders = order_num        
         res = []
         if (can_close > 0) and (vol > 0) and ((n_orders > 1) or (can_close >= vol)):
             trade_vol = min(vol, can_close)
@@ -422,7 +423,7 @@ class GrossGateway(Gateway):
             n_orders -= 1
         if vol > 0:
             res.append((OF_OPEN, vol))
-        return res
+        return res    
 
     def book_spd_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
@@ -432,6 +433,8 @@ class GrossGateway(Gateway):
         action_type = ''.join([offset[0][0] for offset in res])
         new_order = order.SpreadOrder(instID, limit_price, vol, self.agent.tick_id, action_type, direction, price_type, trade_ref)
         self.add_order(new_order)
+        for inst in instIDs:
+            self.positions[inst].re_calc()
         return [new_order]
         
 ########################################################################

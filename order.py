@@ -102,12 +102,9 @@ class Order(object):
         return (self.filled_volume == self.volume) 
 
     def __unicode__(self):
-        return u'Order_A: 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument,
-                u'多' if self.direction==ORDER_BUY else u'空',
-                self.volume,
-                self.filled_volume,
-                self.status,
-            )
+        return u'Order_A: order_ref = %s, 合约=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.order_ref, \
+                    self.instrument, u'多' if self.direction==ORDER_BUY else u'空',
+                    self.volume, self.filled_volume, self.status, )
 
     def __str__(self):
         return unicode(self).encode('utf-8')

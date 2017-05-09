@@ -71,12 +71,12 @@ class GrossPosition(Position):
                     yday_c_locked.long += mo.volume
                 else:
                     yday_closed.short += mo.filled_volume
-                    yday_c_locked.short += mo.volume    
-        
+                    yday_c_locked.short += mo.volume
+
         self.update_can_close(tday_opened, tday_c_locked, yday_c_locked)
         self.tday_pos.long  = tday_opened.long + tday_closed.long + yday_closed.long
         self.tday_pos.short = tday_opened.short + tday_closed.short + yday_closed.short
-        
+
         if self.tday_pos.long > 0:
             self.tday_avp.long = sum([o.filled_price*o.filled_volume for o in self.orders if o.direction == ORDER_BUY])/self.tday_pos.long
         else:
@@ -84,18 +84,15 @@ class GrossPosition(Position):
         if self.tday_pos.short > 0:
             self.tday_avp.short= sum([o.filled_price*o.filled_volume for o in self.orders if o.direction == ORDER_SELL])/self.tday_pos.short
         else:
-            self.tday_avp.short = 0.0        
-        
+            self.tday_avp.short = 0.0
+
         self.curr_pos.long = tday_opened.long - tday_closed.short + self.pos_yday.long - yday_closed.short
         self.curr_pos.short =tday_opened.short- tday_closed.long  + self.pos_yday.short- yday_closed.long
         self.locked_pos.long = self.pos_yday.long -yday_closed.short+ tday_o_locked.long - tday_closed.short
         self.locked_pos.short =self.pos_yday.short-yday_closed.long + tday_o_locked.short- tday_closed.long
-        
         self.can_open.long  = max(self.instrument.max_holding[0] - self.locked_pos.long,0)
         self.can_open.short = max(self.instrument.max_holding[1] - self.locked_pos.short,0)
-        #logging.debug(u'P_RC_1:%s 重算头寸，当前已开数 long=%s,short=%s 当前锁定数 long=%s,short=%s, 昨日仓位long=%s,short=%s' \
-        #            % (str(self), self.curr_pos.long,self.curr_pos.short,self.locked_pos.long,self.locked_pos.short, self.pos_yday.long, self.pos_yday.short))
-    
+
     def get_open_volume(self):
         return (self.can_open.long, self.can_open.short)
     
