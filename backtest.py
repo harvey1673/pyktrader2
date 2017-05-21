@@ -98,10 +98,9 @@ class StratSim(object):
         self.scur_day = sim_data['date'][0]
         for n in range(1, nlen):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
+            self.traded_vol = self.traded_cost = 0
+            self.traded_price = 0
             sim_data['pos'][n] = sim_data['pos'][n - 1]
-            if self.scur_day != sim_data['date'][n]:
-                self.scur_day = sim_data['date'][n]
-                self.daily_initialize(sim_data, n)
             if self.check_data_invalid(sim_data, n):
                 continue
             if (n >= nlen - 2) or (sim_data['contract'][n]!=sim_data['contract'][n+1]):
@@ -110,17 +109,17 @@ class StratSim(object):
                 self.positions = []
                 continue
             else:
-                self.check_curr_pos(sim_data, n)
+                self.on_bar(sim_data, n-1)
+            self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
             if self.traded_price == 0:
                 sim_data['traded_price'][n] = sim_data['close'][n]
             else:
                 sim_data['traded_price'][n] = self.traded_price
-            self.traded_vol = self.traded_cost = 0
-            self.traded_price = 0
-            if n < nlen - 3:
-                self.on_bar(sim_data, n)
+            if self.scur_day != sim_data['date'][n+1]:
+                self.scur_day = sim_data['date'][n+1]
+                self.daily_initialize(sim_data, n)
         pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
         tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
         cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
