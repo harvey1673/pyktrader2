@@ -48,7 +48,7 @@ class RSIATRSim(StratSim):
         self.df['datetime'] = self.df.index
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
-        self.df['traded_price'] = self.df['open']
+        self.df['traded_price'] = self.df['close']
 
     def daily_initialize(self, sim_data, n):
         pass
@@ -71,7 +71,7 @@ class RSIATRSim(StratSim):
             if need_close:
                 for tradepos in self.positions:
                     self.close_tradepos(tradepos, sim_data['open'][n+1])
-                self.positions = [pos for pos in self.positions if not pos.is_closed]
+                self.positions = []
                 return
             else:
                 curr_pos = self.positions[0].pos

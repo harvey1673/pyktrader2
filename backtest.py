@@ -96,27 +96,22 @@ class StratSim(object):
         sim_data = dra.data
         nlen = len(dra)
         self.scur_day = sim_data['date'][0]
-        for n in range(1, nlen):
+        for n in range(1, nlen-1):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
             self.traded_vol = self.traded_cost = 0
-            self.traded_price = 0
+            self.traded_price = sim_data['close'][n]
             sim_data['pos'][n] = sim_data['pos'][n - 1]
-            if self.check_data_invalid(sim_data, n):
-                continue
-            if (n >= nlen - 2) or (sim_data['contract'][n]!=sim_data['contract'][n+1]):
-                for tradepos in self.positions:
-                    self.close_tradepos(tradepos, sim_data['open'][n])
-                self.positions = []
-                continue
-            else:
-                self.on_bar(sim_data, n-1)
-            self.check_curr_pos(sim_data, n)
+            if not self.check_data_invalid(sim_data, n-1):
+                if (n >= nlen - 2) or (sim_data['contract'][n]!=sim_data['contract'][n+1]):
+                    for tradepos in self.positions:
+                        self.close_tradepos(tradepos, sim_data['open'][n])
+                    self.positions = []
+                else:
+                    self.on_bar(sim_data, n-1)
+                    self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
-            if self.traded_price == 0:
-                sim_data['traded_price'][n] = sim_data['close'][n]
-            else:
-                sim_data['traded_price'][n] = self.traded_price
+            sim_data['traded_price'][n] = self.traded_price
             if self.scur_day != sim_data['date'][n+1]:
                 self.scur_day = sim_data['date'][n+1]
                 self.daily_initialize(sim_data, n)
