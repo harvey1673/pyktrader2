@@ -7,6 +7,7 @@ from strategy import *
  
 class RsiAtrStrat(Strategy):
     common_params =  dict( Strategy.common_params, **{'price_limit_buffer': 5, 'daily_close_buffer': 2, \
+                                                      'pos_class': 'TargetTrailTradePos', 'pos_args': {},
                                                       'data_func': [["RSI", "dh.RSI_F", "dh.rsi_f", {'field':'close'}], \
                                                                      ["ATR", "dh.ATR", "dh.atr"], \
                                                                     ["ATRMA", "dh.MA", "dh.ma"]]})
@@ -97,7 +98,7 @@ class RsiAtrStrat(Strategy):
         save_status = False
         if (min_id >= self.last_min_id[idx]) or (len(self.positions[idx])>0) or (self.trade_unit[idx] <= 0):
             return save_status
-        buysell = (self.rsi[idx] > 50 + self.rsi_th[idx]) * 1.0 - (self.rsi[idx] < 50 - self.rsi_th[idx]) * 1.0
+        buysell = (self.rsi[idx] > 50 + self.rsi_th[idx]) * 1 - (self.rsi[idx] < 50 - self.rsi_th[idx]) * 1
         buysell = buysell * (self.atr[idx] > self.atrma[idx])
         if buysell != 0:
             msg = 'RSI-ATR to open position for inst = %s, ATRMA=%s, ATR=%s, RSI=%s, curr_price= %s, direction=%s, volume=%s' \
