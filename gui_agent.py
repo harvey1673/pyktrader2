@@ -62,6 +62,8 @@ class Gui(tk.Tk):
                 self.strat_gui[strat_name] = MASystemStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['AsctrendTrader']:
                 self.strat_gui[strat_name] = AsctrendStratGui(strat, app, self)
+            elif strat.__class__.__name__ in ['RsiAtrStrat']:
+                self.strat_gui[strat_name] = RsiAtrStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'RBreaker':
                 self.strat_gui[strat_name] = RBStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'TurtleTrader':

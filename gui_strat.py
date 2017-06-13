@@ -281,6 +281,29 @@ class AsctrendStratGui(StratGui):
                             'Freq': 'int',
                             }
 
+class RsiAtrStratGui(StratGui):
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiWin', 'RsiTh', 'AtrWin', 'AtrmaWin', 'Atr', 'Rsi', 'Atrma']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
+                            'CurrPrices': 'float',
+                            'RsiWin': 'int',
+                            'RsiTh': 'float',
+                            'Rsi': 'float',
+                            'Atr': 'float',
+                            'Atrma': 'float',
+                            'AtrWin': 'int',
+                            'AtrmaWin': 'int',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            'Freq': 'int',
+                            }
+
 class RBStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)

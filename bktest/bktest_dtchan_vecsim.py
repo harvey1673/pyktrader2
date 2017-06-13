@@ -12,7 +12,7 @@ from backtest import *
 
 class DTChanSim(StratSim):
     def __init__(self, config):
-        super(DTStopSim, self).__init__(config)
+        super(DTChanSim, self).__init__(config)
 
     def process_config(self, config): 
         self.close_daily = config['close_daily']
@@ -45,6 +45,7 @@ class DTChanSim(StratSim):
         self.exit_min = config.get('exit_min', 2058)
         self.buy_trig = 0.0
         self.sell_trig = 0.0
+        self.combo_signal = config.get('combo', True)
      
     def process_data(self, mdf):
         xdf = self.proc_func(mdf, **self.proc_args)
@@ -121,7 +122,7 @@ class DTChanSim(StratSim):
         addon_signal = copy.deepcopy(mdf['dt_signal'])
         mdf['dt_signal'] = mdf['dt_signal'].fillna(method='ffill').fillna(0)
         mdf['chan_sig'] = np.nan
-        if combo_signal:
+        if self.combo_signal:
             mdf.ix[(up_price >= mdf['chan_h']) & (addon_signal > 0), 'chan_sig'] = 1
             mdf.ix[(dn_price <= mdf['chan_l']) & (addon_signal < 0), 'chan_sig'] = -1
         else:
@@ -134,12 +135,12 @@ class DTChanSim(StratSim):
         mdf['cost'] = abs(mdf['pos'] - mdf['pos'].shift(1)) * (self.offset + mdf['open'] * self.tcost)
         mdf['cost'] = mdf['cost'].fillna(0.0)
         mdf['traded_price'] = mdf['open']
-        self.closed_trades = backtest.simdf_to_trades1(mdf, slippage = self.offset )
+        self.closed_trades = simdf_to_trades1(mdf, slippage = self.offset )
         return (mdf, self.closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_class']  = 'bktest_dtchan_vecsim.DTStopSim'
+    sim_config['sim_class']  = 'bktest_dtchan_vecsim.DTChanSim'
     sim_config['sim_func'] = 'run_vec_sim'
     sim_config['scen_keys'] = ['param', 'chan']
     sim_config['sim_name']   = 'DTChan_VecSim'

@@ -458,21 +458,37 @@ def KST(df, r1, r2, r3, r4, n1, n2, n3, n4):
 
 #Relative Strength Index
 def RSI(df, n, field='close'):
-    return pd.Series(talib.RSI(df[field].values, n), index = df.index, name='RSI_%s' % str(n))
-    #UpMove = df[field] - df[field].shift(1)
-    #DoMove = df[field].shift(1) - df[field]
-    #UpD = pd.Series(UpMove)
-    #DoD = pd.Series(DoMove)
-    #UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
-    #DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
-    #PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1))
-    #NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1))
-    #RSI = pd.Series(PosDI / (PosDI + NegDI) * 100, name = 'RSI' + str(n))
-    #return RSI
+    return pd.Series(talib.RSI(df[field].values, n), index = df.index, name='RSI%s' % str(n))
 
 def rsi(df, n, field = 'close'):
-    RSI_key = 'RSI_%s' % str(n)
+    RSI_key = 'RSI%s' % str(n)
     df[RSI_key][-1] = talib.RSI(df[field][(-n-1):], n)[-1]
+
+def RSI_F(df, n, field='close'):
+    UpMove = df[field] - df[field].shift(1)
+    DoMove = df[field].shift(1) - df[field]
+    UpD = pd.Series(UpMove)
+    DoD = pd.Series(DoMove)
+    UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
+    DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
+    PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1), name = "RSI"+str(n)+'_UP')
+    NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1), name = "RSI"+str(n)+'_DN')
+    RSI = pd.Series(PosDI / (PosDI + NegDI) * 100, name = 'RSI' + str(n))
+    return pd.concat([RSI, PosDI, NegDI], join='outer', axis=1)
+
+def rsi_f(df, n, field = 'close'):
+    RSI_key = 'RSI%s' % str(n)
+    dx = df[field][-1] - df[field][-2]
+    alpha = 2.0/(1 + n)
+    if dx > 0:
+        upx = dx
+        dnx = 0
+    else:
+        upx = 0
+        dnx = -dx
+    udi = df[RSI_key + '_UP'][-1] = df[RSI_key + '_UP'][-2] * (1 - alpha) + upx * alpha
+    ddi = df[RSI_key + '_DN'][-1] = df[RSI_key + '_DN'][-2] * (1 - alpha) + dnx * alpha
+    df[RSI_key][-1] = udi/(udi + ddi) * 100.0
     
 #True Strength Index
 def TSI(df, r, s):

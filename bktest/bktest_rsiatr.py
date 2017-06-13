@@ -32,15 +32,16 @@ class RSIATRSim(StratSim):
         self.SL = config['stoploss']
         self.no_trade_set = config['no_trade_set']
         self.pos_freq = config.get('pos_freq', 1)
-        self.exit_min = config.get('exit_min', 2060 - int(self.freq[:-3]) * 2)
+        self.exit_min = config.get('exit_min', 2060 - self.freq * 2)
         self.buy_trig = 0.0
         self.sell_trig = 0.0
      
     def process_data(self, mdf):
-        if int(self.freq[:-3]) == 1:
+        if self.freq == 1:
             xdf = mdf
         else:
-            xdf = dh.conv_ohlc_freq(mdf, self.freq, extra_cols = ['contract'])
+            freq_str = str(self.freq) + "min"
+            xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols = ['contract'])
         xdf['ATR'] = dh.ATR(xdf, n = self.atr_len)
         xdf['ATRMA'] = dh.MA(xdf, n=self.atrma_len, field = 'ATR')
         xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len)
@@ -48,7 +49,7 @@ class RSIATRSim(StratSim):
         self.df['datetime'] = self.df.index
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
-        self.df['traded_price'] = self.df['close']
+        self.df['traded_price'] = self.df['open']
 
     def daily_initialize(self, sim_data, n):
         pass
@@ -58,7 +59,7 @@ class RSIATRSim(StratSim):
         # or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, tradepos, sim_data, n):
-        gap = (int((self.SL * sim_data['close'][n]) / float(self.tick_base)) + 1) * float(self.tick_base)
+        gap = (int((self.SL * sim_data['ATRMA'][n-1]) / float(self.tick_base)) + 1) * float(self.tick_base)
         return gap
 
     def on_bar(self, sim_data, n):
@@ -88,9 +89,9 @@ def gen_config_file(filename):
     sim_config['sim_name']   = 'RSI_ATR'
     sim_config['products']   = ['m', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j' ]
     sim_config['start_date'] = '20160102'
-    sim_config['end_date']   = '20170407'
-    sim_config['stoploss'] = [1.0, 2.0, 3.0]
-    sim_config['freq'] = ['3min', '5min', '15min']
+    sim_config['end_date']   = '20170607'
+    sim_config['stoploss'] = [3.0, 6.0, 9.0]
+    sim_config['freq'] = [3, 5, 15]
     sim_config['pos_class'] = 'strat.TargetTrailTradePos'
     sim_config['offset']    = 1
 

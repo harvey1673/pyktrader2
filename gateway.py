@@ -423,7 +423,7 @@ class GrossGateway(Gateway):
             n_orders -= 1
         if vol > 0:
             res.append((OF_OPEN, vol))
-        return res    
+        return res
 
     def book_spd_orders(self, instID, volume, price_type, limit_price, trade_ref = 0):
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
