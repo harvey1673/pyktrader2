@@ -17,7 +17,6 @@ class DTStopSim(StratSim):
     def process_config(self, config): 
         self.close_daily = config['close_daily']
         self.offset = config['offset']
-        self.tick_base = config['tick_base']
         self.k = config['param'][0]
         self.win = config['param'][1]
         self.multiplier = config['param'][2]
@@ -89,8 +88,7 @@ class DTStopSim(StratSim):
                or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, tradepos, sim_data, n):
-        gap = (int(self.SL * sim_data['atr'][n]/self.tick_base) + 1) * self.tick_base
-        return gap
+        return self.SL * sim_data['atr'][n]
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': sim_data['atr'][n]}
@@ -103,8 +101,7 @@ class DTStopSim(StratSim):
             ref_long = ref_short = sim_data['close'][n]
         else:
             ref_long = ref_short = sim_data['open'][n+1]
-        target_pos = (ref_long > self.buy_trig) * 1 - (ref_short < self.sell_trig) * 1
-        curr_pos = 0
+        target_pos = (ref_long > self.buy_trig) - (ref_short < self.sell_trig)
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
@@ -114,10 +111,9 @@ class DTStopSim(StratSim):
             self.positions = [pos for pos in self.positions if not pos.is_closed]
             if need_close:
                 return
-            else:
-                if len(self.positions) > 0:
-                    curr_pos = self.positions[0].pos        
-        if target_pos != 0 and (curr_pos * target_pos <= 0):                            
+        else:
+            curr_pos = 0
+        if target_pos!=0 and (curr_pos * target_pos <= 0):
             if (not self.use_chan) or (((ref_long > sim_data['chanh'][n]) and target_pos > 0) or ((ref_short < sim_data['chanl'][n]) and target_pos < 0)):
                 self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], target_pos)
 

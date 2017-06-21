@@ -35,6 +35,7 @@ class RSIATRSim(StratSim):
         self.exit_min = config.get('exit_min', 2060 - self.freq * 2)
         self.buy_trig = 0.0
         self.sell_trig = 0.0
+        self.reverse_flag = config.get('reverse_flag', False)
      
     def process_data(self, mdf):
         if self.freq == 1:
@@ -64,22 +65,22 @@ class RSIATRSim(StratSim):
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
-        target_pos = ((sim_data['RSI'][n]>50.0 + self.rsi_trigger)*1.0 - (sim_data['RSI'][n]<50.0-self.rsi_trigger)*1.0) \
-                        * (sim_data['ATR'][n] > sim_data['ATRMA'][n])
         curr_pos = 0
+        next_pos = (sim_data['RSI'][n] > 50.0 + self.rsi_trigger) * 1 - (sim_data['RSI'][n] < 50.0 - self.rsi_trigger) * 1
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
-            if need_close:
+            if need_close or (self.reverse_flag and (curr_pos * next_pos < 0)):
                 for tradepos in self.positions:
                     self.close_tradepos(tradepos, sim_data['open'][n+1])
                 self.positions = []
-                return
+                curr_pos = 0
+                if need_close:
+                    return
             else:
                 curr_pos = self.positions[0].pos
-        if target_pos != 0 and (curr_pos == 0):
-            #if curr_pos != 0:
-                #self.close_tradepos(tradepos, sim_data['open'][n+1])
+        target_pos = next_pos * (sim_data['ATR'][n] > sim_data['ATRMA'][n])
+        if (curr_pos == 0) and target_pos != 0:
             self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], target_pos)
 
 def gen_config_file(filename):
