@@ -48,6 +48,7 @@ class RSIATRSim(StratSim):
         xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len)
         self.df = xdf
         self.df['datetime'] = self.df.index
+        self.df['closeout'] = 0.0
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
         self.df['traded_price'] = self.df['open']

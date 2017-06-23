@@ -980,7 +980,7 @@ class BacktestManager(object):
             else:
                 field  = 'close'
             pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
-            if 'closeout_pnl' in xdf.columns:
+            if 'closeout' in xdf.columns:
                 pnl = pnl + xdf['closeout']
             # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
             if len(sum_pnl) == 0:
