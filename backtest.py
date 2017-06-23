@@ -77,6 +77,7 @@ class StratSim(object):
         self.traded_vol = 0.0
         self.traded_cost = 0.0
         self.traded_price = 0.0
+        self.closeout_pnl = 0.0
         self.scur_day = None
 
     def process_config(self, config):
@@ -98,7 +99,7 @@ class StratSim(object):
         self.scur_day = sim_data['date'][0]
         for n in range(1, nlen-1):
             self.timestamp = datetime.datetime.utcfromtimestamp(sim_data['datetime'][n].astype('O')/1e9)
-            self.traded_vol = self.traded_cost = 0
+            self.traded_vol = self.traded_cost = self.closeout_pnl = 0
             self.traded_price = sim_data['open'][n]
             sim_data['pos'][n] = sim_data['pos'][n - 1]
             if not self.check_data_invalid(sim_data, n-1):
@@ -111,15 +112,18 @@ class StratSim(object):
                     self.check_curr_pos(sim_data, n)
             sim_data['pos'][n] += self.traded_vol
             sim_data['cost'][n] = self.traded_cost
+            sim_data['closeout'][n] = self.closeout_pnl
             sim_data['traded_price'][n] = self.traded_price
             if self.scur_day != sim_data['date'][n+1]:
                 self.daily_initialize(sim_data, n)
                 self.scur_day = sim_data['date'][n + 1]
-        pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
-        tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
-        cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
-        out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, pos, tp, cost], \
-                           join='outer', axis = 1)
+        #pos = pd.Series(sim_data['pos'], index = self.df.index, name = 'pos')
+        #closeout = pd.Series(sim_data['closeout'], index = self.df.index, name = 'closeout')
+        #tp = pd.Series(sim_data['traded_price'], index=self.df.index, name='traded_price')
+        #cost = pd.Series(sim_data['cost'], index=self.df.index, name='cost')
+        #out_df = pd.concat([self.df.open, self.df.high, self.df.low, self.df.close, self.df.date, self.df.min_id, pos, tp, cost, closeout], \
+        #                   join='outer', axis = 1)
+        out_df = pd.DataFrame(sim_data)
         return out_df, self.closed_trades
 
     def run_vec_sim(self):
@@ -133,8 +137,11 @@ class StratSim(object):
         tradepos.close(tp, self.timestamp)
         tradepos.exit_tradeid = self.tradeid
         self.tradeid += 1
-        self.closed_trades.append(tradepos)        
-        self.traded_price = (self.traded_price * self.traded_vol - tp * tradepos.pos)/(self.traded_vol - tradepos.pos)
+        self.closed_trades.append(tradepos)
+        if self.traded_vol * tradepos.pos > 0:
+            self.closeout_pnl += tradepos.pos * (tp - self.traded_price)
+        else:
+            self.traded_price = (self.traded_price * self.traded_vol - tp * tradepos.pos)/(self.traded_vol - tradepos.pos)
         self.traded_vol -= tradepos.pos
         self.traded_cost += abs(tradepos.pos) * (self.offset + tp * self.tcost)
         # print "close", self.timestamp, tp, self.traded_price, self.traded_vol
@@ -973,6 +980,8 @@ class BacktestManager(object):
             else:
                 field  = 'close'
             pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
+            if 'closeout_pnl' in xdf.columns:
+                pnl = pnl + xdf['closeout']
             # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
             if len(sum_pnl) == 0:
                 sum_pnl = pd.Series(pnl, name='pnl')

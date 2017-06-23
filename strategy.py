@@ -15,13 +15,13 @@ import sec_bits
 import logging
 
 tradepos_header = ['insts', 'vols', 'pos', 'direction', 'entry_price', 'entry_time', 'entry_target', 'entry_tradeid',
-                   'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'multiple']
+                   'exit_price', 'exit_time', 'exit_target', 'exit_tradeid', 'profit', 'is_closed', 'multiple', 'reset_margin', 'trailing']
 
 class TrailLossType:
     Ratio, Level = range(2)
 
 class TradePos(object):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1):
+    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 0):
         self.insts = insts
         self.volumes = vols
         self.multiple = multiple
@@ -37,7 +37,8 @@ class TradePos(object):
         self.exit_tradeid = 0
         self.is_closed = False
         self.profit = 0.0
-        #self.trail_loss = 0
+        self.reset_margin = reset_margin
+        self.trailing = False
         self.close_comment = ''
 
     def check_exit(self, curr_price, margin):
@@ -97,7 +98,7 @@ class TradePos(object):
             
 class ParSARTradePos(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, multiple)
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, multiple, reset_margin)
         self.af = af
         self.af_incr = incr
         self.af_cap = cap
@@ -111,13 +112,11 @@ class ParSARTradePos(TradePos):
 
 class ParSARProfitTrig(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple)
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple, reset_margin)
         self.af = af
         self.af_incr = incr
         self.af_cap = cap
         self.ep = entry_target
-        self.trailing = False
-        self.reset_margin = reset_margin
 
     def check_exit(self, curr_price, margin = 0):
         if self.trailing and (self.direction * (self.exit_target - curr_price) >= margin):
@@ -138,9 +137,7 @@ class ParSARProfitTrig(TradePos):
 
 class TargetTrailTradePos(TradePos):
     def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple)
-        self.reset_margin = reset_margin
-        self.trailing = False
+        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple, reset_margin)
 
     def update_price(self, curr_price):
         if self.trailing:
@@ -173,6 +170,8 @@ def tradepos2dict(tradepos):
     trade['profit'] = tradepos.profit
     trade['multiple'] = tradepos.multiple
     trade['is_closed'] = 1 if tradepos.is_closed else 0
+    trade['reset_margin'] = tradepos.reset_margin
+    trade['trailing'] = 1 if tradepos.trailing else 0
     return trade
 
 class Strategy(object):
@@ -468,7 +467,15 @@ class Strategy(object):
                     entry_target = float(row[7])
                     exit_target = float(row[11])
                     multiple = float(row[15])
-                    tradepos = eval(self.pos_class)(insts, vols, pos, entry_target, exit_target, multiple, **self.pos_args)
+                    if len(row) > 16:
+                        reset_margin = float(row[16])
+                    else:
+                        reset_margin = 0
+                    if len(row) > 17:
+                        trailing = True if float(row[17]) > 0 else False
+                    else:
+                        trailing = False
+                    tradepos = eval(self.pos_class)(insts, vols, pos, entry_target, exit_target, multiple, reset_margin, **self.pos_args)
                     if row[6] in ['', '19700101 00:00:00 000000']:
                         entry_time = NO_ENTRY_TIME
                         entry_price = 0
@@ -477,6 +484,7 @@ class Strategy(object):
                         entry_price = float(row[5])
                         tradepos.open(entry_price, pos, entry_time)
                     tradepos.entry_tradeid = int(row[8])
+                    tradepos.trailing = trailing
                     tradepos.exit_tradeid = int(row[12])
                     if row[10] in ['', '19700101 00:00:00 000000']:
                         exit_time = NO_ENTRY_TIME
@@ -501,7 +509,6 @@ class Strategy(object):
                 else:
                     self.load_local_variables(row)
         self.positions = positions
-        return
 
     def save_closed_pos(self, tradepos):
         logfile = self.folder + 'hist_tradepos.csv'

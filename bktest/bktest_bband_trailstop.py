@@ -10,19 +10,20 @@ import numpy as np
 import datetime
 from backtest import *
 
-class RSIATRSim(StratSim):
+class BBTrailStop(StratSim):
     def __init__(self, config):
-        super(RSIATRSim, self).__init__(config)
+        super(BBTrailStop, self).__init__(config)
 
-    def process_config(self, config): 
+    def process_config(self, config):
         self.close_daily = config['close_daily']
         self.offset = config['offset']
         self.tick_base = config['tick_base']
         self.freq = config['freq']
-        self.atr_len = config['atr_period']
-        self.atrma_len = config['atrma_period']
-        self.rsi_len = config['rsi_len']
-        self.rsi_trigger = config['rsi_trigger']
+        self.band_ratio = config['band_rato']
+        self.ma_func = eval(config.get('ma_func', 'dh.MA'))
+        self.band_func = eval(config.get('band_func', 'dh.ATR'))
+        self.boll_len = config['boll_len']
+        self.chan_len = config['chan_len']
         self.pos_update = config['pos_update']
         self.pos_class = config['pos_class']
         self.pos_args  = config['pos_args']        
@@ -43,13 +44,15 @@ class RSIATRSim(StratSim):
         else:
             freq_str = str(self.freq) + "min"
             xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols = ['contract'])
-        xdf['ATR'] = dh.ATR(xdf, n = self.atr_len)
-        xdf['ATRMA'] = dh.MA(xdf, n=self.atrma_len, field = 'ATR')
-        xdf['RSI'] = dh.RSI(xdf, n = self.rsi_len)
+        xdf['ATR'] = self.band_func(xdf, n = self.boll_len)
+        xdf['MA'] = self.ma_func(xdf, n=self.boll_len)
+        xdf['CH_H'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high')
+        xdf['CH_L'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low')
         self.df = xdf
         self.df['datetime'] = self.df.index
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
+        self.df['closeout'] = 0.0
         self.df['traded_price'] = self.df['open']
 
     def daily_initialize(self, sim_data, n):
