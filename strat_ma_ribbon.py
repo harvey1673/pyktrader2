@@ -6,7 +6,7 @@ import copy
 from strategy import *
  
 class MARibbonTrader(Strategy):
-    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HH', 'DONCH_LL'], 'ma_key': 'EMA_C', \
+    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HH', 'DONCH_LL'], \
                                                       'price_limit_buffer': 5, \
                                                       'data_func': [["MA_RIBBON", "dh.MA_RIBBON", "dh.ma_ribbon"], \
                                                                     ["DONCH_HH", "dh.DONCH_H", "dh.donch_h", {'field':'high'}], \

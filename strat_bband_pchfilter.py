@@ -6,10 +6,10 @@ import copy
 from strategy import *
  
 class BbandPChanTrader(Strategy):
-    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'band_keys': ['MA_C', 'STDEV_C'], \
+    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'band_keys': ['MA_CLOSE', 'STDEV_CLOSE'], \
                                                       'price_limit_buffer': 5, 'daily_close_buffer': 2, \
                                                       'data_func': [["DONCH_HC", "dh.DONCH_H", "dh.donch_h", {'field':'close'}], ["DONCH_LC", "dh.DONCH_L", "dh.donch_l", {'field':'close'}], \
-                                                                      ['MA_C', 'dh.MA', 'dh.ma'], ['STDEV_C', 'dh.STDEV', 'dh.stdev']]})
+                                                                      ['MA_CLOSE_', 'dh.MA', 'dh.ma'], ['STDEV_CLOSE_', 'dh.STDEV', 'dh.stdev']]})
     asset_params = dict({'band_win': 40, 'ratios': 1.0, 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
@@ -63,9 +63,9 @@ class BbandPChanTrader(Strategy):
         self.chan_high[idx] = xdf[key][-2]
         key = self.channel_keys[1] + str(self.channels[idx])
         self.chan_low[idx]  = xdf[key][-2]
-        key = self.band_keys[0] + str(self.band_win[idx])
+        key = self.band_keys[0] + '_' + str(self.band_win[idx])
         self.mid_band[idx] = xdf[key][-1]
-        key = self.band_keys[1] + str(self.band_win[idx])
+        key = self.band_keys[1] + '_' + str(self.band_win[idx])
         stdev = xdf[key][-1]
         self.upper_band[idx] = self.mid_band[idx] + self.ratios[idx] * stdev
         self.lower_band[idx] = self.mid_band[idx] - self.ratios[idx] * stdev

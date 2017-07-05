@@ -36,7 +36,6 @@ class BBTrailStop(StratSim):
         self.exit_min = config.get('exit_min', 2060 - self.freq * 2)
         self.buy_trig = 0.0
         self.sell_trig = 0.0
-        self.reverse_flag = config.get('reverse_flag', False)
      
     def process_data(self, mdf):
         if self.freq == 1:
@@ -44,11 +43,21 @@ class BBTrailStop(StratSim):
         else:
             freq_str = str(self.freq) + "min"
             xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols = ['contract'])
-        xdf['ATR'] = self.band_func(xdf, n = self.boll_len)
-        xdf['MA'] = self.ma_func(xdf, n=self.boll_len)
-        xdf['CH_H'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high')
-        xdf['CH_L'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low')
-        self.df = xdf
+        xdf['band_wth'] = self.band_func(xdf, n = self.boll_len) * self.band_ratio
+        xdf['band_mid'] = self.ma_func(xdf, n=self.boll_len)
+        xdf['band_up'] = xdf['band_mid'] + xdf['band_wth']
+        xdf['band_dn'] = xdf['band_mid'] - xdf['band_wth']
+        if (self.chan_len > 0):
+            xdf['chan_h'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high').shift(1)
+            xdf['chan_l'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low').shift(1)
+        else:
+            xdf['chan_h'] = -10000000
+            xdf['chan_l'] = 10000000
+        xdata = pd.concat([xdf['band_up'], xdf['band_dn'], xdf['band_mid'], xdf['band_wth'], \
+                           xdf['chan_h'], xdf['chan_l']], xdf['high'], xdf['low'], axis=1, \
+                           keys=['band_up','band_dn', 'band_mid', 'band_wth', \
+                                 'chan_h', 'chan_l', 'xhigh', 'xlow'])
+        self.df = mdf.join(xdata, how = 'left').fillna(method='ffill')
         self.df['datetime'] = self.df.index
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
@@ -59,17 +68,17 @@ class BBTrailStop(StratSim):
         pass
 
     def check_data_invalid(self, sim_data, n):
-        return np.isnan(sim_data['ATR'][n]) or np.isnan(sim_data['ATRMA'][n]) or np.isnan(sim_data['RSI'][n])
+        return np.isnan(sim_data['band_up'][n]) or np.isnan(sim_data['chan_h'][n]) or np.isnan(sim_data['chan_l'][n])
         # or (sim_data['date'][n] != sim_data['date'][n + 1])
 
     def get_tradepos_exit(self, tradepos, sim_data, n):
-        gap = (int((self.SL * sim_data['ATRMA'][n-1]) / float(self.tick_base)) + 1) * float(self.tick_base)
+        gap = (int((self.SL * sim_data['band_wth'][n-1]) / float(self.tick_base)) + 1) * float(self.tick_base)
         return gap
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
         curr_pos = 0
-        next_pos = (sim_data['RSI'][n] > 50.0 + self.rsi_trigger) * 1 - (sim_data['RSI'][n] < 50.0 - self.rsi_trigger) * 1
+        next_pos = (sim_data['close'][n] > sim_data['band_up']) * 1 - (sim_data['RSI'][n] < 50.0 - self.rsi_trigger) * 1
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)

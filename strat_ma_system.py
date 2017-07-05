@@ -6,9 +6,9 @@ import copy
 from strategy import *
  
 class MASystemTrader(Strategy):
-    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'ma_key': 'MA_C', \
+    common_params =  dict( Strategy.common_params, **{'channel_keys': ['DONCH_HC', 'DONCH_LC'], 'ma_key': 'MA_CLOSE', \
                                                       'price_limit_buffer': 5, \
-                                                      'data_func': [['MA_C', 'dh.MA', 'dh.ma'], \
+                                                      'data_func': [['MA_CLOSE_', 'dh.MA', 'dh.ma'], \
                                                                     ["DONCH_HH", "dh.DONCH_H", "dh.donch_h", {'field':'high'}], \
                                                                     ["DONCH_LL", "dh.DONCH_L", "dh.donch_l", {'field':'low'}]]})
     asset_params = dict({'ma_win': [10, 20, 40], 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
@@ -65,7 +65,7 @@ class MASystemTrader(Strategy):
     def update_mkt_state(self, idx):
         instID = self.underliers[idx][0]
         xdf = self.agent.min_data[instID][self.freq[idx]].data
-        self.ma_prices[idx] = [ xdf[self.ma_key + str(win)][-1] for win in self.ma_win[idx]]
+        self.ma_prices[idx] = [ xdf[self.ma_key + '_' + str(win)][-1] for win in self.ma_win[idx]]
         self.ma_fast[idx] = self.ma_prices[idx][0]
         self.ma_slow[idx] = self.ma_prices[idx][-1]
         self.ma_medm[idx] = self.ma_prices[idx][1]

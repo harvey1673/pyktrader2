@@ -38,7 +38,7 @@ class DTSplitChanAddon(Strategy):
                     fobj = BaseObject(name = name + str(chan), sfunc = fcustom(sfunc, n = chan, **fargs), rfunc = fcustom(rfunc, n = chan, **fargs))
                     self.agent.register_data_func(under[0], 'd', fobj)
             if machan > 0:
-                fobj = BaseObject(name = "MA_C" + str(machan), sfunc = fcustom(dh.MA, n = machan), rfunc = fcustom(dh.ma, n = machan))
+                fobj = BaseObject(name = "MA_CLOSE_" + str(machan), sfunc = fcustom(dh.MA, n = machan), rfunc = fcustom(dh.ma, n = machan))
                 self.agent.register_data_func(under[0], 'd', fobj)             
 
     def register_bar_freq(self):
@@ -67,7 +67,7 @@ class DTSplitChanAddon(Strategy):
                 key = self.channel_keys[1] + str(self.channels[idx])
                 self.chan_low[idx]  = ddf[key][-1]
             if self.ma_chan[idx]>0:
-                self.ma_level[idx] = ddf['MA_C'+str(self.ma_chan[idx])][-1]
+                self.ma_level[idx] = ddf['MA_CLOSE_'+str(self.ma_chan[idx])][-1]
             if last_date < min_date:
                 last_min = mdf['min_id'][-1]
                 pid = 0

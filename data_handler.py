@@ -255,43 +255,43 @@ def atr(df, n = 20):
 
 # talib matype: 0=SMA, 1=EMA, 2=WMA, 3=DEMA, 4=TEMA, 5=TRIMA, 6=KAMA, 7=MAMA, 8=T3
 def MAEXT(df, n, field = 'close', ma_type = 0):
-    return pd.Series(talib.MA(df[field].values, timeperiod = n, matype = ma_type), index = df.index, name = 'MA_' + field[0].upper() + str(n))
+    return pd.Series(talib.MA(df[field].values, timeperiod = n, matype = ma_type), index = df.index, name = 'MA_' + field.upper() + str(n))
 
 def maext(df, n, field = 'close', ma_type = 0):
-    key = 'MA_' + field[0].upper() + str(n)
+    key = 'MA_' + field.upper() + '_' + str(n)
     ma_ts = talib.MA(df[field][-(n+1):].values, timeperiod = n, matype = ma_type)
     df[key][-1] = float(ma_ts[-1])
     
 def MA(df, n, field = 'close'):
-    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field[0].upper() + str(n), index = df.index)
+    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field.upper() + '_' + str(n), index = df.index)
 
 def ma(df, n, field = 'close'):
-    key = 'MA_' + field[0].upper() + str(n)
+    key = 'MA_' + field.upper() + '_' + str(n)
     df[key][-1] = (df[key][-2]*n + df[field][-1] - df[field][-1-n])/n
 
 def STDEV(df, n, field = 'close'):
-    return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field[0].upper() + str(n))
+    return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field.upper() + '_' + str(n))
 
 def stdev(df, n, field = 'close'):
-    df['STDEV_' + field[0].upper() + str(n)][-1] = np.std(df[field][-n:])
+    df['STDEV_' + field.upper() + '_' + str(n)][-1] = np.std(df[field][-n:])
 
 def SMAVAR(df, n, field = 'close'):
     ma_ts = MA(df, n, field)
-    var_ts = pd.Series(pd.rolling_mean(df[field]**2, n) - ma_ts**2, name = 'SVAR_' + field[0].upper() + str(n))
+    var_ts = pd.Series(pd.rolling_mean(df[field]**2, n) - ma_ts**2, name = 'SVAR_' + field.upper() + '_' + str(n))
     return pd.concat([ma_ts, var_ts], join='outer', axis=1)
 
 def smavar(df, n, field = 'close'):
     ma(df, n, field)
-    key_var = 'SVAR_' + field[0].upper() + str(n)
-    key_ma = 'SMA_' + field[0].upper() + str(n)
+    key_var = 'SVAR_' + field.upper() + '_' + str(n)
+    key_ma = 'MA_' + field.upper() + '_' + str(n)
     df[key_var][-1] = df[key_var][-2] + df[key_ma][-1-n]**2 - df[key_ma][-1]**2 + (df[field][-1]**2 - df[field][-1-n]**2)/n
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
-    return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field[0].upper() + str(n), index = df.index)
+    return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field.upper() + '_' + str(n), index = df.index)
 
 def ema(df, n, field =  'close'):    
-    key = 'EMA_' + field[0].upper() + str(n)
+    key = 'EMA_' + field.upper() + '_' + str(n)
     alpha = 2.0/(n+1)
     df[key][-1] = df[key][-2] * (1-alpha) + df[field][-1] * alpha
 
@@ -299,18 +299,18 @@ def EMAVAR(df, n, field = 'close'):
     ema_ts = EMA(df, n, field)
     alpha = 2.0 / (n + 1)
     var_adj = (1-alpha) * (df[field] - ema_ts.shift(1).fillna(0))**2
-    evar_ts = pd.Series(talib.EMA(var_adj.values, n), name = 'EVAR_' + field[0].upper() + str(n), index = df.index)
+    evar_ts = pd.Series(talib.EMA(var_adj.values, n), name = 'EVAR_' + field.upper() + '_' + str(n), index = df.index)
     return pd.concat([ema_ts, evar_ts], join='outer', axis=1)
 
 def emavar(df, n ,field = 'close'):
     ema(df, n, field)
     alpha = 2.0 / (n + 1)
-    key_var = 'EVAR_' + field[0].upper() + str(n)
-    key_ema = 'EMA_' + field[0].upper() + str(n)
+    key_var = 'EVAR_' + field.upper() + '_' + str(n)
+    key_ema = 'EMA_' + field.upper() + '_' + str(n)
     df[key_var][-1] = (1-alpha) * ( df[key_var][-2] + alpha * ((df[field][-1] - df[key_ema][-2])**2))
 
 def KAMA(df, n, field = 'close'):
-    return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field[0].upper() + str(n), index = df.index)
+    return pd.Series(talib.KAMA(df[field].values, n), name = 'KAMA_' + field.upper() + '_' + str(n), index = df.index)
 
 #Momentum
 def MOM(df, n):
@@ -469,17 +469,17 @@ def RSI_F(df, n, field='close'):
     DoMove = df[field].shift(1) - df[field]
     UpD = pd.Series(UpMove)
     DoD = pd.Series(DoMove)
-    UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
-    DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
-    PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1), name = "RSI"+str(n)+'_UP')
-    NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1), name = "RSI"+str(n)+'_DN')
+    UpD[(UpMove <= 0)] = 0
+    DoD[(DoMove <= 0)] = 0
+    PosDI = pd.Series(pd.ewma(UpD, com = n-1), name = "RSI"+str(n)+'_UP')
+    NegDI = pd.Series(pd.ewma(DoD, com = n-1), name = "RSI"+str(n)+'_DN')
     RSI = pd.Series(PosDI / (PosDI + NegDI) * 100, name = 'RSI' + str(n))
     return pd.concat([RSI, PosDI, NegDI], join='outer', axis=1)
 
 def rsi_f(df, n, field = 'close'):
     RSI_key = 'RSI%s' % str(n)
     dx = df[field][-1] - df[field][-2]
-    alpha = 2.0/(1 + n)
+    alpha = 1.0/n
     if dx > 0:
         upx = dx
         dnx = 0
@@ -936,7 +936,7 @@ def MA_RIBBON(df, ma_series):
 def ma_ribbon(df, ma_series):
     ma_array = np.zeros([len(df)])
     for idx, ma_len in enumerate(ma_series):
-        key = 'EMA_C' + str(ma_len)
+        key = 'EMA_CLOSE_' + str(ma_len)
         ema(df, ma_len, field = 'close')
         ma_array[idx] = df[key][-1]
     corr, pval = stats.spearmanr(ma_array, range(len(ma_series), 0, -1))
