@@ -1,150 +1,106 @@
-import misc
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 import json
+import misc
 import data_handler as dh
 import pandas as pd
 import numpy as np
-import strategy as strat
 import datetime
-import backtest
-import sys
+from backtest import *
 
-def MA_sim( mdf, config):
-    offset = config['offset']
-    pos_class = config['pos_class']
-    pos_args  = config['pos_args']
-    pos_update = config.get('pos_update', False)
-    stoploss = config.get('stoploss', 0.0)
-    ma_list = config['ma_list']
-    param = config['param']
-    corr_entry = param[0]
-    corr_exit = param[1]
-    pval_entry = param[2]
-    pval_exit = param[3]
-    if len(param)>=5:
-        channel = param[4]
-    else:
-        channel = 0
-    if channel == 0:
-        use_chan = False
-    else:
-        use_chan = True
-    close_daily = config['close_daily']
-    tcost = config['trans_cost']
-    unit = config['unit']
-    freq = config['freq']   
-    if int(freq[:-3]) == 1:
-        xdf = mdf
-    else:
-        xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols=['contract'])
-    if use_chan:
-        xdf['chan_high'] = eval(config['channel_func'][0])(xdf, channel, **config['channel_args'][0]).shift(2)
-        xdf['chan_low'] = eval(config['channel_func'][1])(xdf, channel, **config['channel_args'][1]).shift(2)
-    else:
-        xdf['chan_high'] = pd.Series(index = xdf.index)
-        xdf['chan_low'] = pd.Series(index = xdf.index)
-    ma_ribbon = dh.MA_RIBBON(xdf, ma_list)
-    xdf["ribbon_corr"] = ma_ribbon["MARIBBON_CORR"].shift(1)
-    xdf["ribbon_pval"] = ma_ribbon["MARIBBON_PVAL"].shift(1)
-    xdf["ribbon_dist"] = ma_ribbon["MARIBBON_DIST"].shift(1)
-    xdf['prev_close'] = xdf['close'].shift(1)
-    xdf['close_ind'] = np.isnan(xdf['close'].shift(-1))
-    if close_daily:
-        daily_end = (xdf['date']!=xdf['date'].shift(-1))
-        xdf['close_ind'] = xdf['close_ind'] | daily_end
-    ll = xdf.shape[0]
-    xdf['pos'] = 0
-    xdf['cost'] = 0
-    xdf['traded_price'] = xdf.open
-    curr_pos = []
-    closed_trades = []
-    tradeid = 0
-    for idx, dd in enumerate(xdf.index):
-        mslice = xdf.loc[dd]
-        if len(curr_pos) == 0:
-            pos = 0
+class MARibbonSim(StratSim):
+    def __init__(self, config):
+        super(MARibbonSim, self).__init__(config)
+
+    def process_config(self, config):
+        self.close_daily = config['close_daily']
+        self.offset = config['offset']
+        self.tick_base = config['tick_base']
+        self.corr_entry = config['param'][0]
+        self.corr_exit = config['param'][1]
+        self.pval_entry = config['param'][2]
+        self.pval_exit = config['param'][3]
+        self.ma_list = config['ma_list']
+        self.pos_update = config['pos_update']
+        self.pos_class = config['pos_class']
+        self.pos_args  = config['pos_args']
+        self.tcost = config['trans_cost']
+        self.unit = config['unit']
+        self.weights = config.get('weights', [1])
+        self.SL = config['stoploss']
+        self.no_trade_set = config['no_trade_set']
+        self.exit_min = config.get('exit_min', 2060 - self.freq * 2)
+
+    def process_data(self, mdf):
+        if self.freq == 1:
+            xdf = mdf
         else:
-            pos = curr_pos[0].pos
-        xdf.set_value(dd, 'pos', pos)
-        if np.isnan(mslice.ribbon_corr):
-            continue
-        if mslice.close_ind:
-            if pos!=0:
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * ( mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-        else:
-            if (((mslice.ribbon_corr >= -corr_exit) or (mslice.ribbon_pval >= pval_exit)) and (pos<0)) or \
-                    (((mslice.ribbon_corr <= corr_exit) or (mslice.ribbon_pval >= pval_exit)) and (pos>0)):
-                curr_pos[0].close(mslice.open - misc.sign(pos) * offset, dd)
-                tradeid += 1
-                curr_pos[0].exit_tradeid = tradeid
-                closed_trades.append(curr_pos[0])
-                curr_pos = []
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] - abs(pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open - misc.sign(pos) * offset)
-                pos = 0
-            if (pos==0) and (mslice.ribbon_corr >= corr_entry) and (mslice.ribbon_pval < pval_entry) \
-                    and ((use_chan == False) or (mslice.open >= mslice.chan_high)):
-                target_pos = unit
-            elif (pos==0) and (mslice.ribbon_corr <= -corr_entry) and (mslice.ribbon_pval < pval_entry) \
-                    and ((use_chan == False) or (mslice.open <= mslice.chan_low)):
-                target_pos = -unit
-            else:
-                target_pos = 0
-            if target_pos != 0:
-                new_pos = pos_class([mslice.contract], [1], target_pos, mslice.open, mslice.open, **pos_args)
-                tradeid += 1
-                new_pos.entry_tradeid = tradeid
-                new_pos.open(mslice.open + misc.sign(target_pos)*offset, dd)
-                curr_pos.append(new_pos)
-                pos = target_pos
-                xdf.set_value(dd, 'cost', xdf.at[dd, 'cost'] -  abs(target_pos) * (mslice.open * tcost))
-                xdf.set_value(dd, 'traded_price', mslice.open + misc.sign(target_pos)*offset)
-        xdf.set_value(dd, 'pos', pos)
-    return (xdf, closed_trades)
+            freq_str = str(self.freq) + "min"
+            xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols=['contract'])
+        ma_ribbon = dh.MA_RIBBON(self.df, self.ma_list)
+        self.df = xdf
+        for malen in self.ma_list:
+            self.df['EMA' + str(malen)] = ma_ribbon['EMA_CLOSE_' + str(malen)]
+        self.df['RIBBON_CORR'] = ma_ribbon['MARIBBON_CORR']
+        self.df['RIBBON_PVAL'] = ma_ribbon['MARIBBON_PVAL']
+        self.df['datetime'] = self.df.index
+        self.df['closeout'] = 0.0
+        self.df['cost'] = 0.0
+        self.df['pos'] = 0.0
+        self.df['traded_price'] = self.df['open']
+
+    def run_vec_sim(self):
+        self.df['prev_close'] = self.df['close'].shift(1)
+        close_ind = np.isnan(self.df['close'].shift(-1))
+        if self.close_daily:
+            daily_end = (self.df['date'] != self.df['date'].shift(-1))
+            close_ind = close_ind | daily_end
+        long_signal = pd.Series(np.nan, index=self.df.index)
+        long_flag = (self.df['RIBBON_CORR'] >= self.corr_entry) & (self.df['RIBBON_PVAL'] < self.pval_entry)
+        long_signal[long_flag] = 1
+        long_signal[(self.df['RIBBON_CORR'] < self.corr_exit) | (self.df['RIBBON_PVAL'] > self.pval_exit)] = 0
+        long_signal[close_ind] = 0
+        long_signal = long_signal.fillna(method='ffill').fillna(0)
+        short_signal = pd.Series(np.nan, index=self.df.index)
+        short_flag = (self.df['RIBBON_CORR'] <= -self.corr_entry) & (self.df['RIBBON_PVAL'] < self.pval_entry)
+        short_signal[short_flag] = -1
+        short_signal[(self.df['RIBBON_CORR'] > -self.corr_exit) | (self.df['RIBBON_PVAL'] > self.pval_exit)] = 0
+        short_signal[close_ind] = 0
+        short_signal = short_signal.fillna(method='ffill').fillna(0)
+        pos =  (long_signal + short_signal)
+        self.df['pos'] = pos.shift(1).fillna(0)
+        self.df.ix[-1:, 'pos'] = 0
+        self.df['cost'] = abs(self.df['pos'] - self.df['pos'].shift(1)) * (self.offset + self.df['open'] * self.tcost)
+        self.df['cost'] = self.df['cost'].fillna(0.0)
+        self.df['traded_price'] = self.df.open + (self.df['pos'] - self.df['pos'].shift(1)) * self.offset
+        self.closed_trades = simdf_to_trades1(self.df, slippage = self.offset )
+        return (self.df, self.closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest_ma_ribbon.MA_sim'
+    sim_config['sim_func']  = 'bktest.bktest_ma_ribbon.MARibbonSim'
     sim_config['scen_keys'] = ['freq', 'param']
     sim_config['sim_name']   = 'ribbon_customMA_'
     sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', \
                                 'SR', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', \
                                 'ag', 'au', 'IF', 'IH', 'TF', 'T']
-    sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160819'
-    sim_config['need_daily'] = False
-    sim_config['freq'] = ['15min', '30min', '60min', '90min']
+    sim_config['start_date'] = '20160102'
+    sim_config['end_date']   = '20170707'
+    sim_config['freq'] = [1, 3, 5]
     sim_config['param'] =[[0, 0, 0.02, 0.2], [0, 0, 0.05, 0.2], [0, 0, 0.08, 0.2], [0, 0, 0.1, 0.2],\
                           [0, 0, 0.02, 0.3], [0, 0, 0.05, 0.3], [0, 0, 0.08, 0.3], [0, 0, 0.1, 0.3],\
                           [0, 0, 0.02, 0.4], [0, 0, 0.05, 0.4], [0, 0, 0.08, 0.4], [0, 0, 0.1, 0.4],]
     sim_config['pos_class'] = 'strat.TradePos'
-    #sim_config['pos_class'] = 'strat.ParSARTradePos'
-    #sim_config['pos_args'] = [{'reset_margin': 1, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 2, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 3, 'af': 0.02, 'incr': 0.02, 'cap': 0.2},\
-    #                            {'reset_margin': 1, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-    #                            {'reset_margin': 2, 'af': 0.01, 'incr': 0.01, 'cap': 0.2},\
-    #                            {'reset_margin': 3, 'af': 0.01, 'incr': 0.01, 'cap': 0.2}]
     sim_config['offset']    = 1
     config = {'capital': 10000,              
               'trans_cost': 0.0,
               'unit': 1,
-              'ma_list': range(10, 160, 10),
-              'trade_ind': 'MARIBBON_CORR',
-              'use_chan': False, 
+              'ma_list': [5] + range(10, 70, 10),
               'stoploss': 0.0,
               'close_daily': False,
               'pos_update': False,
-              'MA_func': 'dh.EMA',
-              'channel_func': ['dh.DONCH_H', 'dh.DONCH_L'],
-              'channel_args': [{}, {}],              
-              'exit_min': 2055,
               'pos_args': {},
               }
     sim_config['config'] = config

@@ -86,7 +86,7 @@ class RSIATRSim(StratSim):
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_class']  = 'bktest_rsiatr2.RSIATRSim'
+    sim_config['sim_class']  = 'bktest.bktest_rsiatr2.RSIATRSim'
     sim_config['sim_func'] = 'run_loop_sim'
     sim_config['scen_keys'] = ['freq', 'stoploss']
     sim_config['sim_name']   = 'RSI_ATR'

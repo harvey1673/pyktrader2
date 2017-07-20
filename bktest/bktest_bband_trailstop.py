@@ -19,11 +19,11 @@ class BBTrailStop(StratSim):
         self.offset = config['offset']
         self.tick_base = config['tick_base']
         self.freq = config['freq']
-        self.band_ratio = config['band_rato']
+        self.band_ratio = config['band_ratio']
         self.ma_func = eval(config.get('ma_func', 'dh.MA'))
         self.band_func = eval(config.get('band_func', 'dh.ATR'))
         self.boll_len = config['boll_len']
-        self.chan_len = config['chan_len']
+        self.chan_len = config['chan_ratio'] * self.boll_len
         self.pos_update = config['pos_update']
         self.pos_class = config['pos_class']
         self.pos_args  = config['pos_args']        
@@ -48,15 +48,16 @@ class BBTrailStop(StratSim):
         xdf['band_up'] = xdf['band_mid'] + xdf['band_wth']
         xdf['band_dn'] = xdf['band_mid'] - xdf['band_wth']
         if (self.chan_len > 0):
-            xdf['chan_h'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high').shift(1)
-            xdf['chan_l'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low').shift(1)
+            xdf['chan_h'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high')
+            xdf['chan_l'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low')
         else:
             xdf['chan_h'] = -10000000
             xdf['chan_l'] = 10000000
-        xdata = pd.concat([xdf['band_up'], xdf['band_dn'], xdf['band_mid'], xdf['band_wth'], \
-                           xdf['chan_h'], xdf['chan_l']], xdf['high'], xdf['low'], axis=1, \
+        xdata = pd.concat([xdf['band_up'].shift(1), xdf['band_dn'].shift(1), \
+                           xdf['band_mid'].shift(1), xdf['band_wth'].shift(1), \
+                           xdf['chan_h'].shift(1), xdf['chan_l'].shift(1)], axis=1, \
                            keys=['band_up','band_dn', 'band_mid', 'band_wth', \
-                                 'chan_h', 'chan_l', 'xhigh', 'xlow'])
+                                 'chan_h', 'chan_l'])
         self.df = mdf.join(xdata, how = 'left').fillna(method='ffill')
         self.df['datetime'] = self.df.index
         self.df['cost'] = 0.0
@@ -78,11 +79,12 @@ class BBTrailStop(StratSim):
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
         curr_pos = 0
-        next_pos = (sim_data['close'][n] > sim_data['band_up']) * 1 - (sim_data['RSI'][n] < 50.0 - self.rsi_trigger) * 1
+        next_pos = (sim_data['high'][n] >= max(sim_data['band_up'][n], sim_data['chan_h'][n])) * 1 - \
+                   (sim_data['low'][n] <= min(sim_data['band_dn'][n], sim_data['chan_l'][n])) * 1
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
-            if need_close or (self.reverse_flag and (curr_pos * next_pos < 0)):
+            if need_close or (curr_pos * next_pos < 0):
                 for tradepos in self.positions:
                     self.close_tradepos(tradepos, sim_data['open'][n+1])
                 self.positions = []
@@ -91,21 +93,22 @@ class BBTrailStop(StratSim):
                     return
             else:
                 curr_pos = self.positions[0].pos
-        target_pos = next_pos * (sim_data['ATR'][n] > sim_data['ATRMA'][n])
-        if (curr_pos == 0) and target_pos != 0:
-            self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], target_pos)
+        if (curr_pos == 0) and next_pos != 0:
+            self.open_tradepos([sim_data['contract'][n]], sim_data['open'][n+1], next_pos)
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_class']  = 'bktest_rsiatr2.RSIATRSim'
+    sim_config['sim_class']  = 'bktest.bktest_bband_trailstop.BBTrailStop'
     sim_config['sim_func'] = 'run_loop_sim'
-    sim_config['scen_keys'] = ['freq', 'stoploss']
-    sim_config['sim_name']   = 'RSI_ATR'
+    sim_config['scen_keys'] = ['boll_len', 'chan_ratio', 'band_ratio', 'stoploss']
+    sim_config['sim_name']   = 'band_trailstop'
     sim_config['products']   = ['m', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j' ]
     sim_config['start_date'] = '20160102'
-    sim_config['end_date']   = '20170607'
-    sim_config['stoploss'] = [3.0, 6.0, 9.0]
-    sim_config['freq'] = [3, 5, 15]
+    sim_config['end_date']   = '20170707'
+    sim_config['boll_len'] = [80, 120, 160]
+    sim_config['chan_ratio'] = [0.125, 0.25, 0.5]
+    sim_config['band_ratio'] = [1.0, 1.5, 2.0]
+    sim_config['stoploss'] = [0.5, 1.0, 1.5, 2.0]
     sim_config['pos_class'] = 'strat.TargetTrailTradePos'
     sim_config['offset']    = 1
 
@@ -114,10 +117,8 @@ def gen_config_file(filename):
               'close_daily': False,
               'unit': 1,                           
               'pos_args': {},
+              'freq': 3,
               'pos_update': True,
-              'atr_period': 22,
-              'atrma_period': 10, 
-              'rsi_len': 5,
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:
