@@ -207,15 +207,13 @@ class Gateway(object):
                         forder = fstr.split(':')
                         pair_str = forder[1].split('_')
                         filled_orders[forder[0]] = [float(pair_str[0]), int(pair_str[1])]
-                    iorder = order_class(inst, float(row[11]), int(float(row[4])), \
-                                int(float(row[12])), row[8], row[9], row[10], int(float(row[15])))
-                    iorder.sys_id = row[1]
-                    iorder.local_id = row[2]
-                    iorder.filled_orders = filled_orders
-                    iorder.filled_volume = int(float(row[5]))
-                    iorder.filled_price = float(row[6])
-                    iorder.order_ref = int(row[0])
-                    iorder.status = int(row[13])
+                    iorder = order_class(instID = inst, limit_price = float(row[11]), \
+                            volume = int(float(row[4])), order_time = int(float(row[12])), \
+                            action_type = row[8], direction = row[9], price_type = row[10], \
+                            trade_ref = int(float(row[15])), order_ref = int(row[0]), \
+                            sys_id = row[1], status = int(row[13]), \
+                            local_id = row[2], filled_orders = filled_orders, \
+                            filled_volume = int(float(row[5])), filled_price = float(row[6]))
                     self.add_order(iorder)
 
     def save_order_list(self, tday):
@@ -320,8 +318,10 @@ class Gateway(object):
     def book_order(self, instID, volume, price_type, limit_price, trade_ref = 0, order_num = 1):        
         direction = ORDER_BUY if volume > 0 else ORDER_SELL
         order_offsets = self.get_order_offset(instID, volume, order_num)
-        new_orders = [order.Order(instID, limit_price, v, self.agent.tick_id, action_type, direction, price_type, trade_ref = trade_ref) \
-                                                            for (action_type, v) in order_offsets]
+        new_orders = [order.Order(instID = instID, limit_price = limit_price, volume = v, \
+                            order_time = self.agent.tick_id, action_type = action_type, \
+                            direction = direction, price_type = price_type, trade_ref = trade_ref) \
+                            for (action_type, v) in order_offsets]
         self.add_orders(new_orders)
         self.positions[instID].re_calc()
         return new_orders
@@ -431,7 +431,10 @@ class GrossGateway(Gateway):
         instIDs, units = spreadinst2underlying(instID)
         res = [self.get_order_offset(inst, u * volume, 1) for inst, u in zip(instIDs, units)]
         action_type = ''.join([offset[0][0] for offset in res])
-        new_order = order.SpreadOrder(instID, limit_price, vol, self.agent.tick_id, action_type, direction, price_type, trade_ref)
+        new_order = order.SpreadOrder(inst = instID, limit_price = limit_price, volume = vol, \
+                            order_time = self.agent.tick_id, action_type = action_type, \
+                            direction = direction, price_type = price_type, \
+                            trade_ref = trade_ref)
         self.add_order(new_order)
         for inst in instIDs:
             self.positions[inst].re_calc()

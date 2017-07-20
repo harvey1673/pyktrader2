@@ -152,7 +152,8 @@ class MktDataMixin(object):
         if self.cur_min[inst]['min_id'] == 0:
             return bar_id
         ra = self.min_data[inst][1]
-        ra.append_by_dict(self.cur_min[inst])
+        if self.cur_min[inst]['high']>self.cur_min[inst]['low']:
+            ra.append_by_dict(self.cur_min[inst])
         for m in sorted(self.min_data_func[inst]):
             ra_m = self.min_data[inst][m]
             if ((int(bar_id/m)>int(prev_bar/m)) or forced):
@@ -172,7 +173,8 @@ class MktDataMixin(object):
                                 'low': min(ra.data['low'][-idx:]), 'close': ra.data['close'][-1],\
                                 'volume': sum(ra.data['volume'][-idx:]), 'openInterest':ra.data['openInterest'][-1],\
                                 'min_id': ra.data['min_id'][-1], 'bar_id': ra.data['bar_id'][-1], 'date':ra.data['date'][-1]}
-                        ra_m.append_by_dict(new_data)                        
+                        if new_data['high'] > new_data['low']:
+                            ra_m.append_by_dict(new_data)
                 for fobj in self.min_data_func[inst][m]:
                     fobj.rfunc(self.min_data[inst][m].data)
         if self.save_flag:

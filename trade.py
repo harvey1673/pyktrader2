@@ -5,6 +5,7 @@ from misc import *
 import itertools
 import datetime
 import csv
+import json
 import os.path
 import order
 from trade_executor import *
@@ -21,30 +22,27 @@ Alive_Trade_Status = [TradeStatus.Ready, TradeStatus.OrderSent, TradeStatus.PFil
 class XTrade(object):
     # instances = weakref.WeakSet()
     id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
-    def __init__(self, instIDs, units, vol, limit_price, price_unit = None, strategy="dummy", book="0", \
-                 agent=None, start_time = 300000, end_time = 2115000, aggressiveness = 1):
-        self.id = next(self.id_generator)
-        self.instIDs = instIDs
-        self.units = units
-        self.vol = vol
-        self.filled_vol = 0
-        self.filled_price = 0
-        self.limit_price = limit_price
-        self.price_unit = price_unit
-        self.underlying = None
-        self.strategy = strategy
-        self.book = book
-        self.agent = agent
-        self.status = TradeStatus.Ready
-        self.order_dict = {}
-        self.working_vol = 0
+    def __init__(self, **kwargs):
+        self.id = kwargs.get('id', next(self.id_generator))
+        self.instIDs = kwargs['instIDs']
+        self.units = kwargs['units']
+        self.vol = kwargs['vol']
+        self.filled_vol = kwargs.get('filled_vol', 0)
+        self.filled_price = kwargs.get('filled_price', 0.0)
+        self.limit_price = kwargs['limit_price']
+        self.price_unit = kwargs.get('price_unit', None)
+        self.strategy = kwargs.get('strategy', 'dummy')
+        self.book = kwargs.get('book', '0')
+        self.status = kwargs.get('status', TradeStatus.Ready)
+        self.order_dict = kwargs.get('order_dict', {})
+        self.working_vol = kwargs.get('working_vol', 0)
         self.remaining_vol = self.vol - self.filled_vol - self.working_vol
-        self.aggressive_level = aggressiveness
-        self.start_time = start_time
-        self.end_time = end_time
+        self.aggressive_level = kwargs.get('aggressiveness', 1.0)
+        self.start_time = kwargs.get('start_time', 300000)
+        self.end_time = kwargs.get('end_time', 2115000)
         self.algo = None
-        if agent != None:
-            self.set_agent(agent)
+        self.agent = None
+        self.underlying = None
 
     def set_agent(self, agent):
         self.agent = agent
@@ -54,6 +52,9 @@ class XTrade(object):
     def set_algo(self, algo):
         self.algo = algo
         self.algo.set_agent(self.agent)
+
+    def save(self):
+        return json.dumps(self, skipkeys = True)
 
     def calc_filled_price(self, order_dict):
         filled_prices = []

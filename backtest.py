@@ -148,7 +148,10 @@ class StratSim(object):
 
     def open_tradepos(self, contracts, price, traded_pos):
         tp = price + misc.sign(traded_pos) * self.offset
-        new_pos = self.pos_class(contracts, self.weights, self.unit * traded_pos, tp, tp, multiple = 1, **self.pos_args)
+        new_pos = self.pos_class(insts = contracts, volumes = self.weights, \
+                                 pos = self.unit * traded_pos, \
+                                 entry_target = tp, exit_target = tp, \
+                                 multiple = 1, **self.pos_args)
         new_pos.entry_tradeid = self.tradeid
         self.tradeid += 1
         new_pos.open(tp, self.unit * traded_pos, self.timestamp)
@@ -193,7 +196,7 @@ def get_asset_tradehrs(asset):
             hrs = [misc.night_trading_hrs[night_idx]] + hrs
     return hrs
     
-def cleanup_mindata(df, asset, index_col = 'datetime'):
+def cleanup_mindata(df, asset, index_col = 'datetime', skip_hl = True):
     cond = None
     if index_col == None:
         xdf = df.set_index('datetime')
@@ -214,6 +217,8 @@ def cleanup_mindata(df, asset, index_col = 'datetime'):
         cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=2100) & (xdf.min_id < 2115))
     xdf = xdf.ix[cond]
     xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
+    if skip_hl:
+        xdf = xdf[xdf.high>xdf.low]
     if index_col == None:
         xdf = xdf.reset_index()
     return xdf

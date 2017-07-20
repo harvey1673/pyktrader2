@@ -21,25 +21,25 @@ class TrailLossType:
     Ratio, Level = range(2)
 
 class TradePos(object):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 0):
-        self.insts = insts
-        self.volumes = vols
-        self.multiple = multiple
-        self.pos = pos
-        self.direction = 1 if pos > 0 else -1
-        self.entry_target = entry_target
-        self.entry_price = 0
-        self.entry_time = NO_ENTRY_TIME
-        self.entry_tradeid = 0
-        self.exit_target = exit_target
-        self.exit_price = 0
-        self.exit_time = NO_ENTRY_TIME
-        self.exit_tradeid = 0
-        self.is_closed = False
-        self.profit = 0.0
-        self.reset_margin = reset_margin
-        self.trailing = False
-        self.close_comment = ''
+    def __init__(self, **kwargs):
+        self.insts = kwargs['insts']
+        self.volumes = kwargs['volumes']
+        self.multiple = kwargs.get('multiple', 1)
+        self.pos = kwargs['pos']
+        self.direction = 1 if self.pos > 0 else -1
+        self.entry_target = kwargs.get('entry_target', 0.0)
+        self.entry_price = kwargs.get('entry_price', 0.0)
+        self.entry_time = kwargs.get('entry_time', NO_ENTRY_TIME)
+        self.entry_tradeid = kwargs.get('entry_tradeid', 0)
+        self.exit_target = kwargs.get('exit_target', 0.0)
+        self.exit_price = kwargs.get('exit_price', 0.0)
+        self.exit_time = kwargs.get('exit_time', NO_ENTRY_TIME)
+        self.exit_tradeid = kwargs.get('exit_tradeid', 0)
+        self.is_closed = kwargs.get('is_closed', False)
+        self.profit = kwargs.get('profit', 0.0)
+        self.reset_margin = kwargs.get('reset_margin', 0.0)
+        self.trailing = kwargs.get('trailing', False)
+        self.comments = kwargs.get('comments', '')
 
     def check_exit(self, curr_price, margin):
         if self.direction * (self.exit_target - curr_price) >= margin:
@@ -97,12 +97,13 @@ class TradePos(object):
             return None
             
 class ParSARTradePos(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target - pos * reset_margin, multiple, reset_margin)
-        self.af = af
-        self.af_incr = incr
-        self.af_cap = cap
-        self.ep = entry_target
+    def __init__(self, **kwargs):
+        kwargs['exit_target'] -= kwargs['pos'] * kwargs['reset_margin']
+        TradePos.__init__(self, **kwargs)
+        self.af = kwargs.get('af', 0.02)
+        self.af_incr = kwargs.get('incr', 0.02)
+        self.af_cap = kwargs.get('cap', 0.2)
+        self.ep = kwargs.get('ep', self.entry_target)
 
     def update_price(self, curr_ep):
         self.exit_target = self.exit_target + self.af_incr * (self.ep - self.exit_target)
@@ -111,12 +112,12 @@ class ParSARTradePos(TradePos):
             self.ep = curr_ep
 
 class ParSARProfitTrig(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10, af = 0.02, incr = 0.02, cap = 0.2):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple, reset_margin)
-        self.af = af
-        self.af_incr = incr
-        self.af_cap = cap
-        self.ep = entry_target
+    def __init__(self, **kwargs):
+        TradePos.__init__(self, **kwargs)
+        self.af = kwargs.get('af', 0.02)
+        self.af_incr = kwargs.get('incr', 0.02)
+        self.af_cap = kwargs.get('cap', 0.2)
+        self.ep = kwargs.get('ep', self.entry_target)
 
     def check_exit(self, curr_price, margin = 0):
         if self.trailing and (self.direction * (self.exit_target - curr_price) >= margin):
@@ -136,8 +137,8 @@ class ParSARProfitTrig(TradePos):
                 self.exit_target = curr_ep
 
 class TargetTrailTradePos(TradePos):
-    def __init__(self, insts, vols, pos, entry_target, exit_target, multiple = 1, reset_margin = 10):
-        TradePos.__init__(self, insts, vols, pos, entry_target, exit_target, multiple, reset_margin)
+    def __init__(self, **kwargs):
+        TradePos.__init__(self, **kwargs)
 
     def update_price(self, curr_price):
         if self.trailing:
@@ -272,7 +273,9 @@ class Strategy(object):
         price = pair[2]
         idx = self.unwind_key[0]
         multiple = self.agent.instruments[instID].multiple
-        tradepos = eval(self.pos_class)([instID], [1], vol, price, price, multiple, **self.pos_args)
+        tradepos = eval(self.pos_class)( insts = [instID], volumes = [1], pos = vol, \
+                            entry_target = price, exit_target = price, \
+                            multiple = multiple, **self.pos_args)
         tradepos.entry_tradeid = idx
         self.positions[idx].append(tradepos)
         tradepos.open(price, vol, datetime.datetime.now())               
@@ -395,12 +398,17 @@ class Strategy(object):
     def open_tradepos(self, idx, direction, price, volume = 0):
         tunit = self.trade_unit[idx] if volume == 0 else volume
         start_time = self.agent.tick_id
-        xtrade = trade.XTrade( self.tradables[idx], self.volumes[idx], direction * tunit, price, price_unit = self.price_unit[idx], strategy=self.name,
-                                book= str(idx), agent = self.agent, start_time = start_time)
+        xtrade = trade.XTrade( instIDs = self.tradables[idx], units = self.volumes[idx], \
+                               vol = direction * tunit, limit_price = price, \
+                               price_unit = self.price_unit[idx], start_time = start_time, \
+                               strategy=self.name, book= str(idx))
+        xtrade.set_agent(self.agent)
         exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
         xtrade.set_algo(exec_algo)
-        tradepos = eval(self.pos_class)(self.tradables[idx], self.volumes[idx], direction * tunit, \
-                                price, price, self.underlying[idx].multiple, **self.pos_args)
+        tradepos = eval(self.pos_class)(insts = self.tradables[idx], \
+                        volumes = self.volumes[idx], pos = direction * tunit, \
+                        entry_target = price, exit_target = price, \
+                        multiple = self.underlying[idx].multiple, **self.pos_args)
         tradepos.entry_tradeid = xtrade.id
         self.submit_trade(idx, xtrade)
         self.positions[idx].append(tradepos)        
@@ -412,8 +420,11 @@ class Strategy(object):
 
     def close_tradepos(self, idx, tradepos, price):
         start_time = self.agent.tick_id
-        xtrade = trade.XTrade( tradepos.insts, tradepos.volumes, -tradepos.pos, price, price_unit = self.price_unit[idx], strategy=self.name,
-                                book= str(idx), agent = self.agent, start_time = start_time)
+        xtrade = trade.XTrade( instIDs = tradepos.insts, units = tradepos.volumes, \
+                               vol = -tradepos.pos, limit_price = price, \
+                               price_unit = self.price_unit[idx], start_time = start_time, \
+                               strategy = self.name, book = str(idx))
+        xtrade.set_agent(self.agent)
         exec_algo = eval(self.exec_class)(xtrade, **self.exec_args[idx])
         xtrade.set_algo(exec_algo)
         tradepos.exit_tradeid = xtrade.id
@@ -475,7 +486,9 @@ class Strategy(object):
                         trailing = True if float(row[17]) > 0 else False
                     else:
                         trailing = False
-                    tradepos = eval(self.pos_class)(insts, vols, pos, entry_target, exit_target, multiple, reset_margin, **self.pos_args)
+                    tradepos = eval(self.pos_class)(insts = insts, volumes = vols, pos = pos, \
+                                    entry_target = entry_target, exit_target = exit_target, \
+                                    multiple = multiple, reset_margin = reset_margin, **self.pos_args)
                     if row[6] in ['', '19700101 00:00:00 000000']:
                         entry_time = NO_ENTRY_TIME
                         entry_price = 0

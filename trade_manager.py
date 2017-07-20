@@ -416,12 +416,12 @@ class TradeManager(object):
                                 order_dict[inst] = [int(o_id) for o_id in str_dict[inst].split('_')]
                     strategy = row[12]
                     book = row[13]
-                    xtrade = XTrade(instIDs, units, vol, limit_price, price_unit = price_unit, strategy = strategy, book = book, \
-                                    agent = self.agent, start_time = start_time, end_time = end_time, aggressiveness = aggressiveness)
-                    xtrade.id = int(row[0])
-                    xtrade.status = int(row[14])
-                    xtrade.order_dict = order_dict
-                    xtrade.filled_vol = filled_vol
-                    xtrade.filled_price = filled_price
+                    xtrade = XTrade(instIDs = instIDs, units = units, vol = vol, \
+                                    limit_price = limit_price, price_unit = price_unit, \
+                                    strategy = strategy, book = book, \
+                                    filled_vol = filled_vol, filled_price = filled_price, \
+                                    start_time = start_time, end_time = end_time, aggressiveness = aggressiveness, \
+                                    tradeid = int(row[0]), status = int(row[14]), order_dict = order_dict)
+                    xtrade.set_agent(self.agent)
                     trade_dict[xtrade.id] = xtrade
         return trade_dict
