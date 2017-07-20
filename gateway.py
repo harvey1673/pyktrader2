@@ -30,7 +30,6 @@ class Gateway(object):
         self.instruments = []      # 已订阅合约代码
         self.working_orders = []
         self.process_flag = False
-        self.eod_flag = False
         self.eod_report = True
         self.account_info = {'available': 0,
                             'locked_margin': 0,
@@ -277,7 +276,7 @@ class Gateway(object):
                 self.onLog(logContent, level = logging.INFO)
                 return False
         else:
-            self.eod_flag = True
+            self.agent.eod_flag = True
         with open(logfile, 'rb') as f:
             reader = csv.reader(f)
             for idx, row in enumerate(reader):

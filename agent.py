@@ -441,6 +441,8 @@ class Agent(MktDataMixin):
 
     def get_all_orders(self):
         self.ref2order = {}
+        if self.eod_flag:
+            return
         for name in self.gateways:
             gway = self.gateways[name]
             gway.load_order_list(self.scur_day)
@@ -555,8 +557,9 @@ class Agent(MktDataMixin):
                     strat.add_live_trades(xtrade)
         for gway in self.gateways:
             gateway = self.gateways[gway]
-            for inst in gateway.positions:
-                gateway.positions[inst].re_calc()
+            if not self.eod_flag:
+                for inst in gateway.positions:
+                    gateway.positions[inst].re_calc()
             gateway.calc_margin()
             gateway.connect()
         self.eventEngine.start()

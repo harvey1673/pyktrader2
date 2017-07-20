@@ -283,6 +283,8 @@ class TradeManager(object):
         self.ref2trade = {}
 
     def initialize(self):
+        if self.agent.eod_flag:
+            return
         self.ref2trade = self.load_trade_list(self.agent.scur_day, self.agent.folder)
         for trade_id in self.ref2trade:
             xtrade = self.ref2trade[trade_id]
