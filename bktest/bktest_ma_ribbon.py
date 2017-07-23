@@ -18,6 +18,7 @@ class MARibbonSim(StratSim):
         self.close_daily = config['close_daily']
         self.offset = config['offset']
         self.tick_base = config['tick_base']
+        self.freq = config['freq']
         self.corr_entry = config['param'][0]
         self.corr_exit = config['param'][1]
         self.pval_entry = config['param'][2]
@@ -39,21 +40,20 @@ class MARibbonSim(StratSim):
         else:
             freq_str = str(self.freq) + "min"
             xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols=['contract'])
-        ma_ribbon = dh.MA_RIBBON(self.df, self.ma_list)
+        ma_ribbon = dh.MA_RIBBON(xdf, self.ma_list)
         self.df = xdf
         for malen in self.ma_list:
             self.df['EMA' + str(malen)] = ma_ribbon['EMA_CLOSE_' + str(malen)]
         self.df['RIBBON_CORR'] = ma_ribbon['MARIBBON_CORR']
         self.df['RIBBON_PVAL'] = ma_ribbon['MARIBBON_PVAL']
-        self.df['datetime'] = self.df.index
         self.df['closeout'] = 0.0
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
         self.df['traded_price'] = self.df['open']
 
     def run_vec_sim(self):
-        self.df['prev_close'] = self.df['close'].shift(1)
-        close_ind = np.isnan(self.df['close'].shift(-1))
+        close_ind = pd.Series(False, index = self.df.index)
+        close_ind.iloc[-1] = True
         if self.close_daily:
             daily_end = (self.df['date'] != self.df['date'].shift(-1))
             close_ind = close_ind | daily_end
@@ -75,19 +75,20 @@ class MARibbonSim(StratSim):
         self.df['cost'] = abs(self.df['pos'] - self.df['pos'].shift(1)) * (self.offset + self.df['open'] * self.tcost)
         self.df['cost'] = self.df['cost'].fillna(0.0)
         self.df['traded_price'] = self.df.open + (self.df['pos'] - self.df['pos'].shift(1)) * self.offset
-        self.closed_trades = simdf_to_trades1(self.df, slippage = self.offset )
+        self.closed_trades = simdf_to_trades1(self.df)
         return (self.df, self.closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest.bktest_ma_ribbon.MARibbonSim'
+    sim_config['sim_class']  = 'bktest.bktest_ma_ribbon.MARibbonSim'
+    sim_config['sim_func'] = 'run_vec_sim'
     sim_config['scen_keys'] = ['freq', 'param']
     sim_config['sim_name']   = 'ribbon_customMA_'
-    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'm', 'RM', \
-                                'SR', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', \
+    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'OI', 'm', 'RM', \
+                                'SR', 'CF', 'c', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', 'zn', \
                                 'ag', 'au', 'IF', 'IH', 'TF', 'T']
     sim_config['start_date'] = '20160102'
-    sim_config['end_date']   = '20170707'
+    sim_config['end_date']   = '20170721'
     sim_config['freq'] = [1, 3, 5]
     sim_config['param'] =[[0, 0, 0.02, 0.2], [0, 0, 0.05, 0.2], [0, 0, 0.08, 0.2], [0, 0, 0.1, 0.2],\
                           [0, 0, 0.02, 0.3], [0, 0, 0.05, 0.3], [0, 0, 0.08, 0.3], [0, 0, 0.1, 0.3],\

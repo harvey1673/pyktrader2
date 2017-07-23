@@ -236,7 +236,7 @@ def simdf_to_trades1(df, slippage = 0):
         if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
             if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)
-            new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
+            new_pos = strat.TradePos(insts = [cont], volumes = [1], pos = pos - prev_pos, entry_target = tprice, exit_target = tprice)
             tradeid += 1
             new_pos.entry_tradeid = tradeid
             new_pos.open(tprice, pos - prev_pos, dtime)
@@ -254,7 +254,7 @@ def simdf_to_trades1(df, slippage = 0):
             pos_list = [ tp for tp in pos_list if not tp.is_closed ]
             if prev_pos != pos:
                 if len(pos_list) == 0:
-                    new_pos = strat.TradePos([cont], [1], pos - prev_pos, tprice, tprice)
+                    new_pos = strat.TradePos(insts = [cont], volumes = [1], pos = pos - prev_pos, entry_target = tprice, exit_target = tprice)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(tprice, pos - prev_pos, dtime)
@@ -284,24 +284,24 @@ def simdf_to_trades2(df, slippage = 0.0):
             if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)            
             npos = int(abs(pos-prev_pos))
-            new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+            new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
+                tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
             pos_list = pos_list + new_pos
-            new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+            new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
+                tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
             pos_list = pos_list + new_pos
         else:
             for i, tp in enumerate(reversed(pos_list)):
                 if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
                     break
                 else:
-                    tp.close(tprice - misc.sign(tp.pos)*slippage, dtime)
+                    tp.close(tprice, dtime)
                     prev_pos -= tp.pos
                     tradeid += 1
                     tp.exit_tradeid = tradeid
@@ -310,11 +310,11 @@ def simdf_to_trades2(df, slippage = 0.0):
             if prev_pos != pos:
                 if len(pos_list) == 0:
                     npos = int(abs(pos-prev_pos))
-                    new_pos = [ strat.TradePos([cont], [1], misc.sign(pos-prev_pos), tprice, tprice) for i in range(npos)]
+                    new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
                     for tpos in new_pos:
                         tradeid += 1
                         tpos.entry_tradeid = tradeid
-                        tpos.open(tprice + misc.sign(pos - prev_pos)*slippage, misc.sign(pos-prev_pos), dtime)
+                        tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
                     pos_list = pos_list + new_pos                    
                 else:  
                     print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
