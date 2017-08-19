@@ -20,7 +20,8 @@ sim_margin_dict = { 'au': 0.06, 'ag': 0.08, 'cu': 0.07, 'al':0.05,
                 'jd': 0.06, 'ni': 0.07, 'IC': 0.1,  'ZC': 0.05,
                 'IH': 0.01, 'FG': 0.05, 'TF':0.015, 'OI': 0.05,
                 'T': 0.015, 'MA': 0.06, 'cs': 0.05, 'bu': 0.07, 
-                'sn': 0.05, 'v': 0.05, 'hc': 0.09, 'SM': 0.1 }
+                'sn': 0.05, 'v': 0.05, 'hc': 0.09, 'SM': 0.1,
+                'CY': 0.05, }
 sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'y': datetime.date(2010,10,1), 'l': datetime.date(2008,10,1), 'rb':datetime.date(2010,10,1),
     'p': datetime.date(2010,10,1), 'cu':datetime.date(2010,10,1), 'al':datetime.date(2010,10,1),
@@ -35,6 +36,7 @@ sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'IH':datetime.date(2015,5,1),  'IC':datetime.date(2015,5,1),  'cs':datetime.date(2015,2,1),
     'jd':datetime.date(2014,2,1),  'ni':datetime.date(2015,6,1),  'sn':datetime.date(2015,6,1),
     'ZC':datetime.date(2015,12,1), 'hc':datetime.date(2012, 1, 1), 'SM': datetime.date(2016,10,10),
+    'CY':datetime.date(2017,8,18),
     }
 
 trade_offset_dict = {
@@ -48,7 +50,7 @@ trade_offset_dict = {
                 'IH': 0.2,  'FG': 1,    'TF':0.005, 'OI': 2,
                 'T': 0.005, 'MA': 1,    'cs': 1,    'bu': 1,
                 'sn': 10,   'v':  5,    'ZC': 0.2,  'hc': 1,
-                'SM': 4,    'SF': 4,
+                'SM': 4,    'SF': 4,    'CY': 5,
                 }
 
 def get_bktest_folder():
