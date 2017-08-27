@@ -952,6 +952,7 @@ class VnctpTdApi(TdApi):
             req['UserID'] = self.userID
             req['Password'] = self.password
             req['BrokerID'] = self.brokerID
+            req['UserProductInfo'] = self.gateway.product_info
             self.reqID += 1
             self.reqUserLogin(req, self.reqID)   
         

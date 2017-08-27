@@ -97,6 +97,7 @@ class CtpGateway(GrossGateway):
         self.md_data_buffer = 0
         self.td_conn_mode = TERT_QUICK
         self.intraday_close_ratio = {}
+        self.product_info = 'vnpyktrader'
         
     #----------------------------------------------------------------------
     def get_pos_class(self, inst):
@@ -130,6 +131,7 @@ class CtpGateway(GrossGateway):
             tdAddress = str(setting['tdAddress'])
             mdAddress = str(setting['mdAddress'])
             self.intraday_close_ratio = setting.get('intraday_close_ratio', {})
+            self.product_info = setting.get('product_info', 'vnpyktrader')
         except KeyError:
             logContent = u'连接配置缺少字段，请检查'
             self.onLog(logContent, level = logging.WARNING)

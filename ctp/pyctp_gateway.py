@@ -952,6 +952,7 @@ class PyctpTdApi(py_ctp.TraderApi):
             req['UserID'] = self.userID
             req['Password'] = self.password
             req['BrokerID'] = self.brokerID
+            req['UserProductInfo'] = self.gateway.product_info
             req_data = self.ApiStruct.ReqUserLogin( **req )
             self.reqID += 1
             self.ReqUserLogin(req_data, self.reqID)   
