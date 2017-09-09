@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 import data_handler as dh
 import strategy as strat
-import mysqlaccess
+import dbaccess
+import mysql.connector as sqlconn
 import misc
 import platform
 
@@ -21,7 +22,7 @@ sim_margin_dict = { 'au': 0.06, 'ag': 0.08, 'cu': 0.07, 'al':0.05,
                 'IH': 0.01, 'FG': 0.05, 'TF':0.015, 'OI': 0.05,
                 'T': 0.015, 'MA': 0.06, 'cs': 0.05, 'bu': 0.07, 
                 'sn': 0.05, 'v': 0.05, 'hc': 0.09, 'SM': 0.1,
-                'CY': 0.05, }
+                'CY': 0.05,}
 sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'y': datetime.date(2010,10,1), 'l': datetime.date(2008,10,1), 'rb':datetime.date(2010,10,1),
     'p': datetime.date(2010,10,1), 'cu':datetime.date(2010,10,1), 'al':datetime.date(2010,10,1),
@@ -36,8 +37,7 @@ sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'IH':datetime.date(2015,5,1),  'IC':datetime.date(2015,5,1),  'cs':datetime.date(2015,2,1),
     'jd':datetime.date(2014,2,1),  'ni':datetime.date(2015,6,1),  'sn':datetime.date(2015,6,1),
     'ZC':datetime.date(2015,12,1), 'hc':datetime.date(2012, 1, 1), 'SM': datetime.date(2016,10,10),
-    'CY':datetime.date(2017,8,18),
-    }
+    'CY': datetime.date(2017, 8, 18),}
 
 trade_offset_dict = {
                 'au': 0.05, 'ag': 1,    'cu': 10,   'al':5,
@@ -681,7 +681,7 @@ def simcontract_min(config_file):
         contlist = {}
         exp_dates = {}
         for i, prod in enumerate(assets):
-            cont_mth, exch = mysqlaccess.prod_main_cont_exch(prod)
+            cont_mth, exch = dbaccess.prod_main_cont_exch(prod)
             contlist[prod] = misc.contract_range(prod, exch, cont_mth, start_date, end_date)
             exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
             edates = [ misc.day_shift(d, rollrule) for d in exp_dates[prod] ]
@@ -695,12 +695,14 @@ def simcontract_min(config_file):
                 minid_end = 2114
                 if prod in misc.night_session_markets:
                     minid_start = 300
-                tmp_df = mysqlaccess.load_min_data_to_df('fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
+                cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+                tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
                 min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
                 if need_daily:
-                    tmp_df = mysqlaccess.load_daily_data_to_df('fut_daily', cont, sd, ed, database = 'hist_data')
+                    tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', cont, sd, ed, database = 'hist_data')
                     day_data[prod][cont] = tmp_df
+                cnx.close()
         if 'offset' in sim_config:
             config['offset'] = sim_config['offset'] * config['tick_base']
         else:
@@ -1143,7 +1145,7 @@ class ContBktestManager(BacktestManager):
         contlist = {}
         exp_dates = {}
         for i, prod in enumerate(assets):
-            cont_mth, exch = mysqlaccess.prod_main_cont_exch(prod)
+            cont_mth, exch = dbaccess.prod_main_cont_exch(prod)
             self.contlist[prod] = misc.contract_range(prod, exch, cont_mth, self.start_date, self.end_date)
             self.exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
             edates = [ misc.day_shift(d, self.config['rollrule']) for d in exp_dates[prod] ]
@@ -1154,9 +1156,11 @@ class ContBktestManager(BacktestManager):
                 minid_end = 2114
                 if prod in misc.night_session_markets:
                     minid_start = 300
-                tmp_df = mysqlaccess.load_min_data_to_df('fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
+                cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+                tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
                 self.min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
+                cnx.close()
 
     def prepare_data(self, asset_idx, cont_idx = 0):
         assets = self.sim_assets[asset_idx]
