@@ -6,7 +6,7 @@ import logging
 import bisect
 import dbaccess
 import misc
-import sqlite3 as sqlconn
+import mysql.connector as sqlconn
 import trade
 import trade_manager
 import os
