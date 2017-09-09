@@ -4,7 +4,6 @@ import misc
 import math
 import bsopt
 import dbaccess
-import mysql.connector as sqlconn
 import data_handler as dh
 import datetime
 import numpy as np
@@ -54,7 +53,7 @@ def plot_series(ts):
     plt.show()
     
 def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule = '-10b'):
-    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+    cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
     if nearby == 0:
         mdf = dbaccess.load_min_data_to_df(cnx, 'fut_min', asset, start_date, end_date, minid_start = 300, minid_end = 2114, database = 'hist_data')
         mdf['contract'] = asset
@@ -68,7 +67,7 @@ def validate_db_data(tday, filter = False):
     all_insts = misc.filter_main_cont(tday, filter)
     data_count = {}
     inst_list = {'min': [], 'daily': [] }
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     for instID in all_insts:
         df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', instID, tday, tday)
         if len(df) <= 0:

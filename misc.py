@@ -1,5 +1,4 @@
 #-*- coding:utf-8 -*-
-import mysql.connector as sqlconn
 import dbaccess
 import workdays
 import datetime
@@ -372,7 +371,7 @@ def inst2exch(inst):
 
 def inst_to_exch(inst):
     key = inst2product(inst)
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange from trade_products where product_code='{prod}' ".format(prod=key)
     cursor.execute(stmt)
@@ -443,7 +442,7 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
     #print contlist, exp_dates
     sdate = start_date
     is_new = True
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
             continue
@@ -486,7 +485,7 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
 def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_roll= '-20b', database = 'hist_data'):
     if start_date > end_date: 
         return None
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange, contract from trade_products where product_code='{prod}' ".format(prod=product)
     cursor.execute(stmt)
@@ -503,7 +502,7 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
     i = 0
     dbconfig = copy.deepcopy(dbaccess.dbconfig)
     dbconfig['database'] = database
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
             continue
@@ -559,7 +558,7 @@ def contract_expiry(cont, hols='db'):
         else:
             expiry = 0
     else:
-        cnx = sqlconn.connect(**dbaccess.dbconfig)
+        cnx = dbaccess.connect(**dbaccess.dbconfig)
         cursor = cnx.cursor()
         stmt = "select expiry from contract_list where instID='{inst}' ".format(inst=cont)
         cursor.execute(stmt)

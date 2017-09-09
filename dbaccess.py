@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import numpy
+import sec_bits
 import mysql.connector as sqlconn
 import copy
 import csv
@@ -8,20 +9,8 @@ import os.path
 import misc
 import pandas as pd
 
-#MKT_DB = 'mkt_data'
-#dbconfig = {'user': 'harvey',
-#            'password': 'h464717',
-#            'host': 'localhost',
-#            'database': MKT_DB,
-#            }
-
-#hist_dbconfig = {'user': 'harvey',
-#            'password': 'h464717',
-#            'host': 'localhost',
-#            'database': MKT_DB,
-#            }
-dbconfig = {'database': "database.db"}
-hist_dbconfig = {'database': "database.db"}
+dbconfig = sec_bits.dbconfig
+hist_dbconfig = sec_bits.hist_dbconfig
 
 fut_tick_columns = ['instID', 'date', 'tick_id', 'hour', 'min', 'sec', 'msec', 'openInterest', 'volume', 'price',
                     'high', 'low', 'bidPrice1', 'bidVol1', 'askPrice1', 'askVol1']
@@ -31,6 +20,9 @@ min_columns = ['datetime', 'date', 'open', 'high', 'low', 'close', 'volume', 'op
 daily_columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'openInterest']
 spot_columns = ['date', 'price']
 price_fields = { 'instID': daily_columns, 'spotID': spot_columns,}
+
+def connect(**args):
+    return sqlconn.connect(**args)
 
 def tick2dict(tick, tick_columns):
     tick_dict = dict(
@@ -113,7 +105,7 @@ def insert_daily_data(cnx, inst, daily_data, is_replace=False, dbtable='fut_dail
     cursor.execute(stmt, args)
     cnx.commit()
 
-def import_tick_from_file(dbtable, cnx=sqlconn.connect(**dbconfig)):
+def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
     inst_list = ['IF1406', 'IO1406-C-2300', 'IO1406-P-2300', 'IO1406-C-2250',
                  'IO1406-P-2250', 'IO1406-C-2200', 'IO1406-P-2200', 'IO1406-C-2150',
                  'IO1406-P-2150', 'IO1406-C-2100', 'IO1406-P-2100', 'IO1406-C-2050',
@@ -134,7 +126,7 @@ def import_tick_from_file(dbtable, cnx=sqlconn.connect(**dbconfig)):
                 cursor.execute(stmt)
                 cnx.commit()
 
-def insert_cont_data(cont, cnx=sqlconn.connect(**dbconfig)):
+def insert_cont_data(cont, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     col_list = cont.keys()
     stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s) ".format(table='contract_list',
@@ -144,7 +136,7 @@ def insert_cont_data(cont, cnx=sqlconn.connect(**dbconfig)):
     cnx.commit()
     cnx.close()
 
-def prod_main_cont_exch(prodcode, cnx=sqlconn.connect(**dbconfig)):
+def prod_main_cont_exch(prodcode, cnx = connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select exchange, contract from trade_products where product_code='{prod}' ".format(prod=prodcode)
     cursor.execute(stmt)
@@ -155,7 +147,7 @@ def prod_main_cont_exch(prodcode, cnx=sqlconn.connect(**dbconfig)):
     cnx.close()
     return cont_mth, exch
 
-def load_product_info(prod, cnx=sqlconn.connect(**dbconfig)):
+def load_product_info(prod, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select exchange, lot_size, tick_size, start_min, end_min, broker_fee from trade_products where product_code='{product}' ".format(
         product=prod)
@@ -172,7 +164,7 @@ def load_product_info(prod, cnx=sqlconn.connect(**dbconfig)):
                }
     return out
 
-def load_stockopt_info(inst, cnx=sqlconn.connect(**dbconfig)):
+def load_stockopt_info(inst, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_base from stock_opt_map where instID='{product}' ".format(
         product=inst)
@@ -190,7 +182,7 @@ def load_stockopt_info(inst, cnx=sqlconn.connect(**dbconfig)):
                }
     return out
 
-def get_stockopt_map(underlying, cont_mths, strikes, cnx=sqlconn.connect(**dbconfig)):
+def get_stockopt_map(underlying, cont_mths, strikes, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, strike, strike_scale, instID from stock_opt_map where underlying='{under}' and opt_mth in ({opt_mth_str}) and strike in ({strikes}) ".format(
         under=underlying,
@@ -203,7 +195,7 @@ def get_stockopt_map(underlying, cont_mths, strikes, cnx=sqlconn.connect(**dbcon
         out[key] = instID
     return out
 
-def load_alive_cont(sdate, cnx=sqlconn.connect(**dbconfig)):
+def load_alive_cont(sdate, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select instID, product_code from contract_list where expiry>=%s"
     args = tuple([sdate])
@@ -218,7 +210,7 @@ def load_alive_cont(sdate, cnx=sqlconn.connect(**dbconfig)):
             pc.append(prod)
     return cont, pc
 
-def load_inst_marginrate(instID, cnx=sqlconn.connect(**dbconfig)):
+def load_inst_marginrate(instID, cnx=connect(**dbconfig)):
     cursor = cnx.cursor()
     stmt = "select margin_l, margin_s from contract_list where instID='{inst}' ".format(inst=instID)
     cursor.execute(stmt)

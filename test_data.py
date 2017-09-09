@@ -2,7 +2,6 @@ import tushare as ts
 import datetime
 import copy
 import pandas as pd
-import mysql.connector as sqlconn
 import misc
 import backtest
 import os
@@ -73,7 +72,7 @@ from glob import glob
 
 def export_tick_data(tday, folder = '', tick_id = 300000):
     all_insts, prods = dbaccess.load_alive_cont(tday)
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     for inst in all_insts:
         stmt = "select * from fut_tick where instID='{prod}' and date='{cdate}' and tick_id>='{tick}'".format(prod=inst, cdate=tday.strftime('%Y-%m-%d'), tick = tick_id)
         df = pd.io.sql.read_sql(stmt, cnx)
@@ -81,7 +80,7 @@ def export_tick_data(tday, folder = '', tick_id = 300000):
 
 def import_tick_data(tday, folder = ''):
     all_insts, prods = dbaccess.load_alive_cont(tday)
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     for inst in all_insts:
         data_file = folder + inst + '.csv'
@@ -104,7 +103,7 @@ def import_datayes_daily_data(start_date, end_date, cont_list = [], is_replace =
         df = mkt.MktFutd(tradeDate = dstring)
         if len(df.ticker) == 0:
             continue
-        cnx = sqlconn.connect(**dbaccess.dbconfig)
+        cnx = dbaccess.connect(**dbaccess.dbconfig)
         for cont in df.ticker:
             if (len(cont_list) > 0) and (cont not in cont_list):
                 continue
@@ -135,7 +134,7 @@ def extract_rar_data(source, target, extract_src = False):
         patoolib.extract_archive(file, outdir = target)
 
 def conv_csv_to_sql(target, db_table = 'test_fut_tick'):
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     allcsvs = [y for x in os.walk(target) for y in glob(os.path.join(x[0], '*.csv'))]
     for csvfile in allcsvs:
         try:
@@ -159,7 +158,7 @@ def conv_csv_to_sql(target, db_table = 'test_fut_tick'):
     return 0
 
 def load_hist_csv2sql(folder, db_table):
-    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+    cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
     cursor = cnx.cursor()
     allcsvs = [y for x in os.walk(folder) for y in glob(os.path.join(x[0], '*.csv'))]
     skipped_files = []
@@ -230,7 +229,7 @@ def load_hist_tick(db_table, instID, sdate, edate):
     stmt += "and date >= '%s' " % sdate.strftime('%Y-%m-%d')
     stmt += "and date <= '%s' " % edate.strftime('%Y-%m-%d')
     stmt += "order by dtime;"
-    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+    cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
     df = pd.io.sql.read_sql(stmt, cnx, index_col = 'dtime')
     return df
 
@@ -239,7 +238,7 @@ def load_hist_min(db_table, instID, sdate, edate):
     stmt += "and date >= '%s' " % sdate.strftime('%Y-%m-%d')
     stmt += "and date <= '%s' " % edate.strftime('%Y-%m-%d')
     stmt += "order by date, min_id;"
-    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+    cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
     df = pd.io.sql.read_sql(stmt, cnx, index_col = 'datetime')
     return df
 
@@ -261,7 +260,7 @@ def conv_db_htick2min(db_table, inst_file, out_table = 'hist_fut_min', database 
         instIDs = conf_dict['instIDs']
     dbconfig = copy.deepcopy(dbaccess.dbconfig)
     dbconfig['database']  = database
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     for inst in instIDs:
         field_dict = {'instID': "\'"+inst+"\'"}
         datestr_list = get_col_dist_values(database + '.' + db_table, 'date', field_dict)
@@ -308,7 +307,7 @@ def get_instIDs_from_file(inst_file, db_table, database = 'hist_data'):
 def conv_db_htmin2daily(db_table, instIDs, sdate, edate, out_table = 'hist_fut_daily', database = 'hist_data'):
     dbconfig = copy.deepcopy(**dbaccess.dbconfig)
     dbconfig['database'] = database
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     for inst in instIDs:
         mdf = load_hist_min(db_table, inst, sdate, edate)
         if len(mdf) == 0:
@@ -332,7 +331,7 @@ def get_col_dist_values(db_table, col_name, field_dict):
                 stmt += " and"
     stmt += ";"
     print stmt
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     cursor = cnx.cursor()
     cursor.execute(stmt)
     #cnx.commit()
@@ -346,7 +345,7 @@ def copy_prod2hist(prod_db, hist_db, sdate, edate):
     dbconfig = copy.deepcopy(**dbaccess.dbconfig)
     stmt = 'insert into {hist_db}.fut_min (instID, exch, datetime, date, min_id, open, close, high, low, volume, openInterest) '.format(hist_db = hist_db)
     stmt += 'select * from {prod_db}.fut_min where date>={sdate} and date<={edate} order by date, min_id;'.format(prod_db = prod_db, sdate = sdate.strftime('%Y%m%d'), edate = edate.strftime('%Y%m%d'));
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     cursor = cnx.cursor()
     cursor.execute(stmt)
     cnx.commit()

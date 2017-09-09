@@ -6,7 +6,6 @@ import logging
 import bisect
 import dbaccess
 import misc
-import mysql.connector as sqlconn
 import trade
 import trade_manager
 import os
@@ -53,7 +52,7 @@ class MktDataMixin(object):
         self.min_data_func = {}
         self.daily_data_days = config.get('daily_data_days', 25)
         self.min_data_days = config.get('min_data_days', 1)
-        self.db_conn = sqlconn.connect(**dbaccess.dbconfig)
+        self.db_conn = dbaccess.connect(**dbaccess.dbconfig)
         if 'min_func' in config:
             self.get_min_id = eval(config['min_func'])
         else:

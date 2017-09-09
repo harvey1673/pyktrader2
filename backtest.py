@@ -8,7 +8,6 @@ import numpy as np
 import data_handler as dh
 import strategy as strat
 import dbaccess
-import mysql.connector as sqlconn
 import misc
 import platform
 
@@ -695,7 +694,7 @@ def simcontract_min(config_file):
                 minid_end = 2114
                 if prod in misc.night_session_markets:
                     minid_start = 300
-                cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+                cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
                 tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
                 min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
@@ -1156,7 +1155,7 @@ class ContBktestManager(BacktestManager):
                 minid_end = 2114
                 if prod in misc.night_session_markets:
                     minid_start = 300
-                cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
+                cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
                 tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
                 self.min_data[prod][cont] = cleanup_mindata( tmp_df, prod)

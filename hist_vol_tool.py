@@ -5,7 +5,6 @@ import pyktlib
 import pandas as pd
 import numpy as np
 import math
-import mysql.connector as sqlconn
 import dbaccess
 import backtest
 import data_handler as dh
@@ -193,7 +192,7 @@ def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor =
             break
         p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
         d_start = day_shift(expiry_d, p_str)
-        cnx = sqlconn.connect(**dbaccess.dbconfig)
+        cnx = dbaccess.connect(**dbaccess.dbconfig)
         if freq == 'd':
             df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', cont, d_start, expiry_d, index_col = None)
         else:
@@ -242,7 +241,7 @@ def hist_cso_by_product(prodcode, start_d, end_d, periods = 24, tenor = '-1w', m
     freq = data['data_freq']
     dbconfig = copy.deepcopy(**dbaccess.hist_dbconfig)
     dbconfig['database'] = data['database']
-    cnx = sqlconn.connect(**dbconfig)
+    cnx = dbaccess.connect(**dbconfig)
     for cont, expiry in zip(contlist, exp_dates):
         expiry_d = expiry.date()
         if expiry_d > end_d:
@@ -269,7 +268,7 @@ def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1
         iv_func = pyktlib.BlackImpliedVol
     else:
         iv_func = pyktlib.AmericanImpliedVol
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     df = dbaccess.load_tick_to_df(cnx, 'fut_tick', underlier, curr_date, curr_date, start_tick=300000, end_tick = tick_id)
     slice_tick = df['tick_id'].iat[-1]
     under_bid = df['bidPrice1'].iat[-1]
@@ -325,7 +324,7 @@ def validate_db_data(tday, filter = False):
     all_insts = filter_main_cont(tday, filter)
     data_count = {}
     inst_list = {'min': [], 'daily': [] }
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     for instID in all_insts:
         df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', instID, tday, tday)
         if len(df) <= 0:
@@ -361,7 +360,7 @@ def hist_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB
                     'delta_func': 'bsopt.BSDelta',
                     'is_dtime': data['is_dtime'],
                     }
-    cnx = sqlconn.connect(**dbaccess.dbconfig)
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
     d_end = end_d
     res = {}
