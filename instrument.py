@@ -1,7 +1,7 @@
 #-*- coding:utf-8 -*-
 import datetime
 import pyktlib
-import mysqlaccess
+import dbaccess
 import copy
 from misc import * 
 
@@ -190,7 +190,7 @@ class Future(Instrument):
     def initialize(self):
         self.ptype = ProductType.Future
         self.product = inst2product(self.name)
-        prod_info = mysqlaccess.load_product_info(self.product)
+        prod_info = dbaccess.load_product_info(self.product)
         self.exchange = prod_info['exch']
         if self.exchange == 'CZCE':
             self.cont_mth = int(self.name[-3:]) + 201000
@@ -206,7 +206,7 @@ class Future(Instrument):
         return
     
     def update_param(self, tday):
-        self.marginrate = mysqlaccess.load_inst_marginrate(self.name)
+        self.marginrate = dbaccess.load_inst_marginrate(self.name)
         
 class OptionInst(Instrument):
     Greek_Map = {'pv': 'price', 'delta': 'delta', 'gamma': 'gamma', \
@@ -277,7 +277,7 @@ class StockOptionInst(OptionInst):
         
     def initialize(self):
         self.ptype = ProductType.Option
-        prod_info = mysqlaccess.load_stockopt_info(self.name)
+        prod_info = dbaccess.load_stockopt_info(self.name)
         self.exchange = prod_info['exch']
         self.multiple = prod_info['lot_size']
         self.tick_base = prod_info['tick_size']
@@ -327,7 +327,7 @@ class FutOptionInst(OptionInst):
                 self.cont_mth = int(self.underlying[-4:]) + 200000
                 self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
                 self.product = str(self.product[:-4])
-        prod_info = mysqlaccess.load_product_info(self.product)
+        prod_info = dbaccess.load_product_info(self.product)
         self.exchange = prod_info['exch']
         self.start_tick_id =  prod_info['start_min'] * 1000
         if self.product in night_session_markets:
