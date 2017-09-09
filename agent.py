@@ -4,7 +4,9 @@ import json
 import datetime
 import logging
 import bisect
-import mysqlaccess
+import dbaccess
+import misc
+import sqlite3 as sqlconn
 import trade
 import trade_manager
 import os
@@ -51,6 +53,7 @@ class MktDataMixin(object):
         self.min_data_func = {}
         self.daily_data_days = config.get('daily_data_days', 25)
         self.min_data_days = config.get('min_data_days', 1)
+        self.db_conn = sqlconn.connect(**dbaccess.dbconfig)
         if 'min_func' in config:
             self.get_min_id = eval(config['min_func'])
         else:
@@ -223,11 +226,11 @@ class MktDataMixin(object):
         type = event.dict['type']
         data = event.dict['data']
         if type == EVENT_MIN_BAR:
-            mysqlaccess.insert_min_data(inst, data, dbtable = self.min_db_table)
+            dbaccess.insert_min_data(self.db_conn, inst, data, dbtable = self.min_db_table)
         elif type == EVENT_TICK:
-            mysqlaccess.bulkinsert_tick_data(inst, data, dbtable = self.tick_db_table)
+            dbaccess.bulkinsert_tick_data(self.db_conn, inst, data, dbtable = self.tick_db_table)
         elif type == EVENT_MKTDATA_EOD:
-            mysqlaccess.insert_daily_data(inst, data, dbtable = self.daily_db_table)
+            dbaccess.insert_daily_data(self.db_conn, inst, data, dbtable = self.daily_db_table)
         else:
             pass
 
@@ -471,7 +474,7 @@ class Agent(MktDataMixin):
             #self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             daily_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
             daily_end = self.scur_day
-            ddf = mysqlaccess.load_daily_data_to_df('fut_daily', inst, daily_start, daily_end, index_col = None)            
+            ddf = dbaccess.load_daily_data_to_df(self.db_conn, 'fut_daily', inst, daily_start, daily_end, index_col = None)
             if len(ddf) > 0:
                 self.instruments[inst].price = self.instruments[inst].mid_price = ddf['close'].iloc[-1]
                 self.instruments[inst].last_update = 0
@@ -494,7 +497,7 @@ class Agent(MktDataMixin):
             d_end = self.scur_day
             min_start = int(self.instruments[inst].start_tick_id/1000)
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
-            mdf = mysqlaccess.load_min_data_to_df('fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, database = 'blueshale', index_col = None)
+            mdf = dbaccess.load_min_data_to_df(self.db_conn, 'fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, index_col = None)
             mdf = backtest.cleanup_mindata(mdf, self.instruments[inst].product, index_col = None)
             mdf['bar_id'] = self.conv_bar_id(mdf['min_id'])
             if len(mdf)>0:
