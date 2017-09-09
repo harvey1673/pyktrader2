@@ -1,10 +1,11 @@
 #-*- coding:utf-8 -*-
-import mysql.connector
-import mysqlaccess
+import mysql.connector as sqlconn
+import dbaccess
 import workdays
 import datetime
 import dateutil
 import math
+import copy
 from base import *
 import pandas as pd
 import smtplib 
@@ -308,12 +309,12 @@ def get_tick_id(dt):
     return ((dt.hour+6)%24)*100000+dt.minute*1000+dt.second*10+dt.microsecond/100000
 
 def filter_main_cont(sdate, filter = False):
-    insts, prods  = mysqlaccess.load_alive_cont(sdate)
+    insts, prods  = dbaccess.load_alive_cont(sdate)
     if not filter:
         return insts
     main_cont = {}
     for pc in prods:
-        main_cont[pc], exch = mysqlaccess.prod_main_cont_exch(pc)
+        main_cont[pc], exch = dbaccess.prod_main_cont_exch(pc)
     main_insts = []
     for inst in insts:
         pc = inst2product(inst)
@@ -371,7 +372,7 @@ def inst2exch(inst):
 
 def inst_to_exch(inst):
     key = inst2product(inst)
-    cnx = mysql.connector.connect(**mysqlaccess.dbconfig)
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange from trade_products where product_code='{prod}' ".format(prod=key)
     cursor.execute(stmt)
@@ -436,26 +437,28 @@ def get_opt_expiry(fut_inst, cont_mth, exch = ''):
 def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False, database = 'hist_data'):
     if start_date > end_date: 
         return None
-    cont_mth, exch = mysqlaccess.prod_main_cont_exch(prodcode)
+    cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
     contlist = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, roll_rule[1:]))
     exp_dates = [day_shift(contract_expiry(cont), roll_rule) for cont in contlist]
     #print contlist, exp_dates
     sdate = start_date
     is_new = True
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
             continue
         elif sdate > end_date:
             break
         nb_cont = contlist[idx+n-1]
+
         if freq == 'd':
-            new_df = mysqlaccess.load_daily_data_to_df('fut_daily', nb_cont, sdate, min(exp,end_date), database = database)
+            new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp,end_date), database = database)
         else:
             minid_start = 1500
             minid_end = 2114
             if prodcode in night_session_markets:
                 minid_start = 300
-            new_df = mysqlaccess.load_min_data_to_df('fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end, database = database)
+            new_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end, database = database)
         if len(new_df.shape) == 0:
             continue
         nn = new_df.shape[0]
@@ -472,7 +475,7 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
                     last_date = df.index[-1].date()
                 else:
                     last_date = df.index[-1]
-                tmp_df = mysqlaccess.load_daily_data_to_df('fut_daily', nb_cont, last_date, last_date, database = database)
+                tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, last_date, last_date, database = database)
                 shift = tmp_df['close'][-1] - df['close'][-1]
                 for ticker in ['open','high','low','close']:
                     df[ticker] = df[ticker] + shift
@@ -483,7 +486,7 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
 def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_roll= '-20b', database = 'hist_data'):
     if start_date > end_date: 
         return None
-    cnx = mysql.connector.connect(**mysqlaccess.dbconfig)
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange, contract from trade_products where product_code='{prod}' ".format(prod=product)
     cursor.execute(stmt)
@@ -498,6 +501,9 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
     sdate = start_date
     all_data = {}
     i = 0
+    dbconfig = copy.deepcopy(dbaccess.dbconfig)
+    dbconfig['database'] = database
+    cnx = sqlconn.connect(**dbconfig)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
             continue
@@ -505,13 +511,14 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
             break
         nb_cont = contlist[idx+n-1]
         if freq == 'd':
-            df = mysqlaccess.load_daily_data_to_df('fut_daily', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
+            df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
         else:
-            df = mysqlaccess.load_min_data_to_df('fut_min', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
+            df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
         all_data[i] = {'contract': nb_cont, 'data': df}
         i += 1
         sdate = min(exp,end_date) + datetime.timedelta(days=1)
-    return all_data    
+    cnx.close()
+    return all_data
     
 def day_shift(d, roll_rule):
     if 'b' in roll_rule:
@@ -552,7 +559,7 @@ def contract_expiry(cont, hols='db'):
         else:
             expiry = 0
     else:
-        cnx = mysql.connector.connect(**mysqlaccess.dbconfig)
+        cnx = sqlconn.connect(**dbaccess.dbconfig)
         cursor = cnx.cursor()
         stmt = "select expiry from contract_list where instID='{inst}' ".format(inst=cont)
         cursor.execute(stmt)
@@ -561,6 +568,7 @@ def contract_expiry(cont, hols='db'):
             expiry = out[0][0]
         else:
             expiry = contract_expiry(cont, CHN_Holidays)
+        cnx.close()
     return expiry
         
 def contract_range(product, exch, cont_mth, start_date, end_date):
