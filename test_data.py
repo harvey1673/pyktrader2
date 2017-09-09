@@ -1,16 +1,18 @@
 import tushare as ts
 import datetime
+import copy
 import pandas as pd
-import mysql.connector as mysqlconn
+import sqlite3 as sqlconn
 import misc
 import backtest
 import os
 import talib
+import quandl
 import urllib2
 import pytz
 import csv
 import patoolib
-import mysqlaccess as db
+import dbaccess
 import json
 from glob import glob
 #
@@ -69,18 +71,17 @@ from glob import glob
 #     sector_ohlc = download_ohlc(sector_tickers, START, END)
 #     store_HDF5(sector_ohlc, 'snp500.h5')
 
-def save_tick_data(tday, folder = '', tick_id = 300000):
-    all_insts, prods = db.load_alive_cont(tday)
-    cnx = mysqlconn.connect(**db.dbconfig)
+def export_tick_data(tday, folder = '', tick_id = 300000):
+    all_insts, prods = dbaccess.load_alive_cont(tday)
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     for inst in all_insts:
         stmt = "select * from fut_tick where instID='{prod}' and date='{cdate}' and tick_id>='{tick}'".format(prod=inst, cdate=tday.strftime('%Y-%m-%d'), tick = tick_id)
         df = pd.io.sql.read_sql(stmt, cnx)
         df.to_csv(folder + inst + '.csv', header=False, index=False)
-    return
 
-def load_tick_data(tday, folder = ''):
-    all_insts, prods = db.load_alive_cont(tday)
-    cnx = mysqlconn.connect(**db.dbconfig)
+def import_tick_data(tday, folder = ''):
+    all_insts, prods = dbaccess.load_alive_cont(tday)
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
     for inst in all_insts:
         data_file = folder + inst + '.csv'
@@ -90,7 +91,6 @@ def load_tick_data(tday, folder = ''):
             cnx.commit()
             print inst
     cnx.close()
-    return
 
 def import_datayes_daily_data(start_date, end_date, cont_list = [], is_replace = False):
     numdays = (end_date - start_date).days + 1
@@ -104,6 +104,7 @@ def import_datayes_daily_data(start_date, end_date, cont_list = [], is_replace =
         df = mkt.MktFutd(tradeDate = dstring)
         if len(df.ticker) == 0:
             continue
+        cnx = sqlconn.connect(**dbaccess.dbconfig)
         for cont in df.ticker:
             if (len(cont_list) > 0) and (cont not in cont_list):
                 continue
@@ -121,7 +122,7 @@ def import_datayes_daily_data(start_date, end_date, cont_list = [], is_replace =
                 data_dict['openInterest'] = int(data.openInt)
                 if data_dict['volume'] > 0:
                     cnt += 1
-                    db.insert_daily_data(cont, data_dict, is_replace = is_replace, dbtable = 'fut_daily')
+                    dbaccess.insert_daily_data(cnx, cont, data_dict, is_replace = is_replace, dbtable = 'fut_daily')
         print 'date=%s, insert count = %s' % (d, cnt)
 
 def extract_rar_data(source, target, extract_src = False):
@@ -134,7 +135,7 @@ def extract_rar_data(source, target, extract_src = False):
         patoolib.extract_archive(file, outdir = target)
 
 def conv_csv_to_sql(target, db_table = 'test_fut_tick'):
-    cnx = mysqlconn.connect(**db.dbconfig)
+    cnx = sqlconn.connect(**dbaccess.dbconfig)
     allcsvs = [y for x in os.walk(target) for y in glob(os.path.join(x[0], '*.csv'))]
     for csvfile in allcsvs:
         try:
@@ -158,8 +159,7 @@ def conv_csv_to_sql(target, db_table = 'test_fut_tick'):
     return 0
 
 def load_hist_csv2sql(folder, db_table):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost', 'database': 'hist_data'}
-    cnx = mysqlconn.connect(**dbconfig)
+    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
     cursor = cnx.cursor()
     allcsvs = [y for x in os.walk(folder) for y in glob(os.path.join(x[0], '*.csv'))]
     skipped_files = []
@@ -226,22 +226,20 @@ def conv_ohlc_freq(df, freq):
     return res
 
 def load_hist_tick(db_table, instID, sdate, edate):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost', 'database': 'hist_data'}
     stmt = "select instID, dtime, date, hour, min, sec, msec, price, dvol, openInterest from {dbtable} where instID='{inst}' ".format(dbtable=db_table, inst=instID)
     stmt += "and date >= '%s' " % sdate.strftime('%Y-%m-%d')
     stmt += "and date <= '%s' " % edate.strftime('%Y-%m-%d')
     stmt += "order by dtime;"
-    cnx = mysqlconn.connect(**dbconfig)
+    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
     df = pd.io.sql.read_sql(stmt, cnx, index_col = 'dtime')
     return df
 
 def load_hist_min(db_table, instID, sdate, edate):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost', 'database': 'hist_data'}
     stmt = "select instID, exch, datetime, date, min_id, open, high, low, close, volume, openInterest from {dbtable} where instID='{inst}' ".format(dbtable=db_table, inst=instID)
     stmt += "and date >= '%s' " % sdate.strftime('%Y-%m-%d')
     stmt += "and date <= '%s' " % edate.strftime('%Y-%m-%d')
     stmt += "order by date, min_id;"
-    cnx = mysqlconn.connect(**dbconfig)
+    cnx = sqlconn.connect(**dbaccess.hist_dbconfig)
     df = pd.io.sql.read_sql(stmt, cnx, index_col = 'datetime')
     return df
 
@@ -261,8 +259,9 @@ def conv_db_htick2min(db_table, inst_file, out_table = 'hist_fut_min', database 
         with open(inst_file, 'r') as infile:
             conf_dict = json.load(infile)
         instIDs = conf_dict['instIDs']
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost', 'database': database}
-    cnx = mysqlconn.connect(**dbconfig)
+    dbconfig = copy.deepcopy(dbaccess.dbconfig)
+    dbconfig['database']  = database
+    cnx = sqlconn.connect(**dbconfig)
     for inst in instIDs:
         field_dict = {'instID': "\'"+inst+"\'"}
         datestr_list = get_col_dist_values(database + '.' + db_table, 'date', field_dict)
@@ -307,8 +306,9 @@ def get_instIDs_from_file(inst_file, db_table, database = 'hist_data'):
     return instIDs
 
 def conv_db_htmin2daily(db_table, instIDs, sdate, edate, out_table = 'hist_fut_daily', database = 'hist_data'):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost', 'database': database}
-    cnx = mysqlconn.connect(**dbconfig)
+    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
+    dbconfig['database'] = database
+    cnx = sqlconn.connect(**dbconfig)
     for inst in instIDs:
         mdf = load_hist_min(db_table, inst, sdate, edate)
         if len(mdf) == 0:
@@ -321,7 +321,7 @@ def conv_db_htmin2daily(db_table, instIDs, sdate, edate, out_table = 'hist_fut_d
     return
 
 def get_col_dist_values(db_table, col_name, field_dict):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost'}
+    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
     stmt = 'select distinct({colname}) from {dbtable}'.format(colname = col_name, dbtable = db_table )
     nlen = len(field_dict.values())
     if nlen > 0:
@@ -332,7 +332,7 @@ def get_col_dist_values(db_table, col_name, field_dict):
                 stmt += " and"
     stmt += ";"
     print stmt
-    cnx = mysqlconn.connect(**dbconfig)
+    cnx = sqlconn.connect(**dbconfig)
     cursor = cnx.cursor()
     cursor.execute(stmt)
     #cnx.commit()
@@ -343,10 +343,10 @@ def get_col_dist_values(db_table, col_name, field_dict):
     return keys
 
 def copy_prod2hist(prod_db, hist_db, sdate, edate):
-    dbconfig = {'user': 'harvey', 'password':'9619252y', 'host':'localhost'}
+    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
     stmt = 'insert into {hist_db}.fut_min (instID, exch, datetime, date, min_id, open, close, high, low, volume, openInterest) '.format(hist_db = hist_db)
     stmt += 'select * from {prod_db}.fut_min where date>={sdate} and date<={edate} order by date, min_id;'.format(prod_db = prod_db, sdate = sdate.strftime('%Y%m%d'), edate = edate.strftime('%Y%m%d'));
-    cnx = mysqlconn.connect(**dbconfig)
+    cnx = sqlconn.connect(**dbconfig)
     cursor = cnx.cursor()
     cursor.execute(stmt)
     cnx.commit()
