@@ -5,7 +5,6 @@ import datetime
 import sys
 import time
 import logging
-import mysqlaccess
 import misc
 import base
 import json
