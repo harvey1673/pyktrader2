@@ -4,7 +4,7 @@ import misc
 import math
 import bsopt
 import dbaccess
-import sqlite3 as sqlconn
+import mysql.connector as sqlconn
 import data_handler as dh
 import datetime
 import numpy as np
