@@ -90,7 +90,7 @@ def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0):
         return df * (Strike * cnorm( -fd2( Fwd, Strike, Vol, Texp ) ) \
              - Fwd * cnorm( -fd1( Fwd, Strike, Vol, Texp ) ))
 
-def BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd ):
+def BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd, Rf = 0.0):
     'Standard Bachelier European vanilla pricing.'
     d = (Fwd-Strike)/Vol/sqrt(Texp)
     p = (Fwd-Strike)  * cnorm( d ) + Vol * sqrt(Texp) * pnorm(d)
@@ -112,11 +112,13 @@ def BSVega( Spot, Strike, Vol, Texp, Rd, Rf ):
     d = d1( Spot, Strike, Vol, Texp, Rd, Rf )
     return Spot * exp( -Rf * Texp ) * sqrt( Texp / 2. / pi ) * exp( -d * d / 2. )
     
-def BSFwdNormalDelta( IsCall, Fwd, Strike, Vol, Texp, Rd = 0 ):
+def BSFwdNormalDelta( IsCall, Fwd, Strike, Vol, Texp, Rd, Rf = 0.0 ):
     return BSDelta( IsCall, Fwd, Strike, Vol, Texp, Rd, Rd )
 
 def BSFwdNormalVega( IsCall, Fwd, Strike, Vol, Texp, Rd = 0 ):
-    return BSVega( Fwd, Strike, Vol, Texp, Rd, Rd )
+    v = BSFwdNormal( IsCall, Fwd, Strike, Vol * 1.01, Texp, Rd) - BSFwdNormal( IsCall, Fwd, Strike, Vol * 0.99, Texp, Rd)
+    v = v /0.02/Vol
+    return v
 
 def BSBin( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
     'Standard Black-Scholes European binary call/put pricing.'
