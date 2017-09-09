@@ -8,7 +8,7 @@ import json
 import os
 import csv
 import pyktlib
-import mysqlaccess
+import dbaccess
 import trade
 import instrument
 import pandas as pd
@@ -237,7 +237,7 @@ class EquityOptStrat(OptionStrategy):
         option_dict = {}
         for under in products:
             for cont_mth in products[under]:
-                map = mysqlaccess.get_stockopt_map(under, [cont_mth], products[under][cont_mth])
+                map = dbaccess.get_stockopt_map(under, [cont_mth], products[under][cont_mth])
                 option_dict.update(map)
         return option_dict
     
