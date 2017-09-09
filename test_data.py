@@ -2,7 +2,7 @@ import tushare as ts
 import datetime
 import copy
 import pandas as pd
-import sqlite3 as sqlconn
+import mysql.connector as sqlconn
 import misc
 import backtest
 import os
