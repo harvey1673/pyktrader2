@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import numpy
-import sqlite3 as sqlconn
+import mysql.connector as sqlconn
 import copy
 import csv
 import os.path
