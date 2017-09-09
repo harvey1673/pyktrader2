@@ -2,7 +2,6 @@
 import backtest
 import misc
 import datetime
-import mysqlaccess
 import data_handler as dh
 import numpy as np
 import matplotlib.finance as finance
