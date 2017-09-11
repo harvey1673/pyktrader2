@@ -126,7 +126,11 @@ def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
                 cursor.execute(stmt)
                 cnx.commit()
 
-def insert_cont_data(cont, cnx=connect(**dbconfig)):
+def insert_cont_data(cont, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     col_list = cont.keys()
     stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s) ".format(table='contract_list',
@@ -134,7 +138,8 @@ def insert_cont_data(cont, cnx=connect(**dbconfig)):
     args = tuple([cont[col] for col in col_list])
     cursor.execute(stmt, args)
     cnx.commit()
-    cnx.close()
+    if conn == None:
+        cnx.close()
 
 def prod_main_cont_exch(prodcode, cnx = connect(**dbconfig)):
     cursor = cnx.cursor()

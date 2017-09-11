@@ -305,7 +305,7 @@ def get_instIDs_from_file(inst_file, db_table, database = 'hist_data'):
     return instIDs
 
 def conv_db_htmin2daily(db_table, instIDs, sdate, edate, out_table = 'hist_fut_daily', database = 'hist_data'):
-    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
+    dbconfig = copy.deepcopy(dbaccess.dbconfig)
     dbconfig['database'] = database
     cnx = dbaccess.connect(**dbconfig)
     for inst in instIDs:
@@ -320,7 +320,7 @@ def conv_db_htmin2daily(db_table, instIDs, sdate, edate, out_table = 'hist_fut_d
     return
 
 def get_col_dist_values(db_table, col_name, field_dict):
-    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
+    dbconfig = copy.deepcopy(dbaccess.dbconfig)
     stmt = 'select distinct({colname}) from {dbtable}'.format(colname = col_name, dbtable = db_table )
     nlen = len(field_dict.values())
     if nlen > 0:
@@ -342,7 +342,7 @@ def get_col_dist_values(db_table, col_name, field_dict):
     return keys
 
 def copy_prod2hist(prod_db, hist_db, sdate, edate):
-    dbconfig = copy.deepcopy(**dbaccess.dbconfig)
+    dbconfig = copy.deepcopy(dbaccess.dbconfig)
     stmt = 'insert into {hist_db}.fut_min (instID, exch, datetime, date, min_id, open, close, high, low, volume, openInterest) '.format(hist_db = hist_db)
     stmt += 'select * from {prod_db}.fut_min where date>={sdate} and date<={edate} order by date, min_id;'.format(prod_db = prod_db, sdate = sdate.strftime('%Y%m%d'), edate = edate.strftime('%Y%m%d'));
     cnx = dbaccess.connect(**dbconfig)

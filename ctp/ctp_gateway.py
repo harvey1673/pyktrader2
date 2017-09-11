@@ -465,7 +465,7 @@ class CtpGateway(GrossGateway):
                 expiry = self.qry_instruments[instID]['expiry']
                 try:
                     expiry_date = datetime.datetime.strptime(expiry, '%Y%m%d')
-                    mysqlaccess.insert_cont_data(self.qry_instruments[instID])
+                    dbaccess.insert_cont_data(self.qry_instruments[instID])
                 except:
                     print instID, expiry
                     continue
