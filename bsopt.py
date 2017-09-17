@@ -477,3 +477,161 @@ def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rf, rd):
 def LogNormalPaths(mu, cov, fwd, numPaths):
     ''' mu and fwd are 1d lists/arrays (1xn); cov is a 2d scipy.array (nxn); numPaths is int '''
     return (fwd*scipy.exp(numpy.random.multivariate_normal(mu, cov, numPaths) - 0.5*cov.diagonal())).transpose()
+
+def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+    '''Calculate Asian option price using TurnbullWakeman model.
+       This is just for forward options, not for stocks.
+       RlzAvg is the realized average price(daily)
+       AvgPeriod is the time length of averaging period, usually 22 for the SGX options
+    '''
+
+    Fwd = float(Fwd)
+    strike = float(strike)
+    RlzAvg = float(RlzAvg)
+
+    tau = numpy.max([0, Texp - AvgPeriod])
+    if AvgPeriod == 0:
+        volA = Vol
+    else:
+        M = (2.0 * exp(Vol * Vol * Texp) - 2.0 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
+            ((Vol ** 4) * ((Texp - tau) ** 2))
+        volA = sqrt(log(M) / Texp)
+
+    X = numpy.copy(strike)
+    if AvgPeriod > Texp:
+        X = X * (AvgPeriod / Texp) - RlzAvg * (AvgPeriod - Texp) / Texp
+
+    if X < 0:
+        if IsCall:
+            return (RlzAvg * (AvgPeriod - Texp) / AvgPeriod + Fwd * Texp / AvgPeriod - X) * exp(-Rf * Texp)
+        else:
+            return 0
+    else:
+        price = BSFwd(IsCall, Fwd, X, volA, Texp, Rf)
+        if AvgPeriod > Texp:
+            return price * Texp / AvgPeriod
+        else:
+            return price
+
+
+def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+    Fwd = float(Fwd)
+    strike = float(strike)
+    RlzAvg = float(RlzAvg)
+
+    if AvgPeriod > Texp:
+        x = strike * (AvgPeriod / Texp) - RlzAvg * (AvgPeriod - Texp) / Texp
+    else:
+        x = strike
+    tau = numpy.max([0, Texp - AvgPeriod])
+
+    if AvgPeriod > 0:
+        M = (2 * exp(Vol * Vol * Texp) - 2 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
+            ((Vol ** 4) * ((Texp - tau) ** 2))
+        volA = sqrt(log(M) / Texp)
+    else:
+        volA = Vol
+
+    if x < 0:
+        if IsCall:
+            return exp(-Rf * Texp) * Texp / AvgPeriod
+        else:
+            return 0
+    else:
+        if Texp < AvgPeriod:
+            multi = Texp / AvgPeriod
+        else:
+            multi = 1.0
+        Asiand1 = (log(Fwd / x) + (volA * volA * 0.5) * Texp) / (volA * sqrt(Texp))
+        if IsCall:
+            return multi * exp(-Rf * Texp) * cnorm(Asiand1)
+        else:
+            return multi * exp(-Rf * Texp) * (cnorm(Asiand1) - 1.0)
+
+
+def AsianFwdGamma(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+    Fwd = float(Fwd)
+    strike = float(strike)
+    RlzAvg = float(RlzAvg)
+
+    if AvgPeriod > Texp:
+        x = strike * (AvgPeriod / Texp) - RlzAvg * (AvgPeriod - Texp) / Texp
+    else:
+        x = strike
+    tau = numpy.max([0, Texp - AvgPeriod])
+
+    if AvgPeriod > 0:
+        M = (2 * exp(Vol * Vol * Texp) - 2 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
+            ((Vol ** 4) * ((Texp - tau) ** 2))
+        volA = sqrt(log(M) / Texp)
+    else:
+        volA = Vol
+
+    if x < 0:
+        return 0
+    else:
+        if Texp < AvgPeriod:
+            multi = Texp / AvgPeriod
+        else:
+            multi = 1.0
+
+        Asiand1 = (log(Fwd / x) + (volA * volA * 0.5) * Texp) / (volA * sqrt(Texp))
+        ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
+        return multi * exp(-Rf * Texp) * ND / (Fwd * volA * sqrt(Texp))
+
+
+def AsianFwdTheta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+    Fwd = float(Fwd)
+    strike = float(strike)
+    RlzAvg = float(RlzAvg)
+
+    if AvgPeriod < Texp:
+        return (AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp + 1.0 / 252.0, AvgPeriod, Rf) - \
+                AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rf)) / 2.0
+    else:
+        SA = (RlzAvg * (AvgPeriod - Texp) + Fwd / 252.0) / (AvgPeriod - Texp + 1.0 / 252.0)
+        return AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf) - \
+               AsianOptTW_Fwd(IsCall, Fwd, strike, SA, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rf)
+
+
+def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+    Fwd = float(Fwd)
+    strike = float(strike)
+    RlzAvg = float(RlzAvg)
+
+    if AvgPeriod > Texp:
+        x = strike * (AvgPeriod / Texp) - RlzAvg * (AvgPeriod - Texp) / Texp
+    else:
+        x = strike
+    tau = numpy.max([0, Texp - AvgPeriod])
+
+    if AvgPeriod > 0:
+        M = (2.0 * exp(Vol * Vol * Texp) - 2.0 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
+            ((Vol ** 4) * ((Texp - tau) ** 2))
+        volA = sqrt(log(M) / Texp)
+    else:
+        volA = Vol
+
+    if x < 0:
+        return 0
+    else:
+        if Texp < AvgPeriod:
+            multi = Texp / AvgPeriod
+        else:
+            multi = 1.0
+
+        if AvgPeriod > 0:
+            dM = 4.0 * (exp(Vol * Vol * Texp) * Texp * Vol - exp(Vol * Vol * tau) \
+                        * ((Vol ** 3) * tau * (Texp - tau) + Vol * Texp)) / \
+                 ((Vol ** 4) * (Texp - tau) * (Texp - tau)) - \
+                 8.0 * (exp(Vol * Vol * Texp) - exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
+                 ((Vol ** 5) * (Texp - tau) * (Texp - tau))
+
+            dvA = 1.0 / (2.0 * volA) / Texp / M * dM
+        else:
+            dvA = 1.0
+
+        Asiand1 = (log(Fwd / x) + volA * volA * 0.5 * Texp) / (volA * sqrt(Texp))
+        ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
+
+        return multi * Fwd * exp(-Rf * Texp) * ND * sqrt(Texp) * dvA * 0.01
