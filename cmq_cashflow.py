@@ -251,7 +251,7 @@ class LegFactory:
                 cp = cp[1:] # remove the leading period
                 if not cp: return None
             elif cutoff == 'present':
-                if PRINT and cutdate != cp[0].accr_start: 
+                if cutdate != cp[0].accr_start:
                     print('warning: leg cut to present and cutdate %s does not follow payment schedule' % cutdate)
                 period = copy.copy(cp[0]) # make a shadow copy to leave the original period intact
                 period.fixdate = self.factory.roll_date(cutdate, '-spot')

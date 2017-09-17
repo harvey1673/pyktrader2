@@ -14,8 +14,8 @@ class CMRiskEngine(object):
         self.create_instrument(trade_data, market_data)
         self.req_greeks = trade_data.get("ReqRisks",['pv'])
         self.run_flag = False
-		self.cmdelta_shift = 0.0001
-		self.cmvega_shift  = 0.005
+        self.cmdelta_shift = 0.0001
+        self.cmvega_shift  = 0.005
         self.ycdelta_shift = 0.0001
         self.swnvega_shift = 0.005
         self.fxdelta_shift = 0.005
@@ -40,7 +40,7 @@ class CMRiskEngine(object):
             crv_type = scen[0].split('_')[0]
         md = copy.deepcopy(market_data)
         if crv_type == "MarketDate":
-            md[scen[0]] = workdays.workday(md[scen[0]], scen[1],
+            md[scen[0]] = workdays.workday(md[scen[0]], scen[1])
         else:
             if hasattr(scen[0], '__iter__'):
                 data = md[scen[0][0]]

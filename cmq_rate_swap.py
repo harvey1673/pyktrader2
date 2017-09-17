@@ -61,8 +61,8 @@ class CMQRateSwap(CMQInstrument):
         lev = trade_data.get('Leverage', 1.0)
         notional = trade_data.get('Notional', 1e6)
         strike = trade_data['Strike']
-        start_date = str2tenor(trade_data.get('StartDate', None))
-        end_date = str2tenor(trade_data.get('EndDate', None))
+        start_date = cmq_utils.str2tenor(trade_data.get('StartDate', None))
+        end_date = cmq_utils.str2tenor(trade_data.get('EndDate', None))
         tenor = cmq_utils.Period("%sM" % (int((end_date - start_date)/365.0*12)))
         libor_fac = cmq_rate_index.LiborIndexFactory(self.flt_freq, self.calendar, self.flt_daycount)
         flt_fac = cmq_cashflow.LegFactory(self.flt_freq, self.calendar, self.flt_daycount, libor_fac,
@@ -75,7 +75,7 @@ class CMQRateSwap(CMQInstrument):
         self.swap = swap_fac.create(start = start_date, tenor=tenor)
         
     def clean_price(self):
-        disc = curve.DiscountCurve(0, self.index_curve.discount)
+        disc = cmq_curve.DiscountCurve(0, self.index_curve.discount)
         return self.swap.value(disc, disc, disc)       
         
 class CMQIRSwap(CMQInstrument):
@@ -94,7 +94,7 @@ class CMQIRSwap(CMQInstrument):
         self.disc_curve = self.index_curve
 
     def create_instrument(self, trade_data):
-        super(VSwapPricer, self).create_instrument(trade_data)
+        super(CMQIRSwap, self).create_instrument(trade_data)
         calendar = UnitedStates()
         fix_tenor = Period(6, Months)
         fix_adj  = Unadjusted
@@ -106,8 +106,8 @@ class CMQIRSwap(CMQInstrument):
         margin = trade_data.get('Margin', 0.0)
         notional = trade_data.get('Notional', 1000000)
         strike = trade_data['Strike']
-        start_date = str2tenor(trade_data.get('StartDate', None))
-        end_date = str2tenor(trade_data.get('EndDate', None))
+        start_date = cmq_utils.str2tenor(trade_data.get('StartDate', None))
+        end_date = cmq_utils.str2tenor(trade_data.get('EndDate', None))
         stype_in = trade_data.get("SwapType", "Payer")
         if stype_in == "Payer":
             swapType = VanillaSwap.Payer

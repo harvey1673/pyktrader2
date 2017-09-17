@@ -1,8 +1,9 @@
-import cmqlib as qlib
+import pyktlib as qlib
 import datetime
 from cmq_inst import CMQInstrument  
 import cmq_utils
 import cmq_curve
+import misc
 
 class CMQFXOption(CMQInstrument):
     def __init__(self, trade_data, market_data):

@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 import math
 import dbaccess
-import backtest
 import data_handler as dh
 from scipy.stats import norm
 from misc import *
@@ -198,7 +197,7 @@ def breakeven_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1
         else:
             mdf = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, d_start, expiry_d, minid_start=300,
                                                   minid_end=2115, index_col = None)
-            mdf = backtest.cleanup_mindata(mdf, prodcode, index_col = None)
+            mdf = cleanup_mindata(mdf, prodcode, index_col = None)
             mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
             df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'], index_col = None)
         cnx.close()
@@ -253,7 +252,7 @@ def hist_cso_by_product(prodcode, start_d, end_d, periods = 24, tenor = '-1w', m
         else:
             mdf = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, d_start, expiry_d, minid_start=300,
                                                   minid_end=2115, index_col = None)
-            mdf = backtest.cleanup_mindata(mdf, prodcode, index_col = None)
+            mdf = cleanup_mindata(mdf, prodcode, index_col = None)
             mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
             df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'], index_col = None)
         cnx.close()
@@ -413,7 +412,7 @@ def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m
         else:
             mdf = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, d_start, expiry_d, minid_start=300,
                                                   minid_end=2115, index_col = None)
-            mdf = backtest.cleanup_mindata(mdf, products, index_col = None)
+            mdf = cleanup_mindata(mdf, products, index_col = None)
             mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
             df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'], index_col = None)
         cnx.close()

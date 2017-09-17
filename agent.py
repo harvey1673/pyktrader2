@@ -16,7 +16,6 @@ import pandas as pd
 from base import *
 from misc import *
 import data_handler
-import backtest
 from eventType import *
 from eventEngine import *
 
@@ -497,7 +496,7 @@ class Agent(MktDataMixin):
             min_start = int(self.instruments[inst].start_tick_id/1000)
             min_end = int(self.instruments[inst].last_tick_id/1000)+1
             mdf = dbaccess.load_min_data_to_df(self.db_conn, 'fut_min', inst, d_start, d_end, minid_start=min_start, minid_end=min_end, index_col = None)
-            mdf = backtest.cleanup_mindata(mdf, self.instruments[inst].product, index_col = None)
+            mdf = cleanup_mindata(mdf, self.instruments[inst].product, index_col = None)
             mdf['bar_id'] = self.conv_bar_id(mdf['min_id'])
             if len(mdf)>0:
                 min_date = mdf['date'].iloc[-1]

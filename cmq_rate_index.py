@@ -159,7 +159,7 @@ class RangeIndexFactory(FloatIndexFactory): ##### need extra work for aged deal.
             dates = [day for day in dates if self.index_fac.calendar.isBusinessDay(day)]
         dates = dates[self.two_ends] # include or exclude the end dates of a period 
         libors = tuple(self.index_fac.create(fixdate=date) for date in dates)
-        if PRINT and self.lk_days is not None: 
+        if self.lk_days is not None:
             print("    lockout %s --> [%s, %s]" % (dates[self.lk_days], dates[self.lk_days + 1], dates[-1]))
         return libors
 
@@ -313,7 +313,6 @@ class CMSIndexFactory(FixedIndexFactory):
             cap = weighted_sum(self.Option.Cap)
             floor = weighted_sum(self.Option.Floor)
             rate = strike + (cap - floor) / (period.accr_cov * self.disc(period.paydate.t))
-        if PRINT: print('cms, par, covexity: %s\t%s\t%s' % (rate, swaption.forward, rate - swaption.forward))
         return rate
 
     def create(self, period):

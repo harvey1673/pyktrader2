@@ -183,7 +183,6 @@ class Period(ql.Period): # make it hashable
         assert l1 // l2 != 0 and l1 % l2 == 0
         return l1 // l2  
 
-
 class Schedule(ql.Schedule):
     DateGeneration = ql.DateGeneration
     def __init__(self, effdate, matdate, freq, calendar, dayroll, rollrule, endmonth):
@@ -191,8 +190,6 @@ class Schedule(ql.Schedule):
 
     def dates(self):
         return np.array([Date.convert(d) for d in self]) # np.hstack(map(Date.convert, self))
-
-
 
 class FormatPrint:
     def __init__(self, format='{0:.2f}'):
@@ -203,7 +200,6 @@ class FormatPrint:
         args = (self.format.format(a) if isinstance(a, float) else a for a in args)
         kwargs = {k:self.format.format(v) if isinstance(v, float) else v for k,v in kwargs.items()}
         print args, kwargs
-
 
 def convert_to_interpolator(size=300, ns=4.5, kind='linear'):
     def decorate(fn):
@@ -238,7 +234,6 @@ def time_this(fn):
         print function_name + ' finished in ' + '{0:.2f}'.format(time.time() - start), 'seconds\n'
         return result
     return wrapper 
-
 
 #def cache_function(order): # similar to functools "@lru_cache(maxsize=None)"
 #    def decorate(fn):

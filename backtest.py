@@ -180,50 +180,6 @@ class StratSim(object):
     def daily_initialize(self):
         pass
 
-def get_asset_tradehrs(asset):
-    exch = 'SHFE'
-    for ex in misc.product_code:
-        if asset in misc.product_code[ex]:
-            exch = ex
-            break
-    hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
-    if exch in ['SSE', 'SZE']:
-        hrs = [(1530, 1730), (1900, 2100)]
-    elif asset in ['TF', 'IF']:
-        hrs = [(1515, 1730), (1900, 2115)]
-    else:
-        if asset in misc.night_session_markets:
-            night_idx = misc.night_session_markets[asset]
-            hrs = [misc.night_trading_hrs[night_idx]] + hrs
-    return hrs
-    
-def cleanup_mindata(df, asset, index_col = 'datetime', skip_hl = True):
-    cond = None
-    if index_col == None:
-        xdf = df.set_index('datetime')
-    else:
-        xdf = df
-    tradehrs = get_asset_tradehrs(asset)
-    for idx, hrs in enumerate(tradehrs):
-        if idx == 0:
-            cond = (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
-        else:
-            cond = cond | (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
-    if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'jm']:
-        cond = cond | ((xdf.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id<830))
-    if asset in ['rb', 'hc', 'bu']:
-        cond = cond | ((xdf.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id < 700))
-    if asset in ['IF', 'IH', 'IC']:
-        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=1515) & (xdf.min_id < 1530))
-        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=2100) & (xdf.min_id < 2115))
-    xdf = xdf.ix[cond]
-    xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
-    if skip_hl:
-        xdf = xdf[xdf.high>xdf.low]
-    if index_col == None:
-        xdf = xdf.reset_index()
-    return xdf
-
 def stat_min2daily(df):
     return pd.Series([df['pnl'].sum(), df['cost'].sum(), df['margin'][-1]], index = ['pnl','cost','margin'])
 
@@ -560,7 +516,7 @@ def simnearby_min(config_file):
             rollrule = config['rollrule']
             if nearby > 0:
                 mdf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'm', need_shift=True, database = 'hist_data')
-            mdf = cleanup_mindata(mdf, asset)
+            mdf = misc.cleanup_mindata(mdf, asset)
             if need_daily:
                 ddf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'd', need_shift=True, database = 'hist_data')
                 config['ddf'] = ddf
@@ -697,7 +653,7 @@ def simcontract_min(config_file):
                 cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
                 tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
-                min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
+                min_data[prod][cont] = misc.cleanup_mindata( tmp_df, prod)
                 if need_daily:
                     tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', cont, sd, ed, database = 'hist_data')
                     day_data[prod][cont] = tmp_df
@@ -961,7 +917,7 @@ class BacktestManager(object):
         for prod in asset:
             mdf = misc.nearby(prod, self.config['nearby'], self.config['start_date'], self.config['end_date'],
                           self.config['rollrule'], 'm', need_shift = self.need_shift, database='hist_data')
-            mdf = cleanup_mindata(mdf, prod)
+            mdf = misc.cleanup_mindata(mdf, prod)
             self.min_data[prod] = mdf
         #if self.config['need_daily']:
         #    self.config['ddf'] = misc.nearby(asset, self.config['nearby'], self.config['start_date'], self.config['end_date'],
@@ -1158,7 +1114,7 @@ class ContBktestManager(BacktestManager):
                 cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
                 tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = 'hist_data')
                 tmp_df['contract'] = cont
-                self.min_data[prod][cont] = cleanup_mindata( tmp_df, prod)
+                self.min_data[prod][cont] = misc.cleanup_mindata( tmp_df, prod)
                 cnx.close()
 
     def prepare_data(self, asset_idx, cont_idx = 0):

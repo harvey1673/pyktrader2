@@ -3,7 +3,6 @@ import datetime
 import copy
 import pandas as pd
 import misc
-import backtest
 import os
 import talib
 import quandl
@@ -276,7 +275,7 @@ def conv_db_htick2min(db_table, inst_file, out_table = 'hist_fut_min', database 
             df = load_hist_tick(db_table, inst, sdate, edate)
             mdf = conv_ohlc_freq(df, '1Min')
             mdf['min_id'] =  ((mdf.index.hour + 6) % 24) * 100 + mdf.index.minute
-            mdf = backtest.cleanup_mindata(mdf, prod)
+            mdf = misc.cleanup_mindata(mdf, prod)
             mdf.index.name = 'datetime'
             mdf['instID'] = inst
             mdf['exch'] = exch

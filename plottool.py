@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import backtest
-import misc
 import datetime
 import data_handler as dh
 import numpy as np

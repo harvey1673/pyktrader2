@@ -2,8 +2,7 @@
 import datetime
 import csv
 import os.path
-import mysql.connector
-import mysqlaccess as db
+import dbaccess
 import math
 import pandas as pd
 import misc
@@ -74,6 +73,7 @@ def get_wind_data(inst_list, start_date, end_date, save_loc = 'C:\\dev\\data\\',
     return True
 
 def load_csv_to_db( edate, save_loc = 'C:\\dev\\data\\', freq = 'm', is_replace = False):
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
     cont_list = misc.filter_main_cont(edate, False)
     if freq not in ['m', 'd']:
         return False
@@ -116,10 +116,10 @@ def load_csv_to_db( edate, save_loc = 'C:\\dev\\data\\', freq = 'm', is_replace 
                     mindata_list.append(min_data)
                 else:
                     print cont
-                    db.insert_daily_data(cont, min_data, is_replace = is_replace, dbtable = 'fut_daily')
+                    dbaccess.insert_daily_data(cont, min_data, is_replace = is_replace, dbtable = 'fut_daily')
         if freq == 'm':
             print cont
-            db.bulkinsert_min_data(cont, mindata_list, is_replace = is_replace)
+            dbaccess.bulkinsert_min_data(cont, mindata_list, is_replace = is_replace)
     return True
 
 def dump2csvfile(data, outfile):

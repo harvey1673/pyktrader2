@@ -597,7 +597,51 @@ def contract_range2(product, exch, cont_mth, start_date, end_date):
                         contLabel = product + "%02d" %(yr%100) + "%02d" % mth
                     cont_list.append(contLabel)
     return cont_list
-  
+
+def get_asset_tradehrs(asset):
+    exch = 'SHFE'
+    for ex in product_code:
+        if asset in product_code[ex]:
+            exch = ex
+            break
+    hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
+    if exch in ['SSE', 'SZE']:
+        hrs = [(1530, 1730), (1900, 2100)]
+    elif asset in ['TF', 'IF']:
+        hrs = [(1515, 1730), (1900, 2115)]
+    else:
+        if asset in night_session_markets:
+            night_idx = night_session_markets[asset]
+            hrs = [night_trading_hrs[night_idx]] + hrs
+    return hrs
+
+def cleanup_mindata(df, asset, index_col = 'datetime', skip_hl = True):
+    cond = None
+    if index_col == None:
+        xdf = df.set_index('datetime')
+    else:
+        xdf = df
+    tradehrs = get_asset_tradehrs(asset)
+    for idx, hrs in enumerate(tradehrs):
+        if idx == 0:
+            cond = (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
+        else:
+            cond = cond | (xdf.min_id>= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
+    if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'jm']:
+        cond = cond | ((xdf.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id<830))
+    if asset in ['rb', 'hc', 'bu']:
+        cond = cond | ((xdf.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (xdf.min_id>=300) & (xdf.min_id < 700))
+    if asset in ['IF', 'IH', 'IC']:
+        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=1515) & (xdf.min_id < 1530))
+        cond = cond | ((xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id>=2100) & (xdf.min_id < 2115))
+    xdf = xdf.ix[cond]
+    xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
+    if skip_hl:
+        xdf = xdf[xdf.high>xdf.low]
+    if index_col == None:
+        xdf = xdf.reset_index()
+    return xdf
+
 def send_mail(mail_account, to_list, sub, content): 
     mail_host = mail_account['host']
     mail_user = mail_account['user']
