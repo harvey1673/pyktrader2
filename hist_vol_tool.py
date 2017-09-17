@@ -43,7 +43,7 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         CF = CF + opt_delta * (df[column].iat[nxt_idx] - df[column].iat[idx])
     return CF
 
-def realized_vol(df, option_input, calib_input, column = 'close'):
+def breakeven_vol(df, option_input, calib_input, column = 'close'):
     strike = option_input['strike']
     otype = option_input.get('otype', True)
     expiry = option_input['expiry']
@@ -156,13 +156,13 @@ def realized_termstruct(option_input, data):
                 raise ValueError, 'no vol is found to match PnL'
             calib_input['ref_vol'] = 0.5
             calib_input['opt_payoff'] = final_value
-            vol = realized_vol(sub_df, option_input, calib_input, column)
+            vol = breakeven_vol(sub_df, option_input, calib_input, column)
             vols.append(vol)
         tenor_str = str(roll_idx * int(term_tenor[-2])) + term_tenor[-1]
         vol_ts.ix[tenor_str, :] = vols
     return vol_ts
 
-def hist_realized_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
+def breakeven_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
     contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
@@ -341,7 +341,7 @@ def validate_db_data(tday, filter = False):
     cnx.close()
     print inst_list
 
-def hist_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB = False):
+def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB = False):
     data = {'is_dtime': False,
             'data_column': 'price',
             'data_freq': 'd',
@@ -376,3 +376,48 @@ def hist_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB
     cnx.close()
     df = pd.DataFrame.from_dict(res, orient = 'index').sort_index()
     return df
+
+def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
+    cont_mth, exch = dbaccess.prod_main_cont_exch(products)
+    contlist = contract_range(products, exch, cont_mth, start_d, end_d)
+    exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
+    data = {'is_dtime': True,
+            'data_column': 'close',
+            'data_freq': '30min',
+            'xs': [0.5, 0.25, 0.75],
+            'xs_names': ['atm', 'v25', 'v75'],
+            'xs_func': 'bs_delta_to_strike',
+            'rehedge_period': 1,
+            'term_tenor': tenor,
+            'database': 'hist_data'
+            }
+    option_input = {'otype': True,
+                    'rd': 0.0,
+                    'rf': 0.0,
+                    'end_vol': 0.0,
+                    'ref_vol': 0.5,
+                    'pricer_func': 'bsopt.BSOpt',
+                    'delta_func': 'bsopt.BSDelta',
+                    'is_dtime': data['is_dtime'],
+                    }
+    freq = data['data_freq']
+    for cont, expiry in zip(contlist, exp_dates):
+        expiry_d = expiry.date()
+        if expiry_d > end_d:
+            break
+        p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
+        d_start = day_shift(expiry_d, p_str)
+        cnx = dbaccess.connect(**dbaccess.dbconfig)
+        if freq == 'd':
+            df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', cont, d_start, expiry_d, index_col = None)
+        else:
+            mdf = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, d_start, expiry_d, minid_start=300,
+                                                  minid_end=2115, index_col = None)
+            mdf = backtest.cleanup_mindata(mdf, products, index_col = None)
+            mdf['bar_id'] = dh.bar_conv_func2(mdf['min_id'])
+            df = dh.conv_ohlc_freq(mdf, freq, bar_func=dh.bar_conv_func2, extra_cols=['bar_id'], index_col = None)
+        cnx.close()
+        option_input['expiry'] = expiry
+        data['dataframe'] = df
+        vol_df = realized_termstruct(option_input, data)
+        print cont, expiry_d, vol_df
