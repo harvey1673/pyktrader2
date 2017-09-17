@@ -105,7 +105,7 @@ def insert_daily_data(cnx, inst, daily_data, is_replace=False, dbtable='fut_dail
     cursor.execute(stmt, args)
     cnx.commit()
 
-def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
+def import_tick_from_file(dbtable, conn = None):
     inst_list = ['IF1406', 'IO1406-C-2300', 'IO1406-P-2300', 'IO1406-C-2250',
                  'IO1406-P-2250', 'IO1406-C-2200', 'IO1406-P-2200', 'IO1406-C-2150',
                  'IO1406-P-2150', 'IO1406-C-2100', 'IO1406-P-2100', 'IO1406-C-2050',
@@ -116,6 +116,10 @@ def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
                  'IO1407-P-2000', 'IF1406']
     date_list = ['20140603', '20140604', '20140605', '20140606']
     main_path = 'C:/dev/data/'
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     for inst in inst_list:
         for date in date_list:
@@ -141,7 +145,11 @@ def insert_cont_data(cont, conn = None):
     if conn == None:
         cnx.close()
 
-def prod_main_cont_exch(prodcode, cnx = connect(**dbconfig)):
+def prod_main_cont_exch(prodcode, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select exchange, contract from trade_products where product_code='{prod}' ".format(prod=prodcode)
     cursor.execute(stmt)
@@ -152,7 +160,11 @@ def prod_main_cont_exch(prodcode, cnx = connect(**dbconfig)):
     cnx.close()
     return cont_mth, exch
 
-def load_product_info(prod, cnx=connect(**dbconfig)):
+def load_product_info(prod, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select exchange, lot_size, tick_size, start_min, end_min, broker_fee from trade_products where product_code='{product}' ".format(
         product=prod)
@@ -169,7 +181,11 @@ def load_product_info(prod, cnx=connect(**dbconfig)):
                }
     return out
 
-def load_stockopt_info(inst, cnx=connect(**dbconfig)):
+def load_stockopt_info(inst, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_base from stock_opt_map where instID='{product}' ".format(
         product=inst)
@@ -187,7 +203,11 @@ def load_stockopt_info(inst, cnx=connect(**dbconfig)):
                }
     return out
 
-def get_stockopt_map(underlying, cont_mths, strikes, cnx=connect(**dbconfig)):
+def get_stockopt_map(underlying, cont_mths, strikes, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, strike, strike_scale, instID from stock_opt_map where underlying='{under}' and opt_mth in ({opt_mth_str}) and strike in ({strikes}) ".format(
         under=underlying,
@@ -200,7 +220,11 @@ def get_stockopt_map(underlying, cont_mths, strikes, cnx=connect(**dbconfig)):
         out[key] = instID
     return out
 
-def load_alive_cont(sdate, cnx=connect(**dbconfig)):
+def load_alive_cont(sdate, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select instID, product_code from contract_list where expiry>=%s"
     args = tuple([sdate])
@@ -215,7 +239,11 @@ def load_alive_cont(sdate, cnx=connect(**dbconfig)):
             pc.append(prod)
     return cont, pc
 
-def load_inst_marginrate(instID, cnx=connect(**dbconfig)):
+def load_inst_marginrate(instID, conn = None):
+    if conn == None:
+        cnx = connect(**dbconfig)
+    else:
+        cnx = conn
     cursor = cnx.cursor()
     stmt = "select margin_l, margin_s from contract_list where instID='{inst}' ".format(inst=instID)
     cursor.execute(stmt)
