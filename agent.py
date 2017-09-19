@@ -51,7 +51,7 @@ class MktDataMixin(object):
         self.min_data_func = {}
         self.daily_data_days = config.get('daily_data_days', 25)
         self.min_data_days = config.get('min_data_days', 1)
-        self.db_conn = dbaccess.connect(**dbaccess.dbconfig)
+        self.db_conn = None
         if 'min_func' in config:
             self.get_min_id = eval(config['min_func'])
         else:
@@ -223,6 +223,7 @@ class MktDataMixin(object):
         inst = event.dict['instID']
         type = event.dict['type']
         data = event.dict['data']
+        self.db_conn = dbaccess.connect(**dbaccess.dbconfig)
         if type == EVENT_MIN_BAR:
             dbaccess.insert_min_data(self.db_conn, inst, data, dbtable = self.min_db_table)
         elif type == EVENT_TICK:
@@ -231,6 +232,7 @@ class MktDataMixin(object):
             dbaccess.insert_daily_data(self.db_conn, inst, data, dbtable = self.daily_db_table)
         else:
             pass
+        self.db_conn.close()
 
     def register_event_handler(self):
         self.eventEngine.register(EVENT_DB_WRITE, self.write_mkt_data)
@@ -468,6 +470,7 @@ class Agent(MktDataMixin):
     def prepare_data_env(self, inst, mid_day = True):
         if  self.instruments[inst].ptype == instrument.ProductType.Option:
             return
+        self.db_conn = dbaccess.connect(**dbaccess.dbconfig)
         if self.daily_data_days > 0 or mid_day:
             #self.logger.debug('Updating historical daily data for %s' % self.scur_day.strftime('%Y-%m-%d'))
             daily_start = workdays.workday(self.scur_day, -self.daily_data_days, CHN_Holidays)
@@ -541,6 +544,7 @@ class Agent(MktDataMixin):
                                 mdf_m[col_name] = ts[col_name]                        
                     self.min_data[inst][m] = data_handler.DynamicRecArray(dataframe = mdf_m)
                     #print inst, self.min_data[inst][m].data['date'][-1] < self.cur_min[inst]['date']
+        self.db_conn.close()
 
     def restart(self):
         self.logger.debug('Prepare trade environment for %s' % self.scur_day.strftime('%y%m%d'))
