@@ -4,15 +4,19 @@ import cmq_utils
 
 class CMQInstrument(object):
     def __init__(self, trade_data, market_data, model_settings={}):
-        self.set_market_data(market_data)
+        self.price_func_key = 'clean_price'
         self.set_trade_data(trade_data)
-        self.set_model_settings(model_settings)
+        if len(market_data) > 0:
+            self.set_market_data(market_data)
+        if len(model_settings) > 0:
+            self.set_model_settings(model_settings)
 
     def set_market_data(self, market_data):
         self.value_date = market_data['MarketDate']
 
     def set_trade_data(self, trade_data):
-        pass
+        self.pricing_ccy = trade_data.get('PricingCCY', 'USD')
+        self.notional = trade_data.get('Notional', 1.0)
 
     def set_model_settings(self, model_settings):
         pass
@@ -21,10 +25,7 @@ class CMQInstrument(object):
         return {}
 
     def price(self):
-        return getattr(self, 'price_func_key')
-
-    def price_func_key(self):
-        return 'clean_price'
+        return getattr(self, self.price_func_key)
 
     def clean_price(self):
         return 0.0
@@ -32,5 +33,5 @@ class CMQInstrument(object):
     def dirty_price(self):
         return 0.0
 
-    def serialize(self):
-        pass
+    def inst_key(self):
+        return self.__class__.__name__
