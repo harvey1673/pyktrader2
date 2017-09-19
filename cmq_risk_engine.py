@@ -131,3 +131,6 @@ class CMRiskEngine(object):
                                           - self.results[(('FXVOL_' + item[1], 'ATM'), - self.fxvega_shift)]) / (
                                          2 * self.fxvega_shift * 100.0)
         return self.calc_risks
+
+if __name__ == '__main__':
+    pass
