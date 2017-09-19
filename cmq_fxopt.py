@@ -1,4 +1,4 @@
-import pyktlib as qlib
+import cmqlib as qlib
 import datetime
 from cmq_inst import CMQInstrument  
 import cmq_utils
@@ -6,9 +6,8 @@ import cmq_curve
 import misc
 
 class CMQFXOption(CMQInstrument):
-    def __init__(self, trade_data, market_data):
-        self.create_instrument(trade_data)
-        self.set_market_data(market_data)
+    def __init__(self, trade_data, market_data = {}):
+        super(CMQFXOption, self).__init__(trade_data, market_data)
     
     def set_market_data(self, market_data):
         self.today = misc.datetime2xl(datetime.datetime.strptime(market_data['MarketDate'], '%Y-%m-%d'))
@@ -44,11 +43,11 @@ class CMQFXOption(CMQInstrument):
         self.v75 = volpts['BFd25'] - volpts['RRd25']/2.0
         self.volnode = qlib.Delta5VolNode(self.today, self.expiry, self.fx_fwd, self.atm, self.v90, self.v75, self.v25, self.v10, "act365")
     
-    def create_instrument(self, trade_data):
+    def set_trade_data(self, trade_data):
         self.notional = trade_data['Notional']
         self.strike = trade_data['Strike']
         self.otype = str(trade_data['OptionType'])
-        self.expiry = misc.datetime2xl(datetime.datetime.strptime(trade_data['Expiry'], '%Y-%m-%d'))        
+        self.expiry = misc.datetime2xl(datetime.datetime.strptime(trade_data['Expiry'], '%Y-%m-%d'))
         self.pricing_ccy = trade_data['PricingCCY']
         self.ccypair = trade_data["CcyPair"]
         
@@ -62,3 +61,4 @@ class CMQFXOption(CMQInstrument):
         else:
             mtm = fp * self.notional/self.fx_spot
         return mtm
+    
