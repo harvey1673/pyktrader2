@@ -6,8 +6,8 @@ import cmq_curve
 import misc
 
 class CMQFXOption(CMQInstrument):
-    def __init__(self, trade_data, market_data = {}):
-        super(CMQFXOption, self).__init__(trade_data, market_data)
+    def __init__(self, trade_data, market_data = {}, model_settings = {}):
+        super(CMQFXOption, self).__init__(trade_data, market_data, model_settings)
     
     def set_market_data(self, market_data):
         self.today = misc.datetime2xl(datetime.datetime.strptime(market_data['MarketDate'], '%Y-%m-%d'))
@@ -50,6 +50,7 @@ class CMQFXOption(CMQInstrument):
         self.expiry = misc.datetime2xl(datetime.datetime.strptime(trade_data['Expiry'], '%Y-%m-%d'))
         self.pricing_ccy = trade_data['PricingCCY']
         self.ccypair = trade_data["CcyPair"]
+        self.inst_key = [self.__class__.__name__, self.ccypair, self.otype, self.strike, self.expiry, self.pricing_ccy, self.notional]
         
     def price(self):
         vol = self.volnode.GetVolByStrike(self.strike)
@@ -61,4 +62,3 @@ class CMQFXOption(CMQInstrument):
         else:
             mtm = fp * self.notional/self.fx_spot
         return mtm
-    
