@@ -7,12 +7,12 @@ class CMQTrade(object):
         self.load_trade(trade_data)
 
     def load_trade(self, trade_data):
-        self.name = trade_data.get('id', 'test_trade')
-        self.trader = trade_data.get('trader', 'harvey')
-        self.sales = trade_data.get('sales', 'harvey')
-        self.cpty = trade_data.get('cpty', 'dummy')
-        self.positions = trade_data.get('positions', [])
-        all_insts = trade_data.get('instruments', [])
+        self.name = trade_data.get('Id', 'test_trade')
+        self.trader = trade_data.get('Trader', 'harvey')
+        self.sales = trade_data.get('Sales', 'harvey')
+        self.cpty = trade_data.get('Cpty', 'dummy')
+        self.positions = trade_data.get('Positions', [])
+        all_insts = trade_data.get('Instruments', [])
         self.instruments = [self.create_instrument(inst_data) for inst_data in all_insts]
 
     def set_market_data(self, market_data):
@@ -29,8 +29,8 @@ class CMQTrade(object):
 
 class CMQBook(object):
     def __init__(self, book_data):
-        self.name = book_data.get('name', 'test')
-        self.trader = book_data.get('name', 'harvey')
+        self.name = book_data.get('Name', 'test')
+        self.trader = book_data.get('Owner', 'harvey')
         self.positions = self.load_position_from_dict(book_data)
 
     def mkt_deps(self):
