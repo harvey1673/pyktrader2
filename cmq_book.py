@@ -3,7 +3,7 @@ import cmq_inst
 import cmq_utils
 
 class CMQTradeStatus:
-    Perspective, PendingSignoff, Live, Matured, Cancelled = range(5)
+    Perspective, PendingSignoff, Live, Matured, Expired, Cancelled = range(6)
 
 class CMQTrade(object):
     class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQTradeStatus.Perspective, \
@@ -38,38 +38,35 @@ class CMQTrade(object):
             d[key] = trade_data.get(key, self.class_params[key])
         self.instruments = [self.create_instrument(inst_data) for inst_data in self.instruments]
 
+    def remove_instrument(self, inst_data):
+        pass
+
     def to_json(self):
         pass
 
 class CMQBook(object):
     def __init__(self, book_data):
-        self.name = book_data.get('Name', 'test')
-        self.trader = book_data.get('Owner', 'harvey')
-        self.trade_list = self.load_trades
+        self.name = book_data.get('name', 'test')
+        self.owner = book_data.get('owner', 'harvey')
+        trade_list = book_data.get('trade_list', [])
+        self.trade_list = [ CMQTrade(trade_data) for trade_data in trade_list ]
+        self.inst_dict = {}
+
+    def book_trade(self, cmq_trade):
+        self.trade_list.append(cmq_trade)
+
+    def update_alive_trade(self):
+        self.trade_list = [trade for trade in self.trade_list if trade.status <= CMQTradeStatus.Live]
 
     def mkt_deps(self):
         return {}
 
-    def load_position_from_dict(self, book_data):
-        return {}
-
     def price(self):
-        return getattr(self, 'price_func_key')
+        return sum([ trade.price() for trade in self.trade_list])
 
-    def price_func_key(self):
-        return 'clean_price'
-
-    def clean_price(self):
-        return 0.0
-
-    def dirty_price(self):
-        return 0.0
-
-    def serialize(self):
+    def to_json(self):
         pass
 
-    def key_field(self):
-        return
 
 if __name__ == '__main__':
     pass
