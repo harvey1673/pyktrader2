@@ -54,9 +54,19 @@ class CMQBook(object):
 
     def book_trade(self, cmq_trade):
         self.trade_list.append(cmq_trade)
+        for inst, pos in zip(cmq_trade.instruments, cmq_trade.positions):
+            if inst not in self.inst_dict:
+                self.inst_dict[inst] = 0
+            self.inst_dict[inst] += pos
 
-    def update_alive_trade(self):
-        self.trade_list = [trade for trade in self.trade_list if trade.status <= CMQTradeStatus.Live]
+    def update_inst_dict(self):
+        inst_dict = {}
+        for cmq_trade in self.trade_list:
+            for inst, pos in zip(cmq_trade.instruments, cmq_trade.positions):
+                if inst not in inst_dict:
+                    inst_dict[inst] = 0
+                inst_dict[inst] += pos
+        self.inst_dict = inst_dict
 
     def mkt_deps(self):
         return {}
