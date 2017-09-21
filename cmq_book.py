@@ -2,22 +2,24 @@
 import cmq_inst
 import cmq_utils
 
-class CMQTrade(object):
-    def __init__(self, trade_data):
-        self.load_trade(trade_data)
+class CMQTradeStatus:
+    Perspective, PendingSignoff, Live, Matured, Cancelled = range(5)
 
-    def load_trade(self, trade_data):
-        self.name = trade_data.get('Id', 'test_trade')
-        self.trader = trade_data.get('Trader', 'harvey')
-        self.sales = trade_data.get('Sales', 'harvey')
-        self.cpty = trade_data.get('Cpty', 'dummy')
-        self.positions = trade_data.get('Positions', [])
-        all_insts = trade_data.get('Instruments', [])
-        self.instruments = [self.create_instrument(inst_data) for inst_data in all_insts]
+class CMQTrade(object):
+    class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQTradeStatus.Perspective, \
+                    'cpty': 'dummy', 'positions': [], 'instruments': [], 'last_updated': ''}
+    def __init__(self, trade_data):
+        if "trade_id" not in trade_data:
+            self.trade_id = ''
+        self.update_trade_data(trade_data)
 
     def set_market_data(self, market_data):
         for inst in self.instruments:
             inst.set_market_data(market_data)
+
+    def add_instrument(self, inst_data, pos):
+        self.positions.append(pos)
+        self.instruments.append(self.create_instrument(inst_data))
 
     def create_instrument(self, inst_data):
         if 'InstType' in inst_data:
@@ -27,11 +29,23 @@ class CMQTrade(object):
             inst_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
             return inst_cls(inst_data)
 
+    def price(self):
+        return sum([inst.price() * pos for inst, pos in zip(self.instruments, self.positions)])
+
+    def update_trade_data(self, trade_data):
+        d = self.__dict__
+        for key in self.class_params:
+            d[key] = trade_data.get(key, self.class_params[key])
+        self.instruments = [self.create_instrument(inst_data) for inst_data in self.instruments]
+
+    def to_json(self):
+        pass
+
 class CMQBook(object):
     def __init__(self, book_data):
         self.name = book_data.get('Name', 'test')
         self.trader = book_data.get('Owner', 'harvey')
-        self.positions = self.load_position_from_dict(book_data)
+        self.trade_list = self.load_trades
 
     def mkt_deps(self):
         return {}
