@@ -442,7 +442,9 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
     #print contlist, exp_dates
     sdate = start_date
     is_new = True
-    cnx = dbaccess.connect(**dbaccess.dbconfig)
+    dbconf = copy.deepcopy(dbaccess.dbconfig)
+    dbconf['database'] = database
+    cnx = dbaccess.connect(**dbconf)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
             continue
@@ -451,13 +453,13 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
         nb_cont = contlist[idx+n-1]
 
         if freq == 'd':
-            new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp,end_date), database = database)
+            new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp,end_date))
         else:
             minid_start = 1500
             minid_end = 2114
             if prodcode in night_session_markets:
                 minid_start = 300
-            new_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end, database = database)
+            new_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end)
         if len(new_df.shape) == 0:
             continue
         nn = new_df.shape[0]
@@ -474,7 +476,7 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
                     last_date = df.index[-1].date()
                 else:
                     last_date = df.index[-1]
-                tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, last_date, last_date, database = database)
+                tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, last_date, last_date)
                 shift = tmp_df['close'][-1] - df['close'][-1]
                 for ticker in ['open','high','low','close']:
                     df[ticker] = df[ticker] + shift
@@ -510,9 +512,9 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
             break
         nb_cont = contlist[idx+n-1]
         if freq == 'd':
-            df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
+            df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, day_shift(sdate,win_roll), min(exp,end_date))
         else:
-            df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, day_shift(sdate,win_roll), min(exp,end_date), database = database)
+            df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, day_shift(sdate,win_roll), min(exp,end_date))
         all_data[i] = {'contract': nb_cont, 'data': df}
         i += 1
         sdate = min(exp,end_date) + datetime.timedelta(days=1)
