@@ -66,8 +66,9 @@ class CompositeCurve(DiscountCurve):
         
 class ForwardCurve(object):
     class InterpMode:
-        Linear = 0  # linear on zero rates
-        LinearLog = 1  # linear on log discounts
+        PiecewiseConst = 0
+        Linear = 1  # linear on zero rates
+        LinearLog = 2  # linear on log discounts
         
     def __init__(self, t0, fn):
         self.t0 = t0
@@ -79,7 +80,10 @@ class ForwardCurve(object):
         if t0 is None:
             t0 = tenors[0]
         assert len(tenors) == len(forwards)
-        if interp_mode == cls.InterpMode.Linear:
+        if interp_mode == cls.InterpMode.PiecewiseConst:
+            interpfwd = interp1d(tenors, forwards, kind='zero', bounds_error=False, fill_value='extrapolate')
+            return cls(t0, lambda t: interpfwd(t))
+        elif interp_mode == cls.InterpMode.Linear:
             interpfwd = interp1d(tenors, forwards, kind='linear', bounds_error=False, fill_value='extrapolate')
             return cls(t0, lambda t: interpfwd(t))
         elif interp_mode == cls.InterpMode.LinearLog:
