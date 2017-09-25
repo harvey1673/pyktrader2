@@ -6,6 +6,8 @@ import cmq_curve
 import misc
 
 class CMQFXOption(CMQInstrument):
+    class_params = dict(CMQInstrument.class_params, **{ 'ccypair':'EURUSD', 'otype': 'C', \
+                                                        'expiry': datetime.date.today(), 'strike': 0.0})
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQFXOption, self).__init__(trade_data, market_data, model_settings)
     
@@ -44,12 +46,11 @@ class CMQFXOption(CMQInstrument):
         self.volnode = qlib.Delta5VolNode(self.today, self.expiry, self.fx_fwd, self.atm, self.v90, self.v75, self.v25, self.v10, "act365")
     
     def set_trade_data(self, trade_data):
-        self.notional = trade_data['Notional']
-        self.strike = trade_data['Strike']
-        self.otype = str(trade_data['OptionType'])
-        self.expiry = misc.datetime2xl(datetime.datetime.strptime(trade_data['Expiry'], '%Y-%m-%d'))
-        self.pricing_ccy = trade_data['PricingCCY']
-        self.ccypair = trade_data["CcyPair"]
+        super(CMQFXOption, self).set_trade_data(trade_data)
+        self.expiry = misc.datetime2xl(datetime.datetime.strptime(trade_data['expiry'], '%Y-%m-%d'))
+        self.set_inst_key()
+
+    def set_inst_key(self):
         self.inst_key = [self.__class__.__name__, self.ccypair, self.otype, self.strike, self.expiry, self.pricing_ccy, self.notional]
         
     def price(self):
