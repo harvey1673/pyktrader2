@@ -41,5 +41,11 @@ class CMQCalendarSwap(CMQInstrument):
         self.fix_series = pd.Series(fix_quotes[1], index = fix_quotes[0])
 
     def clean_price(self):
-        past_fixes = 0.0
-        return 0.0
+        past_fix = [ d for d in self.fixing_dates if d < self.value_date]
+        fut_fix = [ d for d in self.fixing_dates if d >= self.value_date]
+        if self.value_date in self.fix_series.index:
+            past_fix.append(self.value_date)
+            fut_fix.remove(self.value_date)
+        fut_t = [ (d - self.value_date).days for d in fut_fix]
+        avg = (sum(self.fix_series[past_fix]) + sum(self.fwd_curve(fut_t)))/(len(past_fix) + len(fut_fix))
+        return avg
