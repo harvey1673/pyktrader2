@@ -1,14 +1,16 @@
 # -*- coding:utf-8 -*-
+import json
 import cmq_inst
-import cmq_utils
 
 class CMQTradeStatus:
     Perspective, PendingSignoff, Live, Matured, Expired, Cancelled = range(6)
 
 class CMQTrade(object):
     class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQTradeStatus.Perspective, \
-                    'cpty': 'dummy', 'positions': [], 'instruments': [], 'last_updated': ''}
+                    'cpty': 'dummy', 'strategy': 'test', 'last_updated': ''}
     def __init__(self, trade_data):
+        if isinstance(trade_data, (str, unicode)):
+            trade_data = json.loads(trade_data)
         if "trade_id" not in trade_data:
             self.trade_id = ''
         self.update_trade_data(trade_data)
@@ -18,8 +20,8 @@ class CMQTrade(object):
             inst.set_market_data(market_data)
 
     def add_instrument(self, inst_data, pos):
-        self.positions.append(pos)
-        self.instruments.append(self.create_instrument(inst_data))
+        new_inst = self.create_instrument(inst_data)
+        self.positions.append([new_inst, pos])
 
     def create_instrument(self, inst_data):
         if 'InstType' in inst_data:
@@ -30,27 +32,40 @@ class CMQTrade(object):
             return inst_cls(inst_data)
 
     def price(self):
-        return sum([inst.price() * pos for inst, pos in zip(self.instruments, self.positions)])
+        return sum([inst.price() * pos for inst, pos in self.positions])
 
     def update_trade_data(self, trade_data):
         d = self.__dict__
         for key in self.class_params:
             d[key] = trade_data.get(key, self.class_params[key])
-        self.instruments = [self.create_instrument(inst_data) for inst_data in self.instruments]
+        self.positions = [ [self.create_instrument(inst_data), pos] for inst_data, pos in trade_data.get('positions', []) ]
 
-    def remove_instrument(self, inst_data):
-        pass
+    def remove_instrument(self, inst_key):
+        self.positions = [ [inst, pos] for inst, pos in self.positions if inst.inst_key != inst_key ]
 
-    def to_json(self):
-        pass
+    def __str__(self):
+        output = dict([(param, getattr(self, param)) for param in self.class_params])
+        output['position'] = [ [str(inst), pos] for inst, pos in self.positions ]
+        return json.dumps(output)
 
 class CMQBook(object):
+    class_params = {'name': 'test_book', 'owner': 'harvey'}
     def __init__(self, book_data):
-        self.name = book_data.get('name', 'test')
-        self.owner = book_data.get('owner', 'harvey')
-        trade_list = book_data.get('trade_list', [])
-        self.trade_list = [ CMQTrade(trade_data) for trade_data in trade_list ]
+        if isinstance(book_data, (str, unicode)):
+            trade_data = json.loads(book_data)
+        self.load_book(book_data)
+
+    def load_book(self, book_data):
+        d = self.__dict__
+        for key in self.class_params:
+            d[key] = book_data.get(key, self.class_params[key])
+        self.trade_list = [ CMQTrade(trade_data) for trade_data in book_data.get('trade_list', [])]
         self.inst_dict = {}
+        for trade in self.trade_list:
+            for inst, pos in trade.positions:
+                if inst not in self.inst_dict:
+                    self.inst_dict[inst] = 0
+                self.inst_dict[inst] += pos
 
     def book_trade(self, cmq_trade):
         self.trade_list.append(cmq_trade)
@@ -74,9 +89,10 @@ class CMQBook(object):
     def price(self):
         return sum([ trade.price() for trade in self.trade_list])
 
-    def to_json(self):
-        pass
-
+    def __str__(self):
+        output = dict([(param, getattr(self, param)) for param in self.class_params])
+        output['trade_list'] = [ str(trade) for trade in self.trade_list]
+        return json.dumps(output)
 
 if __name__ == '__main__':
     pass
