@@ -9,6 +9,7 @@ class CMQTrade(object):
     class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQTradeStatus.Perspective, \
                     'cpty': 'dummy', 'strategy': 'test', 'last_updated': ''}
     def __init__(self, trade_data):
+        self.mkt_deps = {}
         if isinstance(trade_data, (str, unicode)):
             trade_data = json.loads(trade_data)
         if "trade_id" not in trade_data:
@@ -39,6 +40,13 @@ class CMQTrade(object):
         for key in self.class_params:
             d[key] = trade_data.get(key, self.class_params[key])
         self.positions = [ [self.create_instrument(inst_data), pos] for inst_data, pos in trade_data.get('positions', []) ]
+        self.mkt_deps = {'fixings': {}, 'fwdcurves': {}, }
+        for inst in self.positions:
+            for key in ['fixings', 'fwdcurves']:
+                for fix_data in inst.mkt_deps[key]:
+                    if fix_data not in self.mkt_deps[key]:
+                        self.mkt_deps[key][fix_data] = []
+                    self.mkt_deps[key][fix_data] = list(set(self.mkt_deps[key][fix_data]).union(set(inst.mkt_deps[key][fix_data])))
 
     def remove_instrument(self, inst_key):
         self.positions = [ [inst, pos] for inst, pos in self.positions if inst.inst_key != inst_key ]

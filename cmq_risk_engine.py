@@ -3,7 +3,7 @@ import json
 import workdays
 
 trade_type_map = {
-    "IRS": "cmq_rate_swap.CMQIRSwap",
+    "ComCalSwap": "cmq_rate_swap.CMQIRSwap",
     "Bermudan": "cmq_rate_swap.CMQIRBermSwaption",
     "FXOption": "cmq_fxopt.CMQFXOption",
 }
