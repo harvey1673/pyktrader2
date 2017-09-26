@@ -2,7 +2,7 @@ import copy
 import json
 import workdays
 
-trade_type_map = {
+deal_type_map = {
     "ComCalSwap": "cmq_rate_swap.CMQIRSwap",
     "Bermudan": "cmq_rate_swap.CMQIRBermSwaption",
     "FXOption": "cmq_fxopt.CMQFXOption",
@@ -27,8 +27,8 @@ class CMRiskEngine(object):
         self.pricing_ccy = trade_data.get("PricingCCY", "usd")
 
     def create_instrument(self, trade_data, market_data):
-        trade_type = trade_data.get("TradeType", "IRS")
-        cls_name = trade_type_map[trade_type]
+        deal_type = trade_data.get("DealType", "IRS")
+        cls_name = deal_type_map[deal_type]
         cls_str = cls_name.split('.')
         inst_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
         self.instrument = inst_cls(trade_data, market_data)
