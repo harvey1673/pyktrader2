@@ -3,10 +3,12 @@ import json
 import workdays
 
 deal_type_map = {
-    "ComCalSwap": "cmq_rate_swap.CMQIRSwap",
-    "Bermudan": "cmq_rate_swap.CMQIRBermSwaption",
-    "FXOption": "cmq_fxopt.CMQFXOption",
+    "ComCalSwap": "cmq_calendarswap.CMQCalendarSwap",
+    "ComCalAsian": "cmq_calendarasian.CMQCalendarAsian",
 }
+
+class CMQScenario(object):
+    pass
 
 class CMRiskEngine(object):
     def __init__(self, trade_data, market_data):
@@ -39,7 +41,7 @@ class CMRiskEngine(object):
         else:
             crv_type = scen[0].split('_')[0]
         md = copy.deepcopy(market_data)
-        if crv_type == "MarketDate":
+        if crv_type == "value_date":
             md[scen[0]] = workdays.workday(md[scen[0]], scen[1])
         else:
             if hasattr(scen[0], '__iter__'):
@@ -61,22 +63,22 @@ class CMRiskEngine(object):
         for greek in self.req_greeks:
             item = greek.split('_')
             if item[0] == 'pv':
-                scens = [("MarketDate", 0)]
+                scens = [("value_date", 0)]
             elif item[0] == 'theta':
-                scens = [("MarketDate", 0), ("MarketDate", self.theta_shift)]
+                scens = [("value_date", 0), ("value_date", self.theta_shift)]
             elif item[0] in ['cmdelta', 'cmgamma']:
-                scens = [('COMCurve_' + item[1], self.cmdelta_shift), ("MarketDate", 0),
+                scens = [('COMCurve_' + item[1], self.cmdelta_shift), ("value_date", 0),
                          ('COMCurve_' + item[1], -self.cmdelta_shift)]
             elif item[0] in ['ycdelta', 'ycgamma']:
-                scens = [('IRYCurve_' + item[1], self.ycdelta_shift), ("MarketDate", 0),
+                scens = [('IRYCurve_' + item[1], self.ycdelta_shift), ("value_date", 0),
                          ('IRYCurve_' + item[1], -self.ycdelta_shift)]
             elif item[0] == 'swnvega':
                 scens = [('SWNVOL_' + item[1], self.swnvega_shift), ('SWNVOL_' + item[1], -self.swnvega_shift)]
             elif item[0] in ['fxdelta', 'fxgamma']:
-                scens = [('FXFwd_' + item[1], self.fxdelta_shift), ("MarketDate", 0),
+                scens = [('FXFwd_' + item[1], self.fxdelta_shift), ("value_date", 0),
                          ('FXFwd_' + item[1], -self.fxdelta_shift)]
             elif item[0] == 'fxvega':
-                scens = [(('FXVOL_' + item[1], 'ATM'), self.fxvega_shift), ("MarketDate", 0), \
+                scens = [(('FXVOL_' + item[1], 'ATM'), self.fxvega_shift), ("value_date", 0), \
                          (('FXVOL_' + item[1], 'ATM'), -self.fxvega_shift)]
             for s in scens:
                 if s not in all_scens:
@@ -92,16 +94,16 @@ class CMRiskEngine(object):
         for greek in self.req_greeks:
             item = greek.split('_')
             if item[0] == 'pv':
-                self.calc_risks[greek] = self.results[("MarketDate", 0)]
+                self.calc_risks[greek] = self.results[("value_date", 0)]
             elif item[0] == 'theta':
-                self.calc_risks[greek] = self.results[("MarketDate", 1)] - self.results[("MarketDate", 0)]
+                self.calc_risks[greek] = self.results[("value_date", 1)] - self.results[("value_date", 0)]
             elif item[0] == 'cmdelta':
                 self.calc_risks[greek] = (self.results[('COMCurve_' + item[1], self.cmdelta_shift)] \
                                           - self.results[('COMCurve_' + item[1], -self.cmdelta_shift)]) / ( \
                                              2.0 * self.cmdelta_shift )
             elif item[0] == 'cmgamma':
                 self.calc_risks[greek] = (self.results[('COMCurve_' + item[1], self.cmdelta_shift)] \
-                                          - 2 * self.results[("MarketDate", 0)] \
+                                          - 2 * self.results[("value_date", 0)] \
                                           + self.results[('COMCurve_' + item[1], -self.cmdelta_shift)]) / ( \
                                              self.cmdelta_shift ** 2)
             elif item[0] == 'ycdelta':
@@ -110,7 +112,7 @@ class CMRiskEngine(object):
                                          self.ycdelta_shift * 10000)
             elif item[0] == 'ycgamma':
                 self.calc_risks[greek] = (self.results[('IRYCurve_' + item[1], self.ycdelta_shift)] \
-                                          - 2 * self.results[("MarketDate", 0)] \
+                                          - 2 * self.results[("value_date", 0)] \
                                           + self.results[('IRYCurve_' + item[1], - self.ycdelta_shift)]) / (
                                          (self.ycdelta_shift * 10000) ** 2)
             elif item[0] == 'fxdelta':  ## need to be careful here FX shift is assumed to be ratio multiplier
@@ -119,7 +121,7 @@ class CMRiskEngine(object):
                                          2 * self.fxdelta_shift)
             elif item[0] == 'fxgamma':
                 self.calc_risks[greek] = (self.results[('FXFwd_' + item[1], self.fxdelta_shift)] - 2 * self.results[
-                    ("MarketDate", 0)] \
+                    ("value_date", 0)] \
                                           + self.results[('FXFwd_' + item[1], - self.fxdelta_shift)]) / (
                                          self.fxdelta_shift ** 2)
             elif item[0] == 'swnvega':
