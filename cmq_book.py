@@ -5,6 +5,9 @@ import cmq_inst
 class CMQDealStatus:
     Perspective, PendingSignoff, Live, Matured, Expired, Cancelled = range(6)
 
+class CMQBookStatus:
+    Test, UAT, Prod = range(3)
+
 def agg_mkt_deps(mkt_deps, inst_list):
     for inst in inst_list:
         for key in ['fixings', 'fwdcurves']:
@@ -15,7 +18,10 @@ def agg_mkt_deps(mkt_deps, inst_list):
 
 class CMQDeal(object):
     class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQDealStatus.Perspective, \
-                    'cpty': 'dummy', 'strategy': 'test', 'last_updated': ''}
+                    'cpty': 'dummy', 'strategy': 'test', 'last_updated': '', \
+                    'external_id': 'dummy', 'external_src': 'dummy',
+                    'internal_id': 'dummy', 'business': 'commod',
+                    'desk': 'CST', 'product': 'IO', }
     def __init__(self, deal_data):
         self.mkt_deps = {}
         if isinstance(deal_data, (str, unicode)):
@@ -61,7 +67,7 @@ class CMQDeal(object):
         return json.dumps(output)
 
 class CMQBook(object):
-    class_params = {'name': 'test_book', 'owner': 'harvey'}
+    class_params = {'name': 'test_book', 'owner': 'harvey', 'reporting_ccy': 'USD', 'status': CMQBookStatus.Test}
     def __init__(self, book_data):
         self.mkt_deps = {}
         if isinstance(book_data, (str, unicode)):
