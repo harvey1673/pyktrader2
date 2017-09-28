@@ -49,3 +49,5 @@ class CMQCalendarSwap(CMQInstrument):
         fut_t = [ (d - self.value_date).days for d in fut_fix]
         avg = (sum(self.fix_series[past_fix]) + sum(self.fwd_curve(fut_t)))/(len(past_fix) + len(fut_fix))
         return avg
+
+    
