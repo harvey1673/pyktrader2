@@ -2,26 +2,53 @@
 import json
 import datetime
 
+
+class CurveShiftType:
+    Abs, Rel = range(2)
+
+inst_type_map = {
+    "ComCalSwap": "cmq_calendarswap.CMQCalendarSwap",
+    "ComMthAsian": "cmq_mthlyasian.CMQMthlyAsian",
+}
+
 class CMQInstrument(object):
-    class_params = {'pricing_ccy': 'USD'}
-    def __init__(self, inst_data, market_data, model_settings={}):
+    class_params = {'ccy': 'USD', 'start': datetime.date.today() + datetime.timedelta(days = 2), \
+                    'end': datetime.date.today() + datetime.timedelta(days = 3), }
+    instrument_dict = {}
+
+    def __init__(self, inst_data, market_data = {}, model_settings={}):
+        self.eod_flag = False
+        self.cmdelta_shift = 0.0001
+        self.cmdelta_type = CurveShiftType.Abs
+        self.cmvega_shift = 0.005
+        self.cmvega_type = CurveShiftType.Abs
+        self.ycdelta_shift = 0.0001
+        self.ycdelta_type = CurveShiftType.Abs
+        self.swnvega_shift = 0.005
+        self.swnvega_type = CurveShiftType.Abs
+        self.fxdelta_shift = 0.005
+        self.fxdelta_type = CurveShiftType.Abs
+        self.theta_shift = 1
+        self.theta_type = CurveShiftType.Abs
+        self.fxvega_shift = 1
+        self.fxvega_type = CurveShiftType.Abs
         if isinstance(inst_data, (str, unicode)):
             inst_data = json.loads(inst_data)
         self.set_trade_data(inst_data)
-        if len(market_data) > 0:
-            self.set_market_data(market_data)
-        if len(model_settings) > 0:
-            self.set_model_settings(model_settings)
+        self.set_market_data(market_data)
+        self.set_model_settings(model_settings)
 
     def set_trade_data(self, trade_data):
         d = self.__dict__
         for key in self.class_params:
             d[key] = trade_data.get(key, self.class_params[key])
+            if key in ['start', 'end'] and isinstance(d[key], basestring):
+                d[key] = datetime.datetime.strptime(d[key], "%Y-%m-%d %H:%M:%S").date()
         self.set_inst_key()
         self.mkt_deps = {}
 
     def set_inst_key(self):
-        self.inst_key = [self.__class__.__name__, self.pricing_ccy]
+        self.inst_key = [self.__class__.__name__, self.ccy]
         self.generate_unique_id()
 
     def generate_unique_id(self):
@@ -32,9 +59,10 @@ class CMQInstrument(object):
 
     def set_market_data(self, market_data):
         self.value_date = market_data.get('value_date', datetime.date.today())
+        self.eod_flag = market_data.get('eod_flag', False)
 
     def price(self):
-        return getattr(self, self.price_func)
+        return getattr(self, self.price_func)()
 
     def clean_price(self):
         return 0.0
@@ -49,3 +77,5 @@ class CMQInstrument(object):
         output = dict([(param, getattr(self, param)) for param in self.class_params])
         return json.dumps(output)
 
+if __name__ == '__main__':
+    pass
