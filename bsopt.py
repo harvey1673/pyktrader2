@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import scipy.stats
 import numpy
-from   math import exp, log, pi, sqrt
+from math import exp, log, pi, sqrt
 import scipy
-from   scipy.optimize import brenth, brentq, newton
+from scipy.optimize import brenth, brentq, newton
+from scipy.integrate import dblquad, quad
 import time
 
 def cnorm(x):
@@ -58,6 +59,21 @@ def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
         res['Price'] = (F2+K)*((1 - x2) - FA*(1 - x1)) * exp(-r*Texp)
     return res
 
+def MinOptionOnSpdCall(F1, F2, dv1, dv2, rho, K1, K2, T):
+    ' min(max(F1-K1),max(F2-K2)) assuming F1 F2 are spread of two assets'
+    v1 = dv1 * numpy.sqrt(T)
+    v2 = dv2 * numpy.sqrt(T)
+    def int_func1(x):
+        return  scipy.stats.norm.cdf(((F1-K1)-(F2-K2) + (v1 * rho - v2) * x)/(v1 * numpy.sqrt(1-rho**2))) \
+                        * (v2 * x + F2- K2) * scipy.stats.norm.pdf(x)
+
+    def int_func2(x):
+        return  scipy.stats.norm.cdf(((F2-K2)-(F1-K1) + (v2 * rho - v1) * x)/(v2 * numpy.sqrt(1-rho**2))) \
+                        * (v1 * x + F1- K1) * scipy.stats.norm.pdf(x)
+    res1 = quad(int_func1, (K2-F2)/v2, numpy.inf)
+    res2 = quad(int_func2, (K1-F1)/v1, numpy.inf)
+    return res1[0] + res2[0]
+
 def BSOpt( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
     'Standard Black-Scholes European vanilla pricing.'
     if Strike <= 1e-12 * Spot:
@@ -74,7 +90,7 @@ def BSOpt( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
              - Spot   * exp( -Rf * Texp ) * cnorm( -d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
 
 
-def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0):
+def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0.0):
     'Standard Black-Scholes European vanilla pricing.'
 
     if Strike <= 1e-12 * Fwd:
