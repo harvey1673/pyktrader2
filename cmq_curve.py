@@ -75,7 +75,7 @@ class ForwardCurve(object):
         self.__fwdcurve = fn
         
     @classmethod
-    def from_array(cls, tenors, forwards, t0=None, interp_mode=InterpMode.LinearLog):
+    def from_array(cls, tenors, forwards, t0=None, interp_mode=InterpMode.PiecewiseConst):
         """Create a Curve object: tenors (floats), fwds (floats), interp_mode"""
         if t0 is None:
             t0 = tenors[0]
