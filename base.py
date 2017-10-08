@@ -47,7 +47,7 @@ def add_log2console(level = logging.INFO):
     console.setFormatter(formatter)
     # add the handler to the root logger
     logging.getLogger().addHandler(console)
- 
+
 def is_if(instrument):#判断是否是IF
     return instrument[:2].upper() == 'IF'
 
@@ -325,3 +325,4 @@ def MA_EXAMPLE(src,mlen,_ts=None):
         _ts.ma.append((ss-_ts.sa[-rlen-1]+rlen/2)/rlen) 
     #print _ts.sa
     return _ts.ma
+
