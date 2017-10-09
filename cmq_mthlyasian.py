@@ -11,7 +11,7 @@ import workdays
 import datetime
 
 class CMQMthlyAsian(CMQCalendarSwap):
-    class_params = dict(CMQCalendarSwap.class_params, **{ 'otype': 'C', 'accrual': 'act252'})
+    class_params = dict(CMQCalendarSwap.class_params, **{ 'otype': 'C', 'accrual': 'act252', 'need_disc': False})
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQMthlyAsian, self).__init__(trade_data, market_data, model_settings)
 
