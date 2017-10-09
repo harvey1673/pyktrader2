@@ -3,6 +3,7 @@ import cmq_crv_defn
 import dbaccess
 import datetime
 import misc
+import workdays
 
 IR_Exclusion_Tenors = ['2W', '4M', '5M', '7M', '8M', '9M', '10M', '11M']
 
@@ -30,7 +31,7 @@ def comvol_db_loader(market_data, fwd_index, dep_tenors = []):
     output = {}
     for field in ['ATM', 'V90', 'V75', 'V25', 'V10']:
         if field == 'ATM':
-            output['COMVol' + field] = [[tenor, expiry, 0.42] for tenor, expiry in zip(dep_tenors, expiries)]
+            output['COMVol' + field] = [[tenor, expiry, 0.385] for tenor, expiry in zip(dep_tenors, expiries)]
         else:
             output['COMVol' + field] = [[tenor, expiry, 0.0] for tenor, expiry in zip(dep_tenors, expiries)]
     return output
@@ -67,8 +68,25 @@ def ircurve_db_loader(market_data, fwd_index, dep_tenors = []):
     df['rate'] = df['rate']/100.0
     return df[['tenor', 'expiry', 'rate']].values.tolist()
 
-def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP'):
-    market_data = {'value_date': value_date, 'region': region}
+def process_BOM(market_data):
+    vdate = market_data['value_date']
+    for fwd_idx in market_data['COMFwd']:
+        crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
+        if crv_info['exch'] == 'SGX':
+            fwd_quotes = market_data['COMFwd'][fwd_idx]
+            if (fwd_quotes[0][0] < vdate):
+                hols = getattr(misc, crv_info['calendar'] + '_Holidays')
+                bzdays = workdays.networkdays(fwd_quotes[0][0], fwd_quotes[0][1], hols)
+                spotID = crv_info['spotID']
+                past_fix = [ quote[1] for quote in market_data['COMFix'][spotID] if quote[0] <= vdate]
+                if bzdays > len(past_fix):
+                    fwd_quotes[0][2] = (fwd_quotes[0][2] * bzdays - sum(past_fix))/(bzdays - len(past_fix))
+                else:
+                    fwd_quotes[0][2] = 0
+
+def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP', EOD = False):
+    market_date = workdays.workday(value_date, -1)
+    market_data = {'value_date': market_date, 'region': region}
     for field in mkt_deps:
         if field == 'COMFwd':
             mkt_loader = comfwd_db_loader
@@ -98,6 +116,8 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP'
                     market_data[vol_field][crv_idx] = output[vol_field]
             else:
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
+    market_data['value_date'] = value_date
+    process_BOM(market_data)
     return market_data
 
 
