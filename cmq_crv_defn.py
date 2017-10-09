@@ -6,7 +6,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
     'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO',
-                'parent_curve': '', 'spotID': 'tis_io62', 'vol_index': 'SGXIRO',},
+                'parent_curve': '', 'spotID': 'tsi_io62', 'vol_index': 'SGXIRO',},
     'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN',
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
     'SHFEHC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN',
@@ -48,6 +48,7 @@ def lookup_vol_mark(vol_index, market_data, vol_tenor, vol_fields = COMVOL_field
             volmark['expiry'] = v_quote[1]
             for field in vol_fields:
                 volmark[field] = market_data[field][vol_index][idx][2]
+            break
     return volmark
 
 def tenor_expiry(exch, product, tenor, rolldays = 0, field = 'fwd'):
@@ -89,4 +90,3 @@ def curve_expiry(exch, product, start_date, end_date, rolldays = 0, field = 'fwd
 
 if __name__ == '__main__':
     pass
-
