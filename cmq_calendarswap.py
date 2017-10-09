@@ -54,7 +54,7 @@ class CMQCalendarSwap(CMQInstrument):
                      (d < self.value_date) or ((d == self.value_date) and self.eod_flag)]
         fut_t = [(self.value_date - d).days for d in self.fixing_dates if d not in self.past_fix]
         if len(self.past_fix) > 0:
-            self.past_avg = np.mean(self.fix_series[[ d for d in self.past_fix.index]])
+            self.past_avg = np.mean(self.fix_series[self.past_fix])
         else:
             self.past_avg = 0.0
         self.fwd_avg = np.mean(self.fwd_curve(fut_t))
