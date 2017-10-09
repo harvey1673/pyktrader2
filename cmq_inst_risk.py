@@ -88,7 +88,7 @@ class CMQInstRiskStore(object):
             elif greek == 'cmgamma':
                 self.calc_risks[greek] = {}
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
-                    self.calc_risks[greek] = (self.results[('COMFwd', fwd_idx, 'ALL', inst_obj.cmdelta_shift)] \
+                    self.calc_risks[greek][fwd_idx] = (self.results[('COMFwd', fwd_idx, 'ALL', inst_obj.cmdelta_shift)] \
                                           - 2 * self.results[("value_date", "value_date", "ALL", 0)] \
                                           + self.results[('COMFwd', fwd_idx, 'ALL', -inst_obj.cmdelta_shift)]) \
                                         / ( inst_obj.cmdelta_shift ** 2)
@@ -114,7 +114,7 @@ class CMQInstRiskStore(object):
                 for vol_idx in inst_obj.mkt_deps['COMVolATM']:
                     self.calc_risks[greek][vol_idx] = (self.results[('COMVolATM', vol_idx, 'ALL', inst_obj.cmvega_shift)] \
                                                                   - self.results[('COMVolATM', vol_idx, 'ALL', -inst_obj.cmvega_shift)]) \
-                                                                 / (2.0 * inst_obj.cmvega_shift)
+                                                                 / (2.0 * inst_obj.cmvega_shift * 100.0)
             elif greek == 'cmvegas':
                 self.calc_risks[greek] = {}
                 for vol_idx in inst_obj.mkt_deps['COMVolATM']:
@@ -122,7 +122,7 @@ class CMQInstRiskStore(object):
                     for tenor in inst_obj.mkt_deps['COMVolATM'][vol_idx]:
                         self.calc_risks[greek][vol_idx][tenor] = (self.results[('COMVolATM', vol_idx, tenor, inst_obj.cmvega_shift)] \
                                                                   - self.results[('COMVolATM', vol_idx, tenor, -inst_obj.cmvega_shift)]) \
-                                                                 / (2.0 * inst_obj.cmvega_shift)
+                                                                 / (2.0 * inst_obj.cmvega_shift * 100.0)
             elif greek == 'ycdelta':
                 self.calc_risks[greek] = {}
                 for fwd_idx in inst_obj.mkt_deps['IRCurve']:
