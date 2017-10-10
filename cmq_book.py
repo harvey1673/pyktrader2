@@ -53,7 +53,7 @@ class CMQDeal(object):
             cls_name = cmq_inst.inst_type_map[inst_type]
             cls_str = cls_name.split('.')
             inst_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
-            return inst_cls(inst_data)
+            return inst_cls.create_instrument(inst_data)
 
     def price(self):
         return sum([inst.price() * pos for inst, pos in self.positions])
@@ -65,8 +65,8 @@ class CMQDeal(object):
         self.positions = [ [self.create_instrument(inst_data), pos] for inst_data, pos in json.loads(deal_data['positions']) ]
         agg_mkt_deps(self.mkt_deps, [inst for inst, pos in self.positions])
 
-    def remove_instrument(self, inst_key):
-        self.positions = [ [inst, pos] for inst, pos in self.positions if inst.inst_key != inst_key ]
+    def remove_instrument(self, inst_obj):
+        self.positions = [ [inst, pos] for inst, pos in self.positions if inst != inst_obj ]
         self.mkt_deps = {}
         agg_mkt_deps(self.mkt_deps, [inst for inst, pos in self.positions])
 
