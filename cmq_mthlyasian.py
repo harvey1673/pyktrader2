@@ -12,6 +12,8 @@ import datetime
 
 class CMQMthlyAsian(CMQCalendarSwap):
     class_params = dict(CMQCalendarSwap.class_params, **{ 'otype': 'C', 'accrual': 'act252', 'need_disc': False})
+    inst_key = ['fwd_index', 'otype', 'strike', 'start', 'end', 'ccy']
+
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQMthlyAsian, self).__init__(trade_data, market_data, model_settings)
 
@@ -21,10 +23,6 @@ class CMQMthlyAsian(CMQCalendarSwap):
             if field not in self.mkt_deps:
                 self.mkt_deps[field] = {}
             self.mkt_deps[field][self.fwd_index] = copy.deepcopy(self.mkt_deps['COMFwd'][self.fwd_index])
-
-    def set_inst_key(self):
-        self.inst_key = [self.__class__.__name__, self.fwd_index, self.otype, self.strike, self.start, self.end, self.ccy]
-        self.generate_unique_id()
 
     def set_market_data(self, market_data):
         super(CMQMthlyAsian, self).set_market_data(market_data)
