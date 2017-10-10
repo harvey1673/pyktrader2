@@ -30,11 +30,11 @@ class CMQRiskEngine(object):
     def run_risk(self):
         for inst in self.book.inst_dict:
             self.risk_store[inst].run_risk(self.scenarios)
-            self.inst_risks[inst.unique_id] = self.risk_store[inst].calc_risks
+            self.inst_risks[inst.id] = self.risk_store[inst].calc_risks
         for deal in self.book.deal_list:
             self.deal_risks[deal.id] = {}
             for inst, pos in deal.positions:
-                misc.merge_dict(self.inst_risks[inst.unique_id], self.deal_risks[deal.id], pos, 1)
+                misc.merge_dict(self.inst_risks[inst.id], self.deal_risks[deal.id], pos, 1)
             misc.merge_dict(self.deal_risks[deal.id], self.book_risks, 1, 1)
 
     def save_results(self, filename = None):
