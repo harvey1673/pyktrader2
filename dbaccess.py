@@ -37,7 +37,8 @@ fx_columns = ['date', 'tenor', 'rate']
 ir_columns = ['date', 'tenor', 'rate']
 spot_columns = ['date', 'close']
 vol_columns = ['date', 'expiry', 'atm', 'v90', 'v75', 'v25', 'v10']
-price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': vol_columns, \
+cmvol_columns = ['date', 'tenor_label', 'expiry_date', 'delta', 'vol', 'price', 'run_avg']
+price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': vol_columns, 'cmvol': cmvol_columns, \
                  'ccy': fx_columns, 'ir_index': ir_columns, }
 
 deal_columns = ['id', 'status', 'internal_id', 'external_id', 'cpty', 'positions', \
@@ -285,14 +286,16 @@ def load_deal_data(cnx, dbtable = 'deals', book = 'BOF', deal_status = [2]):
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
 
-def load_vol_curve(cnx, prod_code, ref_date, dbtable = 'fut_vol', field = 'volID'):
-    stmt = "select {variables} from {table} where {field} like '{prod}%' ".format( \
-                                    variables=','.join([field] + price_fields[field]),
-                                    table=dbtable, field = field, prod = prod_code)
+def load_cmvol_curve(cnx, prod_code, ref_date, dbtable = 'cmvol_daily', field = 'cmvol'):
+    stmt = "select {variables} from {table} where product_code like '{prod}%' ".format( \
+                                    variables=','.join(price_fields[field]),
+                                    table = dbtable, prod = prod_code)
     stmt = stmt + "and date like '{refdate}%' ".format( refdate = ref_date.strftime('%Y-%m-%d'))
-    stmt = stmt + "order by {field}".format(field = field)
+    stmt = stmt + "order by expiry_date".format(field = field)
     df = pd.io.sql.read_sql(stmt, cnx)
-    return df
+    df['delta'] = ((df['delta']+1)*100).astype(int) % 100
+    vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = 'sum')
+    return vol_tbl
 
 def load_tick_to_df(cnx, dbtable, inst, d_start, d_end, start_tick=1500000, end_tick=2115000):
     tick_columns = fut_tick_columns
