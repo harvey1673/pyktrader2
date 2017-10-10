@@ -10,6 +10,8 @@ class CMQCalendarSwap(CMQInstrument):
     class_params = dict(CMQInstrument.class_params, **{ 'strike': 0.0,
                                                         'fwd_index': 'SGXIRO',
                                                         'need_disc': True})
+    inst_key = ['fwd_index', 'strike', 'start', 'end', 'ccy']
+
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQCalendarSwap, self).__init__(trade_data, market_data, model_settings)
 
@@ -21,15 +23,10 @@ class CMQCalendarSwap(CMQInstrument):
         self.spotID = crv_info['spotID']
         self.fixing_dates = [d for d in day_range if misc.is_workday(d, crv_info['calendar'])]
         self.fwd_tenors = cmq_crv_defn.curve_expiry(crv_info['exch'], self.fwd_index, self.start, self.end)
-        self.set_inst_key()
         self.mkt_deps['COMFix'] = { self.spotID: self.fixing_dates }
         self.mkt_deps['COMFwd'] = { self.fwd_index: [ x1 for x1, x2 in self.fwd_tenors] }
         if self.need_disc:
             self.mkt_deps['IRCurve'] = { self.ccy.lower() + '_disc': ['ALL'] }
-
-    def set_inst_key(self):
-        self.inst_key = [self.__class__.__name__, self.fwd_index, self.strike, self.start, self.end, self.ccy]
-        self.generate_unique_id()
 
     def set_market_data(self, market_data):
         super(CMQCalendarSwap, self).set_market_data(market_data)
