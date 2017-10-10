@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 import json
 import datetime
-
+import weakref
 
 class CurveShiftType:
     Abs, Rel = range(2)
@@ -12,11 +12,22 @@ inst_type_map = {
 }
 
 class CMQInstrument(object):
+    _get_obj_cache = weakref.WeakValueDictionary()
+    inst_key = [ 'start', 'end', 'ccy']
     class_params = {'ccy': 'USD', 'start': datetime.date.today() + datetime.timedelta(days = 2), \
                     'end': datetime.date.today() + datetime.timedelta(days = 3), }
-    instrument_dict = {}
+
+    @classmethod
+    def create_instrument(cls, inst_data, market_data = {}, model_setting = {}):
+        cache = cls._get_obj_cache
+        identifier = '_'.join([cls.__name__] + [ str(inst_data.get(key, cls.class_params[key])) for key in cls.inst_key])
+        obj = cache.get(identifier, None)
+        if obj is None:
+            obj = cache[identifier] = cls(inst_data, market_data, model_setting)
+        return obj
 
     def __init__(self, inst_data, market_data = {}, model_settings={}):
+        self.id = '_'.join([self.__class__.__name__] + [ str(inst_data.get(key, self.class_params[key])) for key in self.inst_key])
         self.eod_flag = False
         self.cmdelta_shift = 0.0001
         self.cmdelta_type = CurveShiftType.Abs
@@ -44,15 +55,7 @@ class CMQInstrument(object):
             d[key] = trade_data.get(key, self.class_params[key])
             if key in ['start', 'end'] and isinstance(d[key], basestring):
                 d[key] = datetime.datetime.strptime(d[key], "%Y-%m-%d %H:%M:%S").date()
-        self.set_inst_key()
         self.mkt_deps = {}
-
-    def set_inst_key(self):
-        self.inst_key = [self.__class__.__name__, self.ccy]
-        self.generate_unique_id()
-
-    def generate_unique_id(self):
-        self.unique_id = '_'.join([str(key) for key in self.inst_key])
 
     def set_model_settings(self, model_settings):
         self.price_func = model_settings.get('price_func', 'clean_price')
