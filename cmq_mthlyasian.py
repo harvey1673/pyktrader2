@@ -5,7 +5,7 @@ import cmq_crv_defn
 import bsopt
 import copy
 import misc
-import cmqlib as qlib
+import cmq_volgrid
 import numpy as np
 import workdays
 import datetime
@@ -42,16 +42,16 @@ class CMQMthlyAsian(CMQCalendarSwap):
         strike = (self.strike * n - self.past_avg * m)/float(n - m)
         if strike < 0:
             return max((self.past_avg * m + self.fwd_avg * (n - m))/float(n) - self.strike, 0) if ws > 0 else 0.0
-        volnode = qlib.Delta5VolNode( misc.date2xl(self.value_date), \
-                                      misc.date2xl(self.volmark['expiry']), \
-                                      self.fwd_avg, \
-                                      self.volmark['COMVolATM'], \
-                                      self.volmark['COMVolV90'], \
-                                      self.volmark['COMVolV75'], \
-                                      self.volmark['COMVolV25'], \
-                                      self.volmark['COMVolV10'], \
-                                      "act365")
-        ivol = volnode.GetVolByStrike( strike, misc.date2xl(self.end))
+        volnode = cmq_volgrid.Delta5VolNode( self.value_date, \
+                                        self.volmark['expiry'], \
+                                        self.fwd_avg, \
+                                        self.volmark['COMVolATM'], \
+                                        self.volmark['COMVolV90'], \
+                                        self.volmark['COMVolV75'], \
+                                        self.volmark['COMVolV25'], \
+                                        self.volmark['COMVolV10'], \
+                                        "act365")
+        ivol = volnode.GetVolByStrike( strike, self.end)
         if self.accrual == 'act252':
             cal_str = cmq_crv_defn.COM_Curve_Map[self.fwd_index]['calendar'] + '_Holidays'
             hols = getattr(misc, cal_str)
