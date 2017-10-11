@@ -3,7 +3,6 @@ from math import log, exp
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
-from cmq_utils import *  
 
 class DiscountCurve(object):
     class InterpMode:
