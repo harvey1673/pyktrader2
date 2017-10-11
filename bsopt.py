@@ -14,7 +14,7 @@ def cnorminv(x):
     return scipy.stats.norm.ppf(x)
 
 def pnorm(x):
-    scipy.stats.norm.pdf(x)
+    return scipy.stats.norm.pdf(x)
 
 def d1(Spot, Strike, Vol, Texp, Rd, Rf ):
     return (log(Spot/Strike) + (Rf - Rd + 0.5* Vol**2) * Texp)/(Vol*sqrt(Texp))
@@ -651,3 +651,4 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
         ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
 
         return multi * Fwd * exp(-Rf * Texp) * ND * sqrt(Texp) * dvA * 0.01
+    
