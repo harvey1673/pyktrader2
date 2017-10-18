@@ -9,6 +9,7 @@ class CurveShiftType:
 inst_type_map = {
     "ComCalSwap": "cmq_calendarswap.CMQCalendarSwap",
     "ComMthAsian": "cmq_mthlyasian.CMQMthlyAsian",
+    "ComEuroOption": "cmq_commodeuopt.CMQCommodEuOpt",
 }
 
 class CMQInstrument(object):
