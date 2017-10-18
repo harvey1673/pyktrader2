@@ -1,7 +1,37 @@
 import numpy as np
 import bsopt
 import workdays
+import datetime
 import misc
+
+
+def delta_to_logratio(delta, vol, time2mat):
+    return vol * (0.5 * vol - np.sqrt(time2mat) * bsopt.cnorminv(delta))
+
+def ExpIntegral(b, tau):
+    if (b == 0) or (tau ==0):
+        return 1.0
+    else:
+        return (1 - np.exp(-b*tau))/(b*tau)
+
+def SamuelsonFactor1(a, b, t2T, t2mat):
+    factor1 = np.sqrt(1 + 2 * a * ExpIntegral(b, t2T) + a * a * ExpIntegral( 2 * b, t2T))
+    tdiff = t2T- t2mat
+    factor2 = np.sqrt(1 + 2 * a * np.exp(-tdiff * b) * ExpIntegral(b, t2mat) \
+                      + a * a * np.exp( - 2 * b * tdiff) * ExpIntegral( 2 * b, t2mat))
+    return factor2/factor1
+
+def SamuelsonFactor2(a, b, t, T, mat):
+    return SamuelsonFactor1(a, b, T - t, mat - t)
+
+def FitDelta5VolParams(t2exp, fwd, strike_list, vol_list):
+    xi = [ np.log(strike/fwd) for strike in strike_list]
+    intp = ConvInterp(xi, vol_list, 0.75)
+    atm = intp.value(0.0)
+    volparams = [atm]
+    for d in [0.9, 0.75, 0.25, 0.1]:
+        volparams.append(delta_to_logratio(d, atm, t2exp))
+    return volparams
 
 class ConvInterp(object):
     def __init__(self, xs, ys, omega = 0.75):
@@ -51,15 +81,12 @@ class Delta5VolNode(object):
         self._omega = 0.75
         self.initialize()
 
-    def expiry(self):
-        if self.accrual == 'act365':
-            return max((self.exp_date - self.value_date).days, 0)/365.25
-        else:
-            hols = misc.Holiday_Map.get(self.calendar, [])
-            return workdays.networkdays(self.value_date, self.exp_date, hols)/252.0
+    def calc_texp(self, exp_date):
+        hols = misc.Holiday_Map.get(self.calendar, [])
+        return misc.conv_expiry_date(self.value_date, exp_date, self.accrual, hols = [])
 
     def initialize(self):
-        self.time2mat = self.expiry()
+        self.time2exp = self.calc_texp(self.exp_date)
         xs = np.zeros(5)
         ys = np.zeros(5)
         xs[0] = self.delta2logratio(0.9)
@@ -75,14 +102,54 @@ class Delta5VolNode(object):
         self._interp = ConvInterp(xs, ys, self._omega)
 
     def delta2logratio(self, delta):
-        return self.atm * (0.5 * self.atm - np.sqrt(self.time2mat) * bsopt.cnorminv(delta))
+        return delta_to_logratio(delta, self.atm, self.time2exp)
 
-    def GetVolByMoneyness(self, xr, mat_date):
+    def GetVolByMoneyness(self, xr, mat_date = None):
         return self._interp.value(xr)
 
-    def GetVolByStrike(self, strike, mat_date):
+    def GetVolByStrike(self, strike, mat_date = None):
         return self.GetVolByMoneyness( np.log(strike/self.fwd), mat_date)
 
-    def GetVolByDelta(self, delta, mat_date):
+    def GetVolByDelta(self, delta, mat_date = None):
         xr = self.delta2logratio(delta)
         return self.GetVolByMoneyness(xr, mat_date)
+
+class AsianDelta5VolNode(Delta5VolNode):
+    def __init__(self, vdate, exp_date, fwd, atm, v90, v75, v25, v10, accrual='act365', calendar='PLIO'):
+        super(AsianDelta5VolNode, self).__init__(vdate, exp_date, fwd, atm, v90, v75, v25, v10, accrual, calendar)
+
+    def delta2logratio(self, delta):
+        return self.vol_adj * (0.5 * self.vol_adj - np.sqrt(self.time2exp) * bsopt.cnorminv(delta))
+
+    def initialize(self):
+        self.tau = max(0.0, self.calc_texp(datetime.date(self.exp_date.year, self.exp_date.month, 1) \
+                                      - datetime.timedelta(days=1)))
+        self.vol_adj = bsopt.asian_vol_adj(self.atm, self.time2exp, self.tau)
+        super(AsianDelta5VolNode, self).initialize()
+
+class SamuelDelta5VolNode(Delta5VolNode):
+    def __init__(self, vdate, exp_date, fwd, atm, v90, v75, v25, v10, alpha, beta, accrual='act365', calendar='PLIO'):
+        super(SamuelDelta5VolNode, self).__init__(vdate, exp_date, fwd, atm, v90, v75, v25, v10, accrual, calendar)
+        self.alpha = alpha
+        self.beta = beta
+
+    def GetVolByMoneyness(self, xr, mat_date):
+        imp_vol = super(SamuelDelta5VolNode, self).GetVolByMoneyness(xr, mat_date)
+        t2T = self.calc_texp(self.exp_date)
+        t2mat = self.calc_texp(mat_date)
+        if t2T <= 0:
+            return imp_vol
+        else:
+            return imp_vol * SamuelsonFactor1(self.alpha, self.beta, t2T, t2mat)
+
+    def GetInstVol(self, mat_date):
+        t2T = self.calc_texp(self.exp_date)
+        t2mat = self.calc_texp(mat_date)
+        a = self.alpha
+        b = self.beta
+        if (t2T <= 0):
+            return self.atm
+        else:
+            factor = np.sqrt(1 + 2 * a * ExpIntegral(b, t2T - t2mat) + \
+                             a * a * ExpIntegral(2*b, t2T - t2mat))
+            return self.atm/ factor * (1 + a * np.exp(-b*(t2T - t2mat)))
