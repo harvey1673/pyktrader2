@@ -52,18 +52,14 @@ class CMQMthlyAsian(CMQCalendarSwap):
                                         self.volmark['COMVolV10'], \
                                         "act365")
         ivol = volnode.GetVolByStrike( strike, self.end)
-        if self.accrual == 'act252':
-            cal_str = cmq_crv_defn.COM_Curve_Map[self.fwd_index]['calendar'] + '_Holidays'
-            hols = getattr(misc, cal_str)
-            tau = max(workdays.networkdays(self.value_date + datetime.timedelta(days = int(self.eod_flag)), \
-                                       self.start - datetime.timedelta(days = 1), hols)/252.0, 0.0)
-            t_exp = tau + (n - m)/252.0
-        else:
-            t_exp = ((self.end - self.value_date).days + int(not self.eod_flag))/365.25
-            tau = max((self.start - self.value_date).days - int(self.eod_flag), 0.0)/365.25
-        exp_m = (2.0 * np.exp(ivol * ivol * t_exp) - 2.0 * np.exp(ivol * ivol * tau) * \
-                (1.0 + ivol * ivol * (t_exp - tau))) / ((ivol ** 4) * ((t_exp - tau) ** 2))
-        vol_adj = np.sqrt(np.log(exp_m) / t_exp)
+        cal_str = cmq_crv_defn.COM_Curve_Map[self.fwd_index]['calendar'] + '_Holidays'
+        hols = getattr(misc, cal_str)
+        tau = misc.conv_expiry_date(self.value_date + datetime.timedelta(days = int(self.eod_flag)), \
+                                    self.start - datetime.timedelta(days=1), \
+                                    self.accrual, hols)
+        t_exp = misc.conv_expiry_date(self.value_date + datetime.timedelta(days = int(self.eod_flag)), \
+                                    self.end, self.accrual, hols)
+        vol_adj = bsopt.asian_vol_adj(ivol, t_exp, tau)
         pr =  bsopt.BSFwd((ws>0), self.fwd_avg, strike, vol_adj, t_exp, 0) * self.df * float(n - m) / float(n)
         return pr
 
