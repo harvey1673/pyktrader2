@@ -5,8 +5,9 @@ import workdays
 import datetime
 from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
-    'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO',
-                'parent_curve': '', 'spotID': 'tsi_io62', 'vol_index': 'SGXIRO',},
+    'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', \
+                'parent_curve': '', 'spotID': 'tsi_io62', 'vol_index': 'SGXIRO',\
+                '': '', },
     'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN',
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
     'SHFEHC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN',
