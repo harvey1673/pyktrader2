@@ -130,7 +130,9 @@ def insert_daily_data(cnx, inst, daily_data, is_replace=False, dbtable='fut_dail
     cursor.execute(stmt, args)
     cnx.commit()
 
-def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
+def import_tick_from_file(dbtable, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     inst_list = ['IF1406', 'IO1406-C-2300', 'IO1406-P-2300', 'IO1406-C-2250',
                  'IO1406-P-2250', 'IO1406-C-2200', 'IO1406-P-2200', 'IO1406-C-2150',
                  'IO1406-P-2150', 'IO1406-C-2100', 'IO1406-P-2100', 'IO1406-C-2050',
@@ -151,7 +153,9 @@ def import_tick_from_file(dbtable, cnx=connect(**dbconfig)):
                 cursor.execute(stmt)
                 cnx.commit()
 
-def insert_cont_data(cont, cnx=connect(**dbconfig)):
+def insert_cont_data(cont, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     col_list = cont.keys()
     stmt = "REPLACE INTO {table} ({variables}) VALUES (%s,%s,%s,%s,%s,%s) ".format(table='contract_list',
@@ -161,7 +165,9 @@ def insert_cont_data(cont, cnx=connect(**dbconfig)):
     cnx.commit()
     cnx.close()
 
-def prod_main_cont_exch(prodcode, cnx=connect(**dbconfig)):
+def prod_main_cont_exch(prodcode, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange, contract from trade_products where product_code='{prod}' ".format(prod=prodcode)
     cursor.execute(stmt)
@@ -172,7 +178,9 @@ def prod_main_cont_exch(prodcode, cnx=connect(**dbconfig)):
     cnx.close()
     return cont_mth, exch
 
-def load_product_info(prod, cnx=connect(**dbconfig)):
+def load_product_info(prod, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select exchange, lot_size, tick_size, start_min, end_min, broker_fee from trade_products where product_code='{product}' ".format(
         product=prod)
@@ -189,7 +197,9 @@ def load_product_info(prod, cnx=connect(**dbconfig)):
                }
     return out
 
-def load_stockopt_info(inst, cnx=connect(**dbconfig)):
+def load_stockopt_info(inst, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_base from stock_opt_map where instID='{product}' ".format(
         product=inst)
@@ -207,7 +217,9 @@ def load_stockopt_info(inst, cnx=connect(**dbconfig)):
                }
     return out
 
-def get_stockopt_map(underlying, cont_mths, strikes, cnx=connect(**dbconfig)):
+def get_stockopt_map(underlying, cont_mths, strikes, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select underlying, opt_mth, otype, strike, strike_scale, instID from stock_opt_map where underlying='{under}' and opt_mth in ({opt_mth_str}) and strike in ({strikes}) ".format(
         under=underlying,
@@ -220,7 +232,9 @@ def get_stockopt_map(underlying, cont_mths, strikes, cnx=connect(**dbconfig)):
         out[key] = instID
     return out
 
-def load_alive_cont(sdate, cnx=connect(**dbconfig)):
+def load_alive_cont(sdate, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select instID, product_code from contract_list where expiry>=%s"
     args = tuple([sdate])
@@ -235,7 +249,9 @@ def load_alive_cont(sdate, cnx=connect(**dbconfig)):
             pc.append(prod)
     return cont, pc
 
-def load_inst_marginrate(instID, cnx=connect(**dbconfig)):
+def load_inst_marginrate(instID, cnx = None):
+    if cnx == None:
+        cnx = connect(**dbconfig)
     cursor = cnx.cursor()
     stmt = "select margin_l, margin_s from contract_list where instID='{inst}' ".format(inst=instID)
     cursor.execute(stmt)
@@ -275,7 +291,7 @@ def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'ins
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
 
-def load_deal_data(cnx, dbtable = 'deals', book = 'BOF', deal_status = [2]):
+def load_deal_data(cnx, dbtable = 'deal', book = 'BOF', deal_status = [2]):
     stmt = "select {variables} from {table} where book = '{book}' ".format(table=dbtable, \
                                     variables=','.join(deal_columns), book = book)
     if len(deal_status) == 1:
@@ -294,7 +310,7 @@ def load_cmvol_curve(cnx, prod_code, ref_date, dbtable = 'cmvol_daily', field = 
     stmt = stmt + "order by expiry_date".format(field = field)
     df = pd.io.sql.read_sql(stmt, cnx)
     df['delta'] = ((df['delta']+1)*100).astype(int) % 100
-    vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = 'sum')
+    vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = numpy.mean)
     return vol_tbl
 
 def load_tick_to_df(cnx, dbtable, inst, d_start, d_end, start_tick=1500000, end_tick=2115000):
