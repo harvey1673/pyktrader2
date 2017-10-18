@@ -309,7 +309,6 @@ def datetime2xl(dt):
     t = dt - datetime.datetime(1970, 1, 1, 0, 0, 0)
     return 25569.0 + t.days + t.seconds / 60.0 / 60.0 / 24.0
 
-
 def time2exp(opt_expiry, curr_time):
     curr_date = curr_time.date()
     exp_date = opt_expiry.date()
@@ -321,6 +320,14 @@ def time2exp(opt_expiry, curr_time):
         delta = opt_expiry - curr_time
         return (delta.hour * 3600 + delta.min * 60 + delta.second) / 3600.0 / 5.5 / BDAYS_PER_YEAR
 
+def conv_expiry_date(curr_date, expiry, accrual = 'act365', hols = []):
+    if expiry < curr_date:
+        return 0.0
+    year_conv = int(accrual[-3:])
+    if year_conv >= 360:
+        return float((expiry - curr_date).days + 1)/year_conv
+    else:
+        return workdays.networkdays(curr_date, expiry, hols) / float(year_conv)
 
 def merge_dict(src_dict, dest_dict, w_src = 1, w_dest = 1):
     for key, value in src_dict.items():
@@ -735,3 +742,4 @@ def send_mail(mail_account, to_list, sub, content):
     except Exception, e:
         print "exception when sending e-mail %s" % str(e)
         return False
+
