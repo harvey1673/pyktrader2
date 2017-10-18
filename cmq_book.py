@@ -62,7 +62,11 @@ class CMQDeal(object):
         d = self.__dict__
         for key in self.class_params:
             d[key] = deal_data.get(key, self.class_params[key])
-        self.positions = [ [self.create_instrument(inst_data), pos] for inst_data, pos in json.loads(deal_data['positions']) ]
+        if isinstance(deal_data['positions'], (str, unicode)):
+            pos_data =  json.loads(deal_data['positions'])
+        else:
+            pos_data = deal_data['positions']
+        self.positions = [ [self.create_instrument(inst_data), pos] for inst_data, pos in pos_data ]
         agg_mkt_deps(self.mkt_deps, [inst for inst, pos in self.positions])
 
     def remove_instrument(self, inst_obj):
