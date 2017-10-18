@@ -10,23 +10,23 @@ def generate_scen(base_market, curve_type, curve_name, curve_tenor = 'ALL', shif
     if curve_type == 'value_date':
         if shift_size >= 1:
             market_scen[curve_type] = workdays.workday(market_scen[curve_type], shift_size)
-            # curr_date = market_scen[curve_type]
-            # print shift_size, curr_date, prefix_dates
-            # market_scen[curve_type] = prefix_dates[-1]
-            # prefix_dates = prefix_dates[:-1]
-            # for fwd_idx in market_scen['COMFwd']:
-            #     crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
-            #     if (crv_info['exch'] == 'SGX') and (crv_info['spotID'] in market_scen['COMFix']):
-            #         fixes = market_scen['COMFix'][crv_info['spotID']]
-            #         fwd_quotes = market_scen['COMFwd'][fwd_idx]
-            #         if prefix_dates[0] == fixes[-1][0]:
-            #             prefix_dates = prefix_dates[1:]
-            #         idy = 0
-            #         for fix_date in prefix_dates:
-            #             while fwd_quotes[idy][1] < fix_date:
-            #                 idy += 1
-            #             fixes.append([fix_date, fwd_quotes[idy][2]])
-            #             print [fix_date, fwd_quotes[idy][2]]
+            curr_date = market_scen['market_date']
+            prefix_dates = [workdays.workday(curr_date, shift) for shift in range(shift_size + 1)]
+            market_scen[curve_type] = prefix_dates[-1]
+            prefix_dates = prefix_dates[:-1]
+            for fwd_idx in market_scen['COMFwd']:
+                crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
+                if (crv_info['exch'] == 'SGX') and (crv_info['spotID'] in market_scen['COMFix']):
+                    fixes = market_scen['COMFix'][crv_info['spotID']]
+                    fwd_quotes = market_scen['COMFwd'][fwd_idx]
+                    if prefix_dates[0] == fixes[-1][0]:
+                        prefix_dates = prefix_dates[1:]
+                    idy = 0
+                    for fix_date in prefix_dates:
+                        while fwd_quotes[idy][1] < fix_date:
+                            idy += 1
+                        fixes.append([fix_date, fwd_quotes[idy][2]])
+                        print [fix_date, fwd_quotes[idy][2]]
     elif (curve_type in market_scen) and (curve_name in market_scen[curve_type]):
             for idx, value in enumerate(market_scen[curve_type][curve_name]):
                 if curve_tenor == 'ALL' or value[0] == curve_tenor:
@@ -55,7 +55,10 @@ class CMQInstRiskStore(object):
             if greek == 'pv':
                 scens += [("value_date", "value_date", "ALL", 0)]
             elif greek == 'theta':
-                scens += [("value_date", "value_date", "ALL", 0), ("value_date", "value_date", "ALL", inst_obj.theta_shift)]
+                theta_shift = 1
+                if len(greek_keys) > 1:
+                    theta_shift = int(greek_keys[1])
+                scens += [("value_date", "value_date", "ALL", 0), ("value_date", "value_date", "ALL", theta_shift)]
             elif greek in ['cmdelta', 'cmgamma']:
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     scens += [('COMFwd',  fwd_idx, 'ALL', inst_obj.cmdelta_shift), ('COMFwd', fwd_idx, 'ALL', -inst_obj.cmdelta_shift)]
