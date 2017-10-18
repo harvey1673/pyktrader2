@@ -7,6 +7,12 @@ from scipy.optimize import brenth, brentq, newton
 from scipy.integrate import dblquad, quad
 import time
 
+def asian_vol_adj(atm, time2mat, tau):
+    M = (2 * numpy.exp(atm * atm * time2mat) \
+         - 2 * numpy.exp(atm * atm * tau) * (1.0 + atm * atm * (time2mat - tau))) / \
+        ((atm ** 4) * ((time2mat - tau) ** 2))
+    return numpy.sqrt(numpy.log(M) / time2mat)
+
 def cnorm(x):
     return scipy.stats.norm.cdf(x)
 
@@ -509,9 +515,7 @@ def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
     if AvgPeriod == 0:
         volA = Vol
     else:
-        M = (2.0 * exp(Vol * Vol * Texp) - 2.0 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
-            ((Vol ** 4) * ((Texp - tau) ** 2))
-        volA = sqrt(log(M) / Texp)
+        volA = asian_vol_adj(Vol, Texp, tau)
 
     X = numpy.copy(strike)
     if AvgPeriod > Texp:
@@ -542,9 +546,7 @@ def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
     tau = numpy.max([0, Texp - AvgPeriod])
 
     if AvgPeriod > 0:
-        M = (2 * exp(Vol * Vol * Texp) - 2 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
-            ((Vol ** 4) * ((Texp - tau) ** 2))
-        volA = sqrt(log(M) / Texp)
+        volA = asian_vol_adj(Vol, Texp, tau)
     else:
         volA = Vol
 
@@ -577,9 +579,7 @@ def AsianFwdGamma(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
     tau = numpy.max([0, Texp - AvgPeriod])
 
     if AvgPeriod > 0:
-        M = (2 * exp(Vol * Vol * Texp) - 2 * exp(Vol * Vol * tau) * (1.0 + Vol * Vol * (Texp - tau))) / \
-            ((Vol ** 4) * ((Texp - tau) ** 2))
-        volA = sqrt(log(M) / Texp)
+        volA = asian_vol_adj(Vol, Texp, tau)
     else:
         volA = Vol
 
@@ -651,4 +651,3 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
         ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
 
         return multi * Fwd * exp(-Rf * Texp) * ND * sqrt(Texp) * dvA * 0.01
-    
