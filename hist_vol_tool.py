@@ -1,7 +1,7 @@
 import bsopt
 import copy
 import dateutil
-import pyktlib
+import cmqlib as qlib
 import pandas as pd
 import numpy as np
 import math
@@ -36,7 +36,7 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         if nxt_idx >= nlen -1:
             break
         if is_dtime:
-            day_frac = 1.0 - pyktlib.GetDayFraction(datetime2xl(df['datetime'].iat[idx]), 'COMN1')
+            day_frac = 1.0 - qlib.GetDayFraction(datetime2xl(df['datetime'].iat[idx]), 'COMN1')
         tau = max((expiry.date() - df['date'].iat[idx].date()).days, day_frac)/YEARLY_DAYS
         opt_delta = delta_func(otype, df[column].iat[idx], strike, vol, tau, rd, rf)
         CF = CF + opt_delta * (df[column].iat[nxt_idx] - df[column].iat[idx])
@@ -264,9 +264,9 @@ def hist_cso_by_product(prodcode, start_d, end_d, periods = 24, tenor = '-1w', m
 def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1', ir = 0.03, ostyle = 'EU', \
                        iv_tol=1e-5, iv_steps = 100):
     if ostyle == 'EU':
-        iv_func = pyktlib.BlackImpliedVol
+        iv_func = qlib.BlackImpliedVol
     else:
-        iv_func = pyktlib.AmericanImpliedVol
+        iv_func = qlib.AmericanImpliedVol
     cnx = dbaccess.connect(**dbaccess.dbconfig)
     df = dbaccess.load_tick_to_df(cnx, 'fut_tick', underlier, curr_date, curr_date, start_tick=300000, end_tick = tick_id)
     slice_tick = df['tick_id'].iat[-1]
@@ -274,8 +274,8 @@ def volgrid_hist_slice(underlier, strike_list, curr_date, tick_id, accr = 'COMN1
     under_ask = df['askPrice1'].iat[-1]
     under_mid = (under_bid + under_ask)/2.0
     opt_expiry = get_opt_expiry(underlier, inst2contmth(underlier), inst2exch(underlier))
-    nBusDays = pyktlib.NumBusDays(date2xl(curr_date), date2xl(opt_expiry.date()), pyktlib.CHN_Holidays)
-    day_frac = pyktlib.GetDayFraction(min2time(tick_id / 1000), accr)
+    nBusDays = qlib.NumBusDays(date2xl(curr_date), date2xl(opt_expiry.date()), qlib.CHN_Holidays)
+    day_frac = qlib.GetDayFraction(min2time(tick_id / 1000), accr)
     time2exp = (nBusDays - day_frac)/BDAYS_PER_YEAR
     res = {}
     for strike in strike_list:
@@ -342,19 +342,19 @@ def validate_db_data(tday, filter = False):
 
 def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB = False):
     data = {'is_dtime': False,
-            'data_column': 'price',
+            'data_column': 'close',
             'data_freq': 'd',
             'xs': [0.5],
             'xs_names': ['atm'],
             'xs_func': 'bs_delta_to_strike',
-            'rehedge_period': 3,
+            'rehedge_period': 1,
             'term_tenor': tenor,
             }
     option_input = {'otype': True,
                     'rd': 0.0,
                     'rf': 0.0,
                     'end_vol': 0.0,
-                    'ref_vol': 0.5,
+                    'ref_vol': 0.4,
                     'pricer_func': 'bsopt.BSOpt',
                     'delta_func': 'bsopt.BSDelta',
                     'is_dtime': data['is_dtime'],
@@ -420,3 +420,4 @@ def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry_d, vol_df
+        
