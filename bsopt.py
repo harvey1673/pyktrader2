@@ -23,31 +23,31 @@ def pnorm(x):
     return scipy.stats.norm.pdf(x)
 
 def d1(Spot, Strike, Vol, Texp, Rd, Rf ):
-    return (log(Spot/Strike) + (Rf - Rd + 0.5* Vol**2) * Texp)/(Vol*sqrt(Texp))
+    return (log(float(Spot)/float(Strike)) + (Rd - Rf + 0.5*Vol*Vol) * Texp)/(Vol*sqrt(Texp))
 
 def d2(Spot, Strike, Vol, Texp, Rd, Rf ):
     return d1(Spot, Strike, Vol, Texp, Rd, Rf ) - Vol*sqrt(Texp)
 
 def fd1(Fwd,K,Vol,T):
-    return log(Fwd/K)/Vol/sqrt(T) + Vol*sqrt(T)/2.
+    return log(float(Fwd)/K)/Vol/sqrt(T) + Vol*sqrt(T)/2.
 
 def fd2(Fwd,K,Vol,T):
-    return log(Fwd/K)/Vol/sqrt(T) - Vol*sqrt(T)/2.
+    return log(float(Fwd)/K)/Vol/sqrt(T) - Vol*sqrt(T)/2.
     
-def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rf, Rd):
+def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rd, Rf):
     x1 = d1(S, K, Vol, Texp, Rd, Rf )
     x2 = d2(S, K, Vol, Texp, Rd, Rf )
-    y = pnorm(d1)
+    y = pnorm(x1)
     res = {}
 
     if IsCall:
-        res['Price'] = S * exp(-Rd*Texp)* x1 - K * exp(-Rf*Texp) * x2
-        res['Delta'] = x1 * exp(-Rd*Texp)
+        res['Price'] = S * exp(-Rf*Texp)* x1 - K * exp(-Rd*Texp) * x2
+        res['Delta'] = x1 * exp(-Rf*Texp)
     else:
-        res['Price'] = K * exp(-Rf*Texp) * (1 - x2) - S * exp(-Rd*Texp) * (1 - x1)
-        res['Delta'] = (x1  - 1) * exp(-Rd*Texp)
-    res['Vega'] = S * sqrt(Texp) * y * exp(-Rd*Texp)
-    res['Gamma'] = y/(S*Vol* sqrt(Texp))
+        res['Price'] = K * exp(-Rd*Texp) * (1 - x2) - S * exp(-Rf*Texp) * (1 - x1)
+        res['Delta'] = (x1  - 1) * exp(-Rf*Texp)
+    res['Vega'] = S * sqrt(Texp) * y * exp(-Rf*Texp)
+    res['Gamma'] = y * exp(-Rf*Texp)/(S*Vol* sqrt(Texp))
     return res
 
 def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
@@ -96,7 +96,7 @@ def BSOpt( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
              - Spot   * exp( -Rf * Texp ) * cnorm( -d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
 
 
-def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0.0):
+def BSFwd( IsCall, Fwd, Strike, Vol, Texp, ir):
     'Standard Black-Scholes European vanilla pricing.'
 
     if Strike <= 1e-12 * Fwd:
@@ -104,7 +104,7 @@ def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0.0):
             return Fwd
         else:
             return 0.
-    df = exp(-Rd * Texp)
+    df = exp(-ir * Texp)
     if IsCall:
         return df * (Fwd  * cnorm( fd1( Fwd, Strike, Vol, Texp ) ) \
              - Strike * cnorm( fd2( Fwd, Strike, Vol, Texp ) ))
@@ -112,17 +112,22 @@ def BSFwd( IsCall, Fwd, Strike, Vol, Texp, Rd = 0.0):
         return df * (Strike * cnorm( -fd2( Fwd, Strike, Vol, Texp ) ) \
              - Fwd * cnorm( -fd1( Fwd, Strike, Vol, Texp ) ))
 
-def BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, Rd, Rf = 0.0):
+def BSFwdDelta( IsCall, Fwd, Strike, Vol, Texp, ir):
+    if IsCall:
+        return exp( -ir * Texp ) * cnorm(fd1( Fwd, Strike, Vol, Texp))
+    else:
+        return -exp( -ir * Texp ) * cnorm(-fd1( Fwd, Strike, Vol, Texp))
+
+def BSFwdNormal( IsCall, Fwd, Strike, Vol, Texp, ir):
     'Standard Bachelier European vanilla pricing.'
     d = (Fwd-Strike)/Vol/sqrt(Texp)
     p = (Fwd-Strike)  * cnorm( d ) + Vol * sqrt(Texp) * pnorm(d)
     if not IsCall:
-        p = Fwd - Strike - p
-    return p * exp(-Texp*Rd)
+        p = p - Fwd + Strike
+    return p * exp(-Texp*ir)
     
 def BSDelta( IsCall, Spot, Strike, Vol, Texp, Rd, Rf ):
     'Standard Black-Scholes Delta calculation. Over-currency spot delta.'
-
     if IsCall:
         return exp( -Rf * Texp ) * cnorm( d1( Spot, Strike, Vol, Texp, Rd, Rf ) )
     else:
@@ -135,9 +140,10 @@ def BSVega( Spot, Strike, Vol, Texp, Rd, Rf ):
     return Spot * exp( -Rf * Texp ) * sqrt( Texp / 2. / pi ) * exp( -d * d / 2. )
     
 def BSFwdNormalDelta( IsCall, Fwd, Strike, Vol, Texp, Rd, Rf = 0.0 ):
-    return BSDelta( IsCall, Fwd, Strike, Vol, Texp, Rd, Rd )
+    d1 = (Fwd - Strike)/Vol/numpy.sqrt(Texp)
+    return exp( -Rd * Texp ) * cnorm(d1)
 
-def BSFwdNormalVega( IsCall, Fwd, Strike, Vol, Texp, Rd = 0 ):
+def BSFwdNormalVega( IsCall, Fwd, Strike, Vol, Texp, Rd, Rf = 0.0 ):
     v = BSFwdNormal( IsCall, Fwd, Strike, Vol * 1.01, Texp, Rd) - BSFwdNormal( IsCall, Fwd, Strike, Vol * 0.99, Texp, Rd)
     v = v /0.02/Vol
     return v
@@ -421,7 +427,7 @@ def WhaleyDelta( IsCall, Spot, Fwd, Strike, Vol, Texp, Df, Tr, D,\
                 fD = - fD * Fwd / Strike + PriceMid / Strike
         return fD
 
-def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
+def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rd, rf ):
     '''
     Early exercise premium for american spot options based on Barone-Adesi, Whaley
     approximation formula. To compute the options prices, this needs to be added to
@@ -432,15 +438,15 @@ def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
 
     T   = Texp
     K   = Strike
-    D   = exp( -rf * Texp)
-    Dq  = exp( -rd * Texp )
+    D   = exp( -rd * Texp)
+    Dq  = exp( -rf * Texp )
     Phi = (IsCall and 1 or -1)
 
     k = (D==1.) and 2./Vol/Vol or 2.* rf/Vol/Vol/(1-D)
     # the expression in the middle is really the expression on the right in the limit D -> 1
     # note that lim_{D -> 1.} log(D)/(1-D) = -1.
 
-    beta = 2.*(rf-rd)/Vol/Vol
+    beta = 2.*(rd-rf)/Vol/Vol
     if Phi == 1:
         q2=(-(beta-1.)+sqrt((beta-1.)**2+4.*k))/2.
         def EarlyExerBdry( eeb ):
@@ -472,22 +478,22 @@ def BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
 
     return eePrem
 
-def BAWAmOptPricer( IsCall, Fwd, Strike, Vol, Texp, rf, rd ):
-    prem = BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rf, rd )
-    D    = exp( -rf * Texp)
+def BAWAmOptPricer( IsCall, Fwd, Strike, Vol, Texp, rd, rf ):
+    prem = BAWPremium( IsCall, Fwd, Strike, Vol, Texp, rd, rf )
+    D    = exp( -rd * Texp)
     Euro = D * BSFwd(IsCall, Fwd, Strike, Vol, Texp)
     return Euro + prem
 
-def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rf, rd):
+def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rd, rf):
     '''
     Implied vol for american options according to BAW
     '''
-    Df   = exp( -rf * Texp)
+    Df   = exp( -rd * Texp)
     if Texp <= 0.:
         raise ValueError, 'maturity must be > 0'
 
     def f( vol ):
-        return Price - Df * BSFwd(IsCall, Fwd, Strike, vol, Texp) - BAWPremium(IsCall, Fwd, Strike, vol, Texp, rf, rd)
+        return Price - Df * BSFwd(IsCall, Fwd, Strike, vol, Texp) - BAWPremium(IsCall, Fwd, Strike, vol, Texp, rd, rf)
 
     Vol = brentq(f,0.001, 10.0)
 
@@ -500,7 +506,7 @@ def LogNormalPaths(mu, cov, fwd, numPaths):
     ''' mu and fwd are 1d lists/arrays (1xn); cov is a 2d scipy.array (nxn); numPaths is int '''
     return (fwd*scipy.exp(numpy.random.multivariate_normal(mu, cov, numPaths) - 0.5*cov.diagonal())).transpose()
 
-def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     '''Calculate Asian option price using TurnbullWakeman model.
        This is just for forward options, not for stocks.
        RlzAvg is the realized average price(daily)
@@ -523,18 +529,17 @@ def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
 
     if X < 0:
         if IsCall:
-            return (RlzAvg * (AvgPeriod - Texp) / AvgPeriod + Fwd * Texp / AvgPeriod - X) * exp(-Rf * Texp)
+            return (RlzAvg * (AvgPeriod - Texp) / AvgPeriod + Fwd * Texp / AvgPeriod - X) * exp(-Rd * Texp)
         else:
             return 0
     else:
-        price = BSFwd(IsCall, Fwd, X, volA, Texp, Rf)
+        price = BSFwd(IsCall, Fwd, X, volA, Texp, Rd)
         if AvgPeriod > Texp:
             return price * Texp / AvgPeriod
         else:
             return price
 
-
-def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     Fwd = float(Fwd)
     strike = float(strike)
     RlzAvg = float(RlzAvg)
@@ -552,7 +557,7 @@ def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
 
     if x < 0:
         if IsCall:
-            return exp(-Rf * Texp) * Texp / AvgPeriod
+            return exp(-Rd * Texp) * Texp / AvgPeriod
         else:
             return 0
     else:
@@ -562,12 +567,12 @@ def AsianFwdDelta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
             multi = 1.0
         Asiand1 = (log(Fwd / x) + (volA * volA * 0.5) * Texp) / (volA * sqrt(Texp))
         if IsCall:
-            return multi * exp(-Rf * Texp) * cnorm(Asiand1)
+            return multi * exp(-Rd * Texp) * cnorm(Asiand1)
         else:
-            return multi * exp(-Rf * Texp) * (cnorm(Asiand1) - 1.0)
+            return multi * exp(-Rd * Texp) * (cnorm(Asiand1) - 1.0)
 
 
-def AsianFwdGamma(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+def AsianFwdGamma(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     Fwd = float(Fwd)
     strike = float(strike)
     RlzAvg = float(RlzAvg)
@@ -593,24 +598,24 @@ def AsianFwdGamma(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
 
         Asiand1 = (log(Fwd / x) + (volA * volA * 0.5) * Texp) / (volA * sqrt(Texp))
         ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
-        return multi * exp(-Rf * Texp) * ND / (Fwd * volA * sqrt(Texp))
+        return multi * exp(- Rd * Texp) * ND / (Fwd * volA * sqrt(Texp))
 
 
-def AsianFwdTheta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+def AsianFwdTheta(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     Fwd = float(Fwd)
     strike = float(strike)
     RlzAvg = float(RlzAvg)
 
     if AvgPeriod < Texp:
-        return (AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp + 1.0 / 252.0, AvgPeriod, Rf) - \
-                AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rf)) / 2.0
+        return (AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp + 1.0 / 252.0, AvgPeriod, Rd) - \
+                AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rd)) / 2.0
     else:
         SA = (RlzAvg * (AvgPeriod - Texp) + Fwd / 252.0) / (AvgPeriod - Texp + 1.0 / 252.0)
-        return AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf) - \
-               AsianOptTW_Fwd(IsCall, Fwd, strike, SA, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rf)
+        return AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd) - \
+               AsianOptTW_Fwd(IsCall, Fwd, strike, SA, Vol, Texp - 1.0 / 252.0, AvgPeriod, Rd)
 
 
-def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
+def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     Fwd = float(Fwd)
     strike = float(strike)
     RlzAvg = float(RlzAvg)
@@ -630,12 +635,12 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
 
     if x < 0:
         return 0
+    
     else:
         if Texp < AvgPeriod:
             multi = Texp / AvgPeriod
         else:
             multi = 1.0
-
         if AvgPeriod > 0:
             dM = 4.0 * (exp(Vol * Vol * Texp) * Texp * Vol - exp(Vol * Vol * tau) \
                         * ((Vol ** 3) * tau * (Texp - tau) + Vol * Texp)) / \
@@ -646,8 +651,7 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rf):
             dvA = 1.0 / (2.0 * volA) / Texp / M * dM
         else:
             dvA = 1.0
-
         Asiand1 = (log(Fwd / x) + volA * volA * 0.5 * Texp) / (volA * sqrt(Texp))
         ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
-
-        return multi * Fwd * exp(-Rf * Texp) * ND * sqrt(Texp) * dvA * 0.01
+        return multi * Fwd * exp(-Rd * Texp) * ND * sqrt(Texp) * dvA * 0.01
+    
