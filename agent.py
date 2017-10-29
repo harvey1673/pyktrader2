@@ -686,7 +686,19 @@ class Agent(MktDataMixin):
         if status in trade.Alive_Trade_Status:
             mytrade.execute()
         self.save_state()
-            
+
+    def run_gway_service(self, gway, service, args):
+        if gway in self.gateways:
+            gateway = self.gateways[gway]
+            svc_func = service
+            if hasattr(gateway, svc_func):
+                ts = datetime.datetime.now()
+                self.put_command(ts, getattr(gateway, svc_func), args)
+            else:
+                print "no such service = % for %s" % (service, gway)
+        else:
+            print "no such a gateway %s" % gway
+
     def exit(self):
         """退出"""
         # 停止事件驱动引擎

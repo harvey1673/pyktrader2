@@ -28,6 +28,7 @@ class Gui(tk.Tk):
         self.volgrid_gui = {}
         self.volgrid_frame = {}
         self.account_fields = ['CurrCapital', 'PrevCapital', 'LockedMargin', 'UsedMargin', 'Available', 'PnlTotal']
+        self.account_qry_items = ['qryAccount', 'qryPosition', 'qryOrder', 'qryTrade', 'connect', 'close']
         self.field_types = {'ScurDay' : 'date',
                             'TickId'  : 'int',
                             'EodFlag' : 'bool',
@@ -189,6 +190,10 @@ class Gui(tk.Tk):
                 v = self.stringvars['Account'][gway + '.' + field]
                 v.set(params['Account'][gway][field])
 
+    def run_gateway_service(self, gway, service, args = {}):
+        params = (gway, service, args)
+        self.app.run_agent_func('run_gway_service', params)
+
     def recalc_margin(self, gway):
         params = ()
         self.app.run_gateway_func(gway, 'calc_margin', params)
@@ -221,7 +226,6 @@ class Gui(tk.Tk):
             col_idx += 1
             self.stringvars[field] = v
         row_idx += 1
-        #account_fields = ['CurrCapital', 'PrevCapital', 'PnlTotal', 'LockedMargin', 'UsedMargin', 'Available']
         for col_idx, field in enumerate(['gateway'] + self.account_fields):
             lab = ttk.Label(lbl_frame, text=field, anchor='w', width = 9)
             lab.grid(column=col_idx, row=row_idx, sticky="ew")
@@ -237,6 +241,10 @@ class Gui(tk.Tk):
                 self.stringvars['Account'][key] = v
                 lab = ttk.Label(lbl_frame, width = 9, textvariable = v, anchor='w')
                 lab.grid(column=col_idx, row=row_idx, sticky="ew")
+            for svc in self.account_qry_items:
+                col_idx += 1
+                qry_buttn = ttk.Button(lbl_frame, text=svc, width = 11, command = lambda gway=gway, svc =svc: self.run_gateway_service(gway, svc))
+                qry_buttn.grid(column=col_idx, row=row_idx, sticky="ew")
             row_idx += 1
         agent_fields = entry_fields + label_fields
         setup_qrybtn = ttk.Button(lbl_frame, text='QryInst', width = 9, command= self.qry_agent_inst)

@@ -151,6 +151,12 @@ class SimctpTdApi(object):
     def qryAccount(self):
         pass
 
+    def qryTrade(self):
+        pass
+
+    def qryOrder(self):
+        pass
+
     def qryInstrument(self):
         pass
 

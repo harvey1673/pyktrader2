@@ -204,7 +204,16 @@ class CtpGateway(GrossGateway):
     def qryPosition(self):
         """查询持仓"""
         self.tdApi.qryPosition()
-        
+
+    def qryTrade(self):
+        """查询账户资金"""
+        self.tdApi.qryTrade()
+
+    #----------------------------------------------------------------------
+    def qryOrder(self):
+        """查询持仓"""
+        self.tdApi.qryOrder()
+
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
@@ -248,10 +257,10 @@ class CtpGateway(GrossGateway):
         self.eventEngine.register(EVENT_TDLOGIN+self.gatewayName, self.rsp_td_login)
 
     def rsp_td_login(self, event):
-        self.qry_commands.append(self.tdApi.qryAccount)
-        self.qry_commands.append(self.tdApi.qryPosition)
-        self.qry_commands.append(self.tdApi.qryOrder)
-        self.qry_commands.append(self.tdApi.qryTrade)
+        self.qry_commands.append(self.qryAccount)
+        self.qry_commands.append(self.qryPosition)
+        self.qry_commands.append(self.qryOrder)
+        self.qry_commands.append(self.qryTrade)
 
     def onOrder(self, order):
         pass
