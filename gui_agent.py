@@ -28,7 +28,7 @@ class Gui(tk.Tk):
         self.volgrid_gui = {}
         self.volgrid_frame = {}
         self.account_fields = ['CurrCapital', 'PrevCapital', 'LockedMargin', 'UsedMargin', 'Available', 'PnlTotal']
-        self.account_qry_items = ['qryAccount', 'qryPosition', 'qryOrder', 'qryTrade', 'connect', 'close']
+        self.account_qry_items = ['qryAccount', 'qryPosition', 'qryOrder', 'qryTrade', 'close']
         self.field_types = {'ScurDay' : 'date',
                             'TickId'  : 'int',
                             'EodFlag' : 'bool',
