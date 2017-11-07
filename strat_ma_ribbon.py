@@ -12,7 +12,7 @@ class MARibbonTrader(Strategy):
                                                                     ["DONCH_HH", "dh.DONCH_H", "dh.donch_h", {'field':'high'}], \
                                                                     ["DONCH_LL", "dh.DONCH_L", "dh.donch_l", {'field':'low'}]], \
                                                       'ma_series': [10, 20, 30, 40, 50, 60, 80, 100, 120, 150]})
-    asset_params = dict({'freq': 30, 'channels': 20, 'pval_th': [5, 25], 'corr_th': [10, 0], 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'freq': 30, 'channels': 20, 'pval_th': [5, 25], 'corr_th': [10, 0], }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)        

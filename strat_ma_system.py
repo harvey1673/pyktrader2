@@ -11,7 +11,7 @@ class MASystemTrader(Strategy):
                                                       'data_func': [['MA_CLOSE_', 'dh.MA', 'dh.ma'], \
                                                                     ["DONCH_HH", "dh.DONCH_H", "dh.donch_h", {'field':'high'}], \
                                                                     ["DONCH_LL", "dh.DONCH_L", "dh.donch_l", {'field':'low'}]]})
-    asset_params = dict({'ma_win': [10, 20, 40], 'freq': 30, 'channels': 20, 'daily_close': False, }, **Strategy.asset_params)
+    asset_params = dict({'ma_win': [10, 20, 40], 'freq': 30, 'channels': 20, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)

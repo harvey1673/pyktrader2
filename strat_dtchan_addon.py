@@ -11,7 +11,7 @@ class DTSplitChanAddon(Strategy):
                            'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
                           **Strategy.common_params)
     asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, \
-                         'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004, 'daily_close': False}, **Strategy.asset_params)
+                         'vol_ratio': [1.0, 1.0], 'price_mode': 'HL', 'min_rng': 0.004}, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)

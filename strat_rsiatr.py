@@ -13,7 +13,7 @@ class RsiAtrStrat(Strategy):
                                         ["ATRMA", "dh.MA", "dh.ma"]]}, \
                            **Strategy.common_params)
     asset_params = dict({'rsi_win': 14, 'rsi_th': 20.0, 'atrma_win': 10, 'atr_win': 20, \
-                         'freq': 1, 'stoploss': 4, 'daily_close': False, }, **Strategy.asset_params)
+                         'freq': 1, 'stoploss': 4, }, **Strategy.asset_params)
     def __init__(self, config, agent = None):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
