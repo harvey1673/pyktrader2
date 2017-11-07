@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import cmq_crv_defn
+import pandas as pd
 import dbaccess
 import misc
 import workdays
@@ -19,6 +20,7 @@ def comfwd_db_loader(market_data, fwd_index, dep_tenors = []):
         print "COMFwd data is not available for %s on %s" % (fwd_index, mdate)
     df['date'] = df['instID'].apply(lambda x: misc.inst2cont(x))
     df['expiry'] = df['instID'].apply(lambda x: misc.contract_expiry(x, []))
+    df = df[pd.to_datetime(df.date).dt.month.isin(curve_info['active_mths'])]
     return df[['date', 'expiry', 'close']].values.tolist()
 
 def tenor_to_expiry(tenor_label):
@@ -74,6 +76,15 @@ def comvol_db_loader(market_data, fwd_index, dep_tenors = []):
     #        output['COMVol' + field] = [[tenor, expiry, 0.0] for tenor, expiry in zip(dep_tenors, expiries)]
     return vol_dict
 
+def comdv_db_loader(market_data, fwd_index, dep_tenors = [], spd_key = 'DV1'):
+    mdate = market_data['market_date']
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
+    df = dbaccess.load_cmdv_curve(cnx, fwd_index, spd_key, mdate)
+    if len(df) > 0 and isinstance(df['date'][0], basestring):
+        df['date'] = df['date'].apply(lambda x: datetime.datetime.strptime(x,"%Y-%m-%d").date())
+        df['expiry'] = df['expiry'].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    return df[['date', 'expiry', 'vol']].values.tolist()
+
 def comfix_db_loader(market_data, spotID, dep_tenors = []):
     cnx = dbaccess.connect(**dbaccess.dbconfig)
     df = dbaccess.load_daily_data_to_df(cnx, 'spot_daily', spotID, min(dep_tenors), max(dep_tenors), index_col = None, field='spotID')
@@ -110,7 +121,7 @@ def ircurve_db_loader(market_data, fwd_index, dep_tenors = []):
     df['rate'] = df['rate']/100.0
     return df[['tenor', 'expiry', 'rate']].values.tolist()
 
-def process_BOM(market_data):
+def process_BOM(market_data, mkt_deps):
     mdate = market_data['market_date']
     for fwd_idx in market_data['COMFwd']:
         crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
@@ -151,6 +162,8 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP'
             mkt_loader = fxfix_db_loader
         elif field == 'IRCurve':
             mkt_loader = ircurve_db_loader
+        elif field[:5] == 'COMDV':
+            mkt_loader = comdv_db_loader
         else:
             continue
         market_data[field] = {}
@@ -159,9 +172,11 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP'
                 output = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
                 for vol_field in cmq_crv_defn.COMVOL_fields:
                     market_data[vol_field][crv_idx] = output[vol_field]
+            elif field[:5] == 'COMDV':
+                market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx], field[3:])
             else:
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
-    process_BOM(market_data)
+    process_BOM(market_data, mkt_deps)
     return market_data
 
 if __name__ == '__main__':
