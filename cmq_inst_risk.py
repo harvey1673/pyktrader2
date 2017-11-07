@@ -5,6 +5,20 @@ import cmq_inst
 import cmq_crv_defn
 import workdays
 
+def inst_valuation(val_data):
+    inst_data = val_data[0]
+    market_data = val_data[1]
+    model_settings = {}
+    if len(val_data) > 2:
+        model_settings = val_data[2]
+    inst_type = inst_data["inst_type"]
+    cls_name = cmq_inst.inst_type_map[inst_type]
+    cls_str = cls_name.split('.')
+    inst_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
+    inst_obj = inst_cls.create_instrument(inst_data, market_data, model_settings)
+    pr = inst_obj.price()
+    return pr
+
 def generate_scen(base_market, curve_type, curve_name, curve_tenor = 'ALL', shift_size = 0.0001, shift_type = cmq_inst.CurveShiftType.Abs):
     market_scen = copy.deepcopy(base_market)
     if curve_type == 'value_date':
@@ -12,11 +26,10 @@ def generate_scen(base_market, curve_type, curve_name, curve_tenor = 'ALL', shif
             market_scen[curve_type] = workdays.workday(market_scen[curve_type], shift_size)
             curr_date = market_scen['market_date']
             prefix_dates = [workdays.workday(curr_date, shift) for shift in range(shift_size + 1)]
-            market_scen[curve_type] = prefix_dates[-1]
             prefix_dates = prefix_dates[:-1]
             for fwd_idx in market_scen['COMFwd']:
                 crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
-                if (crv_info['exch'] == 'SGX') and (crv_info['spotID'] in market_scen['COMFix']):
+                if (crv_info['exch'] == 'SGX') and ('COMFix' in market_scen) and (crv_info['spotID'] in market_scen['COMFix']):
                     fixes = market_scen['COMFix'][crv_info['spotID']]
                     fwd_quotes = market_scen['COMFwd'][fwd_idx]
                     if prefix_dates[0] == fixes[-1][0]:
@@ -44,6 +57,7 @@ class CMQInstRiskStore(object):
         self.scen_keys = []
         self.results = {}
         self.calc_risks = {}
+        self.map_results = None
 
     def get_scen_keys(self):
         self.scen_keys = []
@@ -100,11 +114,22 @@ class CMQInstRiskStore(object):
                     self.scen_keys.append(scen)
         return self.scen_keys
 
-    def run_risk(self, scenarios = {}):
+    def run_scenarios(self, scenarios = {}, pool = None):
+        self.map_result = None
+        if pool == None:
+            for scen in self.scen_keys:
+                self.instrument.set_market_data(scenarios[scen])
+                self.results[scen] = self.instrument.price()
+        else:  ## can do parallel computing here
+            param_list = [[self.instrument.inst_data, scenarios[scen], self.instrument.model_settings] \
+                          for scen in self.scen_keys]
+            self.map_result = pool.map_async(inst_valuation, param_list)
+
+    def summarize_risks(self):
         inst_obj = self.instrument
-        for scen in self.scen_keys:  ## can do parallel computing here, get some worker on this
-            inst_obj.set_market_data(scenarios[scen])
-            self.results[scen] = inst_obj.price()
+        if self.map_result != None:
+            pool_result = self.map_result.get()
+            self.results = dict([(scen, val) for scen, val in zip(self.scen_keys, pool_result)])
         for greek_str in self.req_greeks:
             greek_keys = greek_str.split('_')
             greek = greek_keys[0]
@@ -207,6 +232,10 @@ class CMQInstRiskStore(object):
                         self.calc_risks[greek_str][vol_idx] = (self.results[(vol_key, vol_idx, tenor, inst_obj.fxvega_shift)] \
                                           - self.results[(vol_key, vol_idx, tenor, -inst_obj.fxvega_shift)]) \
                                         / (2 * inst_obj.fxvega_shift * 100.0)
+
+    def run_risk(self, scenarios = {}):
+        self.run_scenarios(scenarios)
+        self.summarize_risks()
 
     def save_results(self, filename = None):
         if filename != None:
