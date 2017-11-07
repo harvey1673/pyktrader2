@@ -23,8 +23,7 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
     strike = option_input['strike']
     otype = option_input.get('otype', True)
     expiry = option_input['expiry']
-    rd = option_input['rd']
-    rf = option_input.get('rf', rd)
+    ir = option_input['ir']
     dfunc_name = option_input.get('delta_func', 'bsopt.BSDelta')
     delta_func = eval(dfunc_name)
     is_dtime = option_input.get('is_dtime', False)
@@ -38,7 +37,7 @@ def delta_cashflow(df, vol, option_input, rehedge_period = 1, column = 'close'):
         if is_dtime:
             day_frac = 1.0 - qlib.GetDayFraction(datetime2xl(df['datetime'].iat[idx]), 'COMN1')
         tau = max((expiry.date() - df['date'].iat[idx].date()).days, day_frac)/YEARLY_DAYS
-        opt_delta = delta_func(otype, df[column].iat[idx], strike, vol, tau, rd, rf)
+        opt_delta = delta_func(otype, df[column].iat[idx], strike, vol, tau, ir)
         CF = CF + opt_delta * (df[column].iat[nxt_idx] - df[column].iat[idx])
     return CF
 
@@ -46,8 +45,7 @@ def breakeven_vol(df, option_input, calib_input, column = 'close'):
     strike = option_input['strike']
     otype = option_input.get('otype', True)
     expiry = option_input['expiry']
-    rd = option_input['rd']
-    rf = option_input.get('rf', rd)
+    ir = option_input['ir']
     ref_vol = calib_input.get('ref_vol', 0.5)
     opt_payoff = calib_input.get('opt_payoff', 0.0)
     rehedge_period = calib_input.get('rehedge_period', 1)
@@ -61,7 +59,7 @@ def breakeven_vol(df, option_input, calib_input, column = 'close'):
     tau = max((expiry.date() - start_d).days, 1.0)/YEARLY_DAYS
     vol = ref_vol
     def func(x):
-        return pricer_func(otype, fwd, strike, x, tau, rd, rf) + delta_cashflow(df, x, option_input, rehedge_period, column) - opt_payoff
+        return pricer_func(otype, fwd, strike, x, tau, ir) + delta_cashflow(df, x, option_input, rehedge_period, column) - opt_payoff
 
     while diff >= SOLVER_ERROR_EPSILON and numTries <= ITERATION_NUM:
         current = func(vol)
@@ -105,11 +103,10 @@ def realized_termstruct(option_input, data):
     expiry = option_input['expiry']
     otype = option_input.get('otype', True)
     ref_vol = option_input.get('ref_vol', 0.5)
-    rd = option_input['rd']
-    rf = option_input.get('rf', rd)
+    ir = option_input['ir']
     end_vol = option_input.get('end_vol', 0.0)
     vol = end_vol
-    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSOpt'))
+    pricer_func = eval(option_input.get('pricer_func', 'bsopt.BSFwd'))
     if is_dtime:
         datelist = df['date']
         dexp = expiry.date()
@@ -144,7 +141,7 @@ def realized_termstruct(option_input, data):
             option_input['strike'] = strike
             if end_vol > 0:
                 tau = max((expiry.date() - end_d).days, 1.0)/YEARLY_DAYS
-                final_value = pricer_func(otype, sub_df[column].iat[-1], strike, end_vol, tau, rd, rf)
+                final_value = pricer_func(otype, sub_df[column].iat[-1], strike, end_vol, tau, ir)
                 ref_vol = end_vol
             elif end_vol == 0:
                 if otype:
@@ -176,8 +173,7 @@ def breakeven_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1
             'database': 'hist_data'
             }
     option_input = {'otype': True,
-                    'rd': 0.0,
-                    'rf': 0.0,
+                    'ir': 0.0,
                     'end_vol': 0.0,
                     'ref_vol': 0.5,
                     'pricer_func': 'bsopt.BSOpt',
@@ -229,8 +225,7 @@ def hist_cso_by_product(prodcode, start_d, end_d, periods = 24, tenor = '-1w', m
             'database': 'hist_data'
             }
     option_input = {'otype': True,
-                    'rd': 0.0,
-                    'rf': 0.0,
+                    'ir': 0.0,
                     'end_vol': 0.0,
                     'ref_vol': 0.5,
                     'pricer_func': pricer_func,
@@ -314,11 +309,6 @@ def variance_ratio(ts, freqs):
         res['ln'].append(np.var(ln_diff)/freq/lnvar1)
     return res
 
-def price_stats(df):
-    stats  = {}
-    stats['20H'] = max(df['high'][-20:])
-    stats['20H'] = min(df['low'][-20:])
-
 def validate_db_data(tday, filter = False):
     all_insts = filter_main_cont(tday, filter)
     data_count = {}
@@ -340,7 +330,7 @@ def validate_db_data(tday, filter = False):
     cnx.close()
     print inst_list
 
-def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', writeDB = False):
+def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m'):
     data = {'is_dtime': False,
             'data_column': 'close',
             'data_freq': 'd',
@@ -351,22 +341,22 @@ def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', wr
             'term_tenor': tenor,
             }
     option_input = {'otype': True,
-                    'rd': 0.0,
-                    'rf': 0.0,
+                    'ir': 0.0,
                     'end_vol': 0.0,
                     'ref_vol': 0.4,
-                    'pricer_func': 'bsopt.BSOpt',
-                    'delta_func': 'bsopt.BSDelta',
+                    'pricer_func': 'bsopt.BSFwd',
+                    'delta_func': 'bsopt.BSFwdDelta',
                     'is_dtime': data['is_dtime'],
                     }
     cnx = dbaccess.connect(**dbaccess.dbconfig)
     p_str = '-' + str(int(tenor[1:-1]) * periods) + tenor[-1]
     d_end = end_d
     res = {}
+    df = dbaccess.load_daily_data_to_df(cnx, 'spot_daily', spotID, day_shift(start_d, p_str), end_d, index_col=None, field = 'spotID')
+    df['date'] = pd.to_datetime(df['date'])
     while d_end > start_d:
         d_start = day_shift(d_end, p_str)
-        xdf = dbaccess.load_daily_data_to_df(cnx, 'spot_daily', spotID, d_start, d_end, index_col=None, field = 'spotID')
-        xdf['date'] = pd.to_datetime(xdf['date'])
+        xdf = df[(df['date'] <= d_end) & (df['date'] >= d_start)]
         option_input['expiry'] = datetime.datetime.combine(d_end, datetime.time(0, 0))
         data['dataframe'] = xdf
         vol_df = realized_termstruct(option_input, data)
@@ -376,7 +366,7 @@ def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m', wr
     df = pd.DataFrame.from_dict(res, orient = 'index').sort_index()
     return df
 
-def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
+def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m'):
     cont_mth, exch = dbaccess.prod_main_cont_exch(products)
     contlist = contract_range(products, exch, cont_mth, start_d, end_d)
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
@@ -391,8 +381,7 @@ def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m
             'database': 'hist_data'
             }
     option_input = {'otype': True,
-                    'rd': 0.0,
-                    'rf': 0.0,
+                    'ir': 0.0,
                     'end_vol': 0.0,
                     'ref_vol': 0.5,
                     'pricer_func': 'bsopt.BSOpt',
@@ -420,4 +409,3 @@ def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m
         data['dataframe'] = df
         vol_df = realized_termstruct(option_input, data)
         print cont, expiry_d, vol_df
-        
