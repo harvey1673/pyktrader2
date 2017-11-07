@@ -25,7 +25,7 @@ class DataPacker(object):
     def __json_pack(self, data):
         return json.dumps(data)
 
-    def __json_upack(self, data):
+    def __json_unpack(self, data):
         return json.loads(data)
 
     def __msgpack_pack(self, data):
@@ -186,18 +186,18 @@ class TestRpcClient(RpcClient):
         print 'client received topic:', topic, ', data:', data
 
 def test_client():
-    req_address = 'tcp://localhost:2014'
-    sub_address = 'tcp://localhost:0602'
+    req_address = 'tcp://localhost:10010'
+    sub_address = 'tcp://localhost:10020'
     tc = TestRpcClient(req_address, sub_address)
-    tc.subscribeTopic('')
+    tc.subscribe_topic('')
     tc.start()
     while 1:
         print tc.add(1, 3)
         time.sleep(2)
 
 def test_server():
-    rep_address = 'tcp://*:2014'
-    pub_address = 'tcp://*:0602'
+    rep_address = 'tcp://*:10010'
+    pub_address = 'tcp://*:10020'
     ts = TestRpcServer(rep_address, pub_address)
     ts.start()
     while 1:
