@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 import json
 import datetime
-import time
+import itertools
 import cmq_inst
 import dbaccess
 
@@ -24,6 +24,7 @@ def agg_mkt_deps(mkt_deps, inst_list):
     return mkt_deps
 
 class CMQDeal(object):
+    id_generator = itertools.count(int(datetime.datetime.strftime(datetime.datetime.now(), '%d%H%M%S')))
     class_params = {'trader': 'harvey', 'sales': 'harvey', 'status': CMQDealStatus.Perspective, \
                     'cpty': 'dummy', 'strategy': 'test',\
                     'enter_date': datetime.date.today(), 'last_updated': datetime.datetime.now(), \
@@ -31,12 +32,12 @@ class CMQDeal(object):
                     'external_id': 'dummy', 'external_src': 'dummy', \
                     'internal_id': 'dummy', 'business': 'commod', \
                     'desk': 'CST', 'prtfolio': 'test', 'product': 'SGIRO', \
-                    'day1_comments': '', 'commission': 0.0, }
+                    'day1_comments': '', 'commission': 0.0, 'ccy': 'USD'}
     def __init__(self, deal_data):
         self.mkt_deps = {}
         if isinstance(deal_data, (str, unicode)):
             deal_data = json.loads(deal_data)
-        self.id = deal_data.get('id', int(time.time()))
+        self.id = deal_data.get('id', next(self.id_generator))
         self.update_deal_data(deal_data)
 
     def set_market_data(self, market_data):
@@ -54,6 +55,9 @@ class CMQDeal(object):
             cls_str = cls_name.split('.')
             inst_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
             return inst_cls.create_instrument(inst_data)
+        else:
+            print 'inst_type key is missing in the instrument data'
+            return None
 
     def price(self):
         return sum([inst.price() * pos for inst, pos in self.positions])
