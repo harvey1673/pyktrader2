@@ -635,7 +635,6 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
 
     if x < 0:
         return 0
-    
     else:
         if Texp < AvgPeriod:
             multi = Texp / AvgPeriod
