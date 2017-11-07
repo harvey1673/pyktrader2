@@ -1,4 +1,4 @@
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 import dbaccess
 import workdays
 import datetime
@@ -350,7 +350,7 @@ def get_tick_id(dt):
     return ((dt.hour + 6) % 24) * 100000 + dt.minute * 1000 + dt.second * 10 + dt.microsecond / 100000
 
 
-def is_workday(d, calendar, we_cutoff = 5):
+def is_workday(d, calendar = '', we_cutoff = 5):
     return (d.weekday() < we_cutoff) and (d not in Holiday_Map.get(calendar, []))
 
 
@@ -369,6 +369,7 @@ def filter_main_cont(sdate, filter=False):
             main_insts.append(inst)
     return main_insts
 
+
 def trading_hours(product, exch):
     hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
     if exch in ['SSE', 'SZE']:
@@ -383,11 +384,13 @@ def trading_hours(product, exch):
             hrs = [night_trading_hrs[night_idx]] + hrs
     return hrs
 
+
 def spreadinst2underlying(inst_name):
     spread_keys = inst_name.split(' ')
     instIDs = spread_keys[1].split('&')
     units = [1, -1]
     return (instIDs, units)
+
 
 def inst2product(inst):
     if inst[2].isalpha():
@@ -399,6 +402,7 @@ def inst2product(inst):
     if len(inst) > 8 and (('C' in inst[5:]) or ('P' in inst[5:])):
         key = key + '_Opt'
     return key
+
 
 def inst2contmth(instID):
     exch = inst2exch(instID)
@@ -424,6 +428,7 @@ def inst2exch(inst):
             return exch
     return "NA"
 
+
 def inst_to_exch(inst):
     key = inst2product(inst)
     cnx = dbaccess.connect(**dbaccess.dbconfig)
@@ -434,6 +439,7 @@ def inst_to_exch(inst):
     cnx.close()
     return str(out[0][0])
 
+
 def get_option_map(products):
     option_map = {}
     for under in products:
@@ -443,6 +449,7 @@ def get_option_map(products):
                     key = (str(under), cont_mth, otype, strike)
                     option_map[key] = get_opt_name(under, otype, strike)
     return option_map
+
 
 def get_opt_name(fut_inst, otype, strike):
     cont_mth = inst2contmth(fut_inst)
@@ -456,7 +463,6 @@ def get_opt_name(fut_inst, otype, strike):
     else:
         instID = instID + '-' + otype + '-' + str(int(strike))
     return instID
-
 
 def get_opt_expiry(fut_inst, cont_mth, exch=''):
     cont_yr = int(cont_mth / 100)
@@ -487,8 +493,13 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
         else:
             expiry_month = datetime.date(cont_yr - 1, 11, 30)
         expiry = workdays.workday(expiry_month, 5, CHN_Holidays)
+    elif fut_inst[:3] == 'fef' or exch == 'SGX':
+        if cont_mth < 12:
+            expiry_month = datetime.date(cont_yr, cont_mth + 1, 1)
+        else:
+            expiry_month = datetime.date(cont_yr + 1, 1, 1)
+        expiry = workdays.workday(expiry_month, -1, PLIO_Holidays)
     return datetime.datetime.combine(expiry, datetime.time(15, 0))
-
 
 def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False, database='hist_data'):
     if start_date > end_date:
@@ -510,18 +521,19 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
         nb_cont = contlist[idx + n - 1]
 
         if freq == 'd':
-            new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp,end_date))
+            new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp, end_date))
         else:
             minid_start = 1500
             minid_end = 2114
             if prodcode in night_session_markets:
                 minid_start = 300
-            new_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, sdate, min(exp,end_date), minid_start, minid_end)
+            new_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', nb_cont, sdate, min(exp, end_date), minid_start,
+                                                  minid_end)
         if len(new_df.shape) == 0:
             continue
         nn = new_df.shape[0]
         if nn > 0:
-            new_df['contract'] = pd.Series([nb_cont]*nn, index=new_df.index)
+            new_df['contract'] = pd.Series([nb_cont] * nn, index=new_df.index)
         else:
             continue
         if is_new:
@@ -535,14 +547,15 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
                     last_date = df.index[-1]
                 tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, last_date, last_date)
                 shift = tmp_df['close'][-1] - df['close'][-1]
-                for ticker in ['open','high','low','close']:
+                for ticker in ['open', 'high', 'low', 'close']:
                     df[ticker] = df[ticker] + shift
             df = df.append(new_df)
-        sdate = min(exp,end_date) + datetime.timedelta(days=1)
-    return df        
+        sdate = min(exp, end_date) + datetime.timedelta(days=1)
+    return df
 
-def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_roll= '-20b', database = 'hist_data'):
-    if start_date > end_date: 
+
+def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_roll='-20b', database='hist_data'):
+    if start_date > end_date:
         return None
     cnx = dbaccess.connect(**dbaccess.dbconfig)
     cursor = cnx.cursor()
@@ -552,10 +565,10 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
     exch = str(out[0][0])
     cont = str(out[0][1])
     cont_mth = [month_code_map[c] for c in cont]
-    cnx.close()  
+    cnx.close()
     contlist = contract_range(product, exch, cont_mth, start_date, end_date)
     exp_dates = [day_shift(contract_expiry(cont), cont_roll) for cont in contlist]
-    #print contlist, exp_dates
+    # print contlist, exp_dates
     sdate = start_date
     all_data = {}
     i = 0
@@ -578,7 +591,8 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
         sdate = min(exp, end_date) + datetime.timedelta(days=1)
     cnx.close()
     return all_data
-    
+
+
 def day_shift(d, roll_rule):
     if 'b' in roll_rule:
         days = int(roll_rule[:-1])
@@ -596,6 +610,7 @@ def day_shift(d, roll_rule):
         weeks = int(roll_rule[:-1])
         shft_day = d + relativedelta(weeks=weeks)
     return shft_day
+
 
 def contract_expiry(cont, hols='db'):
     if type(hols) == list:
@@ -631,7 +646,8 @@ def contract_expiry(cont, hols='db'):
             expiry = contract_expiry(cont, CHN_Holidays)
         cnx.close()
     return expiry
-        
+
+
 def contract_range(product, exch, cont_mth, start_date, end_date):
     st_year = start_date.year
     cont_list = []
@@ -646,6 +662,7 @@ def contract_range(product, exch, cont_mth, start_date, end_date):
                     cont_list.append(contLabel)
     return cont_list
 
+
 def contract_range2(product, exch, cont_mth, start_date, end_date):
     st_year = start_date.year
     cont_list = []
@@ -659,6 +676,7 @@ def contract_range2(product, exch, cont_mth, start_date, end_date):
                         contLabel = product + "%02d" % (yr % 100) + "%02d" % mth
                     cont_list.append(contLabel)
     return cont_list
+
 
 def get_asset_tradehrs(asset):
     exch = 'SHFE'
@@ -708,23 +726,23 @@ def cleanup_mindata(df, asset, index_col='datetime', skip_hl=True):
         xdf = xdf.reset_index()
     return xdf
 
-def send_mail(mail_account, to_list, sub, content): 
+def send_mail(mail_account, to_list, sub, content):
     mail_host = mail_account['host']
     mail_user = mail_account['user']
     mail_pass = mail_account['passwd']
-    msg = MIMEText(content) 
-    msg['Subject'] = sub 
-    msg['From'] = mail_user 
-    msg['To'] = ';'.join(to_list) 
+    msg = MIMEText(content)
+    msg['Subject'] = sub
+    msg['From'] = mail_user
+    msg['To'] = ';'.join(to_list)
     try:
         smtp = smtplib.SMTP(mail_host, 587)
-        #smtp.ehlo()
+        # smtp.ehlo()
         smtp.starttls()
-        #smtp.ehlo()
+        # smtp.ehlo()
         smtp.login(mail_user, mail_pass)
         smtp.sendmail(mail_user, to_list, msg.as_string())
         smtp.close()
         return True
-    except Exception, e: 
-        print "exception when sending e-mail %s" % str(e) 
+    except Exception, e:
+        print "exception when sending e-mail %s" % str(e)
         return False
