@@ -10,6 +10,7 @@ inst_type_map = {
     "ComCalSwap": "cmq_calendarswap.CMQCalendarSwap",
     "ComMthAsian": "cmq_mthlyasian.CMQMthlyAsian",
     "ComEuroOption": "cmq_commodeuopt.CMQCommodEuOpt",
+    "ComDVolCSO": "cmq_normcso.CMQNormalCSO",
 }
 
 class CMQInstrument(object):
@@ -47,8 +48,10 @@ class CMQInstrument(object):
         if isinstance(inst_data, (str, unicode)):
             inst_data = json.loads(inst_data)
         self.set_trade_data(inst_data)
+        self.inst_data = inst_data
         self.set_market_data(market_data)
         self.set_model_settings(model_settings)
+        self.model_settings = model_settings
 
     def set_trade_data(self, trade_data):
         d = self.__dict__
