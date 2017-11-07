@@ -6,13 +6,16 @@ import cmq_inst
 import copy
 import pandas as pd
 import cmq_risk_engine
+import multiprocessing as mp
 
-def run_book_report(value_date, book, fwd_idx = 'SGXIRO'):
-    mkt_data = cmq_market_data.load_market_data(book.mkt_deps, value_date = value_date)
-    req_greeks = ['pv','cmdelta','cmgamma','cmvega_atm', 'theta']
+def run_book_report(value_date, book, fwd_idx = 'SGXIRO', req_greeks = ['pv','cmdeltas', 'theta'], \
+                    base_mkt = {}):
+    if len(base_mkt) == 0:
+        mkt_data = cmq_market_data.load_market_data(book.mkt_deps, value_date = value_date)
+    else:
+        mkt_data = base_mkt
     re = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks)
     re.run_risk()
-
     # assume only one instrument for one deal
     deal_results = copy.deepcopy(re.deal_risks)
     for deal in book.deal_list:
@@ -25,25 +28,28 @@ def run_book_report(value_date, book, fwd_idx = 'SGXIRO'):
             if greek in ['cmdelta', 'cmvega_atm', 'cmvega_v90', 'cmvega_v75', 'cmvega_v25', 'cmvega_v10', 'cmgamma']:
                 deal_results[deal_id][greek] = deal_results[deal_id][greek][fwd_idx]
     df = pd.DataFrame.from_dict(deal_results, orient='index')
-    vol_tbl = df.pivot_table(columns = ['otype','strike'], index = ['end'], values = ['volume'], aggfunc = 'sum')/1000.0
-    delta_tbl = df.pivot_table(columns=['otype', 'strike'], index = ['end'], values = ['cmdelta'], aggfunc = 'sum')/1000.0
-    gamma_tbl = df.pivot_table(columns=['otype', 'strike'], index=['end'], values=['cmgamma'], aggfunc = 'sum')/1000.0
-    vega_tbl = df.pivot_table(columns=['otype', 'strike'], index=['end'], values=['cmvega_atm'], aggfunc = 'sum')/1000.0
-    theta_tbl = df.pivot_table(columns=['otype', 'strike'], index=['end'], values=['theta'], aggfunc = 'sum')/1000.0
     return re, df
 
 def book_greek_scen_report(value_date, book, \
                     req_greeks = ['pv', 'theta', 'cmdelta', 'cmgamma', 'cmvega_atm'], \
                     scens = ['COMFwd', 'SGXIRO',  [- 5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0], 0], \
-                    base_mkt = {}):
+                    base_mkt = {}, use_pool = False):
     if len(base_mkt) == 0:
         base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date)
     output = {}
+    if use_pool:
+        num_cpus = mp.cpu_count() - 1
+        pool = mp.Pool(num_cpus)
+    else:
+        pool = None
+    re = {}
     for shift in scens[2]:
         mkt_data = cmq_inst_risk.generate_scen(base_mkt, scens[0], scens[1], curve_tenor = 'ALL', shift_size = shift, shift_type = scens[3])
-        re = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks)
-        re.run_risk()
-        output[shift] = copy.deepcopy(re.book_risks)
+        re[shift] = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks, pool)
+        re[shift].run_scenarios()
+    for shift in scens[2]:
+        re[shift].summerize_risks()
+        output[shift] = copy.deepcopy(re[shift].book_risks)
         for greek in req_greeks:
             if greek in ['cmdelta', 'cmvega_atm', 'cmgamma', 'cmvega_v90', 'cmvega_v75', 'cmvega_v25', 'cmvega_v10']:
                 output[shift][greek] = sum(output[shift][greek].values())
@@ -53,19 +59,27 @@ def book_greek_scen_report(value_date, book, \
 def greeks_ladder_report(value_date, book, \
                         req_greeks = ['cmdeltas', 'cmgammas', 'cmvegas_atm'], \
                         scens = ['COMFwd', 'SGXIRO', [-5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0], 0],\
-                        base_mkt = {}):
+                        base_mkt = {}, use_pool = False):
     if len(base_mkt) == 0:
         base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date)
     output = dict([(greek, {}) for greek in req_greeks])
+    if use_pool:
+        num_cpus = mp.cpu_count() - 1
+        pool = mp.Pool(num_cpus)
+    else:
+        pool = None
+    re = {}
     for shift in scens[2]:
         mkt_data = cmq_inst_risk.generate_scen(base_mkt, scens[0], scens[1], curve_tenor = 'ALL', shift_size = shift, shift_type = scens[3])
-        re = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks)
-        re.run_risk()
+        re[shift] = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks, pool)
+        re[shift].run_scenarios()
+    for shift in scens[2]:
+        re[shift].summerize_risks()
         for greek in req_greeks:
-            for idx in re.book_risks[greek]:
+            for idx in re[shift].book_risks[greek]:
                 if idx not in output[greek]:
                     output[greek][idx] = {}
-                output[greek][idx][shift] = copy.deepcopy(re.book_risks[greek][idx])
+                output[greek][idx][shift] = copy.deepcopy(re[shift].book_risks[greek][idx])
     res = dict([(greek, {}) for greek in req_greeks])
     for greek in req_greeks:
         for idx in output[greek]:
