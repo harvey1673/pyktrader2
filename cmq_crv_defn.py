@@ -6,13 +6,17 @@ import datetime
 from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
     'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', \
+                'active_mths': range(1, 13), \
                 'parent_curve': '', 'spotID': 'tsi_io62', 'vol_index': 'SGXIRO',\
                 '': '', },
-    'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN',
+    'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN', \
+                'active_mths': [1, 5, 10], \
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
-    'SHFEHC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN',
+    'SHFEHC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', \
+                'active_mths': [1, 5, 10], \
                 'parent_curve': '', 'spotID': 'hc', 'vol_index': 'SHFEHC',},
-    'DCEIRO': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN',
+    'DCEIRO': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN',\
+                'active_mths': [1, 5, 9],
                 'parent_curve': '', 'spotID': 'i', 'vol_index': 'DCEIRO',},
 }
 
@@ -33,6 +37,7 @@ Market_Input_Struct = ['COMFwd', 'COMFix', 'COMVolATM', 'COMVolV10', 'COMVolV25'
 
 COMVOL_fields = ['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']
 FXVOL_fields = ['FXVolATM', 'FXVolV10', 'FXVolV25', 'FXVolV75', 'FXVolV90']
+COMDV_fields = ['COMDV1', 'COMDV2', 'COMDV3', 'COMDV4']
 
 def extract_vol_mark(vol_index, market_data, vol_fields = COMVOL_fields):
     volmark = dict([(field, []) for field in ['expiry'] + vol_fields])
