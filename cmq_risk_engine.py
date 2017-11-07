@@ -4,7 +4,7 @@ import cmq_inst_risk
 import json
 
 class CMQRiskEngine(object):
-    def __init__(self, book_obj, base_market, req_greeks):
+    def __init__(self, book_obj, base_market, req_greeks, pool = None):
         self.book = book_obj
         self.base_market = base_market
         self.req_greeks = req_greeks
@@ -15,6 +15,7 @@ class CMQRiskEngine(object):
         self.deal_risks = {}
         self.book_risks = {}
         self.update_risk_store()
+        self.pool = pool
 
     def update_risk_store(self):
         self.scen_keys = []
@@ -28,8 +29,20 @@ class CMQRiskEngine(object):
                                                                        scen[0], scen[1], scen[2], scen[3])
 
     def run_risk(self):
+        self.run_scenarios()
+        self.summerize_risks()
+
+    def run_scenarios(self):
+        if self.pool != None:
+            for inst in self.book.inst_dict:
+                self.risk_store[inst].run_scenarios(self.scenarios, self.pool)
+        else:
+            for inst in self.book.inst_dict:
+                self.risk_store[inst].run_scenarios(self.scenarios)
+
+    def summerize_risks(self):
         for inst in self.book.inst_dict:
-            self.risk_store[inst].run_risk(self.scenarios)
+            self.risk_store[inst].summarize_risks()
             self.inst_risks[inst.id] = self.risk_store[inst].calc_risks
         for deal in self.book.deal_list:
             self.deal_risks[deal.id] = {}
