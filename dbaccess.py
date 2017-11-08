@@ -168,7 +168,8 @@ def prod_main_cont_exch(prodcode, conn = None):
     exch = str(out[0][0])
     cont = str(out[0][1])
     cont_mth = [misc.month_code_map[c] for c in cont]
-    cnx.close()
+    if conn == None:
+        cnx.close()
     return cont_mth, exch
 
 def load_product_info(prod, conn = None):
@@ -180,7 +181,8 @@ def load_product_info(prod, conn = None):
     stmt = "select exchange, lot_size, tick_size, start_min, end_min, broker_fee from trade_products where product_code='{product}' ".format(
         product=prod)
     cursor.execute(stmt)
-    cnx.close()
+    if conn == None:
+        cnx.close()
     out = {}
     for (exchange, lot_size, tick_size, start_min, end_min, broker_fee) in cursor:
         out = {'exch': str(exchange),
@@ -201,7 +203,8 @@ def load_stockopt_info(inst, conn = None):
     stmt = "select underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_base from stock_opt_map where instID='{product}' ".format(
         product=inst)
     cursor.execute(stmt)
-    cnx.close()
+    if conn == None:
+        cnx.close()
     out = {}
     for (underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_size) in cursor:
         out = {'exch': str(exchange),
@@ -224,7 +227,8 @@ def get_stockopt_map(underlying, cont_mths, strikes, conn = None):
         under=underlying,
         opt_mth_str=','.join([str(mth) for mth in cont_mths]), strikes=','.join([str(s) for s in strikes]))
     cursor.execute(stmt)
-    cnx.close()
+    if conn == None:
+        cnx.close()
     out = {}
     for (underlying, opt_mth, otype, strike, strike_scale, instID) in cursor:
         key = (str(underlying), int(opt_mth), str(otype), float(strike) / float(strike_scale))
@@ -240,7 +244,8 @@ def load_alive_cont(sdate, conn = None):
     stmt = "select instID, product_code from contract_list where expiry>=%s"
     args = tuple([sdate])
     cursor.execute(stmt, args)
-    cnx.close()
+    if conn == None:
+        cnx.close()
     cont = []
     pc = []
     for line in cursor:
@@ -258,7 +263,8 @@ def load_inst_marginrate(instID, conn = None):
     cursor = cnx.cursor()
     stmt = "select margin_l, margin_s from contract_list where instID='{inst}' ".format(inst=instID)
     cursor.execute(stmt)
-    cnx.close()
+    if conn == None:
+        cnx.close()
     out = (0, 0)
     for (margin_l, margin_s) in cursor:
         out = (float(margin_l), float(margin_s))
