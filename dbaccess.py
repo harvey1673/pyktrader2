@@ -140,6 +140,8 @@ def import_tick_from_file(dbtable, conn = None):
                     path=path, table=dbtable)
                 cursor.execute(stmt)
                 cnx.commit()
+    if conn == None:
+        cnx.close()
 
 def insert_cont_data(cont, conn = None):
     if conn == None:
@@ -181,8 +183,6 @@ def load_product_info(prod, conn = None):
     stmt = "select exchange, lot_size, tick_size, start_min, end_min, broker_fee from trade_products where product_code='{product}' ".format(
         product=prod)
     cursor.execute(stmt)
-    if conn == None:
-        cnx.close()
     out = {}
     for (exchange, lot_size, tick_size, start_min, end_min, broker_fee) in cursor:
         out = {'exch': str(exchange),
@@ -192,6 +192,8 @@ def load_product_info(prod, conn = None):
                'end_min': end_min,
                'broker_fee': float(broker_fee)
                }
+    if conn == None:
+        cnx.close()
     return out
 
 def load_stockopt_info(inst, conn = None):
@@ -203,8 +205,6 @@ def load_stockopt_info(inst, conn = None):
     stmt = "select underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_base from stock_opt_map where instID='{product}' ".format(
         product=inst)
     cursor.execute(stmt)
-    if conn == None:
-        cnx.close()
     out = {}
     for (underlying, opt_mth, otype, exchange, strike, strike_scale, lot_size, tick_size) in cursor:
         out = {'exch': str(exchange),
@@ -215,6 +215,8 @@ def load_stockopt_info(inst, conn = None):
                'otype': str(otype),
                'underlying': str(underlying)
                }
+    if conn == None:
+        cnx.close()
     return out
 
 def get_stockopt_map(underlying, cont_mths, strikes, conn = None):
@@ -227,12 +229,12 @@ def get_stockopt_map(underlying, cont_mths, strikes, conn = None):
         under=underlying,
         opt_mth_str=','.join([str(mth) for mth in cont_mths]), strikes=','.join([str(s) for s in strikes]))
     cursor.execute(stmt)
-    if conn == None:
-        cnx.close()
     out = {}
     for (underlying, opt_mth, otype, strike, strike_scale, instID) in cursor:
         key = (str(underlying), int(opt_mth), str(otype), float(strike) / float(strike_scale))
         out[key] = instID
+    if conn == None:
+        cnx.close()
     return out
 
 def load_alive_cont(sdate, conn = None):
@@ -244,8 +246,6 @@ def load_alive_cont(sdate, conn = None):
     stmt = "select instID, product_code from contract_list where expiry>=%s"
     args = tuple([sdate])
     cursor.execute(stmt, args)
-    if conn == None:
-        cnx.close()
     cont = []
     pc = []
     for line in cursor:
@@ -253,6 +253,8 @@ def load_alive_cont(sdate, conn = None):
         prod = str(line[1])
         if prod not in pc:
             pc.append(prod)
+    if conn == None:
+        cnx.close()
     return cont, pc
 
 def load_inst_marginrate(instID, conn = None):
@@ -263,11 +265,11 @@ def load_inst_marginrate(instID, conn = None):
     cursor = cnx.cursor()
     stmt = "select margin_l, margin_s from contract_list where instID='{inst}' ".format(inst=instID)
     cursor.execute(stmt)
-    if conn == None:
-        cnx.close()
     out = (0, 0)
     for (margin_l, margin_s) in cursor:
         out = (float(margin_l), float(margin_s))
+    if conn == None:
+        cnx.close()
     return out
 
 def load_min_data_to_df(cnx, dbtable, inst, d_start, d_end, minid_start=1500, minid_end=2114, index_col='datetime'):

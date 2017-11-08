@@ -346,6 +346,7 @@ class Agent(MktDataMixin):
             self.instruments[name].update_param(self.scur_day)
             if name not in self.inst2strat:
                 self.inst2strat[name] = {}
+                self.inst2strat[name] = {}
             if name not in self.inst2gateway:
                 gateway = self.gateway_map(name)
                 if gateway != None:
