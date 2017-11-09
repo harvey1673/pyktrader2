@@ -329,15 +329,13 @@ class Gui(tk.Tk):
         self.destroy()
         
 class MainApp(object):
-    def __init__(self, name, tday, config_file, agent_class = 'agent.Agent', master = None):
+    def __init__(self, tday, config, master = None):
         self.scur_day = tday
-        self.name = name
+        self.name = config.get('name', 'test_agent')
+        agent_class = config.get('agent_class', 'agent.Agent')
         cls_str = agent_class.split('.')
-        config = {}
-        with open(config_file, 'r') as infile:
-            config = json.load(infile)
         agent_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
-        self.agent = agent_cls(name = name, tday = tday, config = config)
+        self.agent = agent_cls(config = config, tday = tday)
         self.master = master
         self.restart()
                         

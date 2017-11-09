@@ -13,7 +13,7 @@ def discount(irate, dtoday, dexp):
     return np.exp(-irate * max(dexp - dtoday,0)/365.0)
                 
 class OptAgentMixin(object):
-    def __init__(self, name, tday=datetime.date.today(), config = {}):
+    def __init__(self, config = {}):
         self.volgrids = {}
         self.irate = config.get('irate', {'CNY': 0.03, 'USD': 0.01})
         self.option_insts = [inst for inst in self.instruments.values() if inst.ptype == instrument.ProductType.Option]
@@ -182,9 +182,9 @@ class OptAgentMixin(object):
         return [atm, v90, v75, v25, v10]
       
 class OptionAgent(Agent, OptAgentMixin):
-    def __init__(self, name, tday=datetime.date.today(), config = {}):
-        Agent.__init__(self, name, tday, config)
-        OptAgentMixin.__init__(self, name, tday, config)        
+    def __init__(self, config = {}, tday=datetime.date.today()):
+        Agent.__init__(self, config, tday)
+        OptAgentMixin.__init__(self, config)
         self.create_volgrids()
         self.load_volgrids()
         self.set_opt_pricers()

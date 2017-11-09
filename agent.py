@@ -238,14 +238,14 @@ class MktDataMixin(object):
         self.eventEngine.register(EVENT_DB_WRITE, self.write_mkt_data)
 
 class Agent(MktDataMixin):
-    def __init__(self, name, tday=datetime.date.today(), config = {}):
+    def __init__(self, config = {}, tday=datetime.date.today()):
         '''
             trader为交易对象
             tday为当前日,为0则为当日
         '''
         self.tick_id = 0
         self.timer_count = 0
-        self.name = name
+        self.name = config.get('name', 'test_agent')
         self.sched_commands = []
         self.folder = str(config.get('folder', self.name + os.path.sep))
         self.live_trading = config.get('live_trading', False)

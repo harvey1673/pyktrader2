@@ -5,6 +5,7 @@ import datetime
 import sys
 import time
 import logging
+import mysqlaccess
 import misc
 import base
 import json
@@ -24,16 +25,17 @@ def get_option_map(underliers, expiries, strikes):
                 opt_map[key] = instID
     return opt_map
 
-def save(name, config_file, tday, filter):
-    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
+def save(config_file, tday):
+    with open(config_file, 'r') as infile:
+        config = json.load(infile)
+    name = config.get('name', 'save_ctp')
+    filter_flag = config.get('filter_flag', False)
+    base.config_logging(name + "/" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
                    console_level = logging.INFO)
     scur_day = datetime.datetime.strptime(tday, '%Y%m%d').date()
-    filter_flag = (int(filter)>0)
-    with open(config_file, 'r') as infile:
-        config = json.load(infile)
-    save_agent = saveagent.SaveAgent(name = name, tday = scur_day, config = config)
+    save_agent = saveagent.SaveAgent(config = config, tday = scur_day)
     curr_insts = misc.filter_main_cont(tday, filter_flag)
     for inst in curr_insts:
         save_agent.add_instrument(inst)
@@ -44,28 +46,33 @@ def save(name, config_file, tday, filter):
     except KeyboardInterrupt:
         save_agent.exit()
 
-def run_gui(name, config_file, tday, agent_class = 'agent.Agent'):
-    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
+def run_gui(config_file, tday):
+    with open(config_file, 'r') as infile:
+        config = json.load(infile)
+    name = config.get('name', 'test_agent')
+    base.config_logging(name + "/" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
                    console_level = logging.INFO)
     scur_day = datetime.datetime.strptime(tday, '%Y%m%d').date()
-    myApp = MainApp(name, scur_day, config_file, agent_class = agent_class, master = None)
+    myApp = MainApp(scur_day, config, master = None)
     myGui = Gui(myApp)
     # myGui.iconbitmap(r'c:\Python27\DLLs\thumbs-up-emoticon.ico')
     myGui.mainloop()
 
-def run(name, config_file, tday, agent_class = 'agent.Agent'):
-    base.config_logging(name + "\\" + name + ".log", level=logging.DEBUG,
+def run(config_file, tday):
+    with open(config_file, 'r') as infile:
+        config = json.load(infile)
+    name = config.get('name', 'test_agent')
+    base.config_logging(name + "/" + name + ".log", level=logging.DEBUG,
                    format = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s',
                    to_console = True,
                    console_level = logging.INFO)
     scur_day = datetime.datetime.strptime(tday, '%Y%m%d').date()
+    agent_class = config.get('agent_class', 'agent.Agent')
     cls_str = agent_class.split('.')
-    with open(config_file, 'r') as infile:
-        config = json.load(infile)
     agent_cls = getattr(__import__(str(cls_str[0])), str(cls_str[1]))
-    agent = agent_cls(name=name, tday=scur_day, config=config)
+    agent = agent_cls(config=config, tday=scur_day)
     try:
         agent.restart()
         while 1:
@@ -76,5 +83,5 @@ def run(name, config_file, tday, agent_class = 'agent.Agent'):
 if __name__ == '__main__':
     args = sys.argv[1:]
     app_name = args[0]
-    params = (args[1], args[2], args[3], args[4], )
+    params = (args[1], args[2], )
     getattr(sys.modules[__name__], app_name)(*params)
