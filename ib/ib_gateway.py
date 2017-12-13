@@ -17,12 +17,8 @@ import calendar
 from datetime import datetime, timedelta
 from copy import copy
 
-from vnpy.api.ib import *
-from vnpy.trader.vtGateway import *
-from vnpy.trader.vtFunction import getJsonPath
-from .language import text
-
-
+from vnib import IbApi, Contract, Order, TagValueList
+from gateway import *
 
 # 以下为一些VT类型和CTP类型的映射字典
 # 价格类型映射
@@ -109,7 +105,7 @@ accountKeyMap['MaintMarginReq'] = 'margin'
 
 
 ########################################################################
-class IbGateway(VtGateway):
+class IbGateway(Gateway):
     """IB接口"""
 
     #----------------------------------------------------------------------
@@ -138,20 +134,18 @@ class IbGateway(VtGateway):
         self.connected = False          # 连接状态
         
         self.api = IbWrapper(self)      # API接口
-        
-        self.fileName = self.gatewayName + '_connect.json'
-        self.filePath = getJsonPath(self.fileName, __file__)             
 
     #----------------------------------------------------------------------
     def connect(self):
         """连接"""
         # 载入json文件
+        fileName = self.file_prefix + 'connect.json'
         try:
-            f = file(self.filePath)
+            f = file(fileName)
         except IOError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
-            log.logContent = text.LOADING_ERROR
+            log.logContent = u'读取连接配置出错，请检查'
             self.onLog(log)
             return
         
@@ -165,7 +159,7 @@ class IbGateway(VtGateway):
         except KeyError:
             log = VtLogData()
             log.gatewayName = self.gatewayName
-            log.logContent = text.CONFIG_KEY_MISSING
+            log.logContent = u'连接配置缺少字段，请检查'
             self.onLog(log)
             return            
         
@@ -266,7 +260,7 @@ class IbGateway(VtGateway):
         """查询账户资金"""
         log = VtLogData()
         log.gatewayName = self.gatewayName        
-        log.logContent = text.NONEED_TO_QRYACCOUNT
+        log.logContent = 'No need to query Account info'
         self.onLog(log) 
     
     #----------------------------------------------------------------------
@@ -274,7 +268,7 @@ class IbGateway(VtGateway):
         """查询持仓"""
         log = VtLogData()
         log.gatewayName = self.gatewayName        
-        log.logContent = text.NONEED_TO_QRYPOSITION
+        log.logContent = 'No need to query Position info'
         self.onLog(log) 
     
     #----------------------------------------------------------------------
@@ -320,7 +314,7 @@ class IbWrapper(IbApi):
         
         log = VtLogData()
         log.gatewayName = self.gatewayName
-        log.logContent = text.API_CONNECTED.format(time=t)
+        log.logContent = u'行情服务器连接成功 t = %s' % t
         self.gateway.onLog(log) 
         
         for symbol, req in self.subscribeReqDict.items():
@@ -476,7 +470,7 @@ class IbWrapper(IbApi):
     
         log = VtLogData()
         log.gatewayName = self.gatewayName
-        log.logContent = text.API_DISCONNECTED
+        log.logContent =  u'服务器连接断开'
         self.gateway.onLog(log) 
         
     #----------------------------------------------------------------------
