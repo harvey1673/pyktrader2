@@ -22,8 +22,7 @@ class DTChanSim(StratSim):
         self.win = config['param'][1]
         self.multiplier = config['param'][2]
         self.f = config['param'][3]
-        self.atr_len = config['atr_period']
-        self.price_mode = config.get('price_mode','TP')
+        self.price_mode = config.get('mode','TP')
         self.pos_update = config['pos_update']
         self.pos_class = config['pos_class']
         self.pos_args  = config['pos_args']
@@ -48,33 +47,7 @@ class DTChanSim(StratSim):
         self.combo_signal = config.get('combo', True)
      
     def process_data(self, mdf):
-        xdf = self.proc_func(mdf, **self.proc_args)
-        if self.win == -1:
-            tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))],
-                           join='outer', axis=1).max(axis=1)
-        elif self.win == 0:
-            tr = pd.concat([(pd.rolling_max(xdf.high, 2) - pd.rolling_min(xdf.close, 2))*self.multiplier,
-                            (pd.rolling_max(xdf.close, 2) - pd.rolling_min(xdf.low, 2))*self.multiplier,
-                            xdf.high - xdf.close,
-                            xdf.close - xdf.low],
-                            join='outer', axis=1).max(axis=1)
-        else:
-            tr= pd.concat([pd.rolling_max(xdf.high, self.win) - pd.rolling_min(xdf.close, self.win),
-                           pd.rolling_max(xdf.close, self.win) - pd.rolling_min(xdf.low, self.win)],
-                           join='outer', axis=1).max(axis=1)
-        xdf['TR'] = tr
-        xdf['chanh'] = self.chan_high(xdf['high'], self.chan, **self.chan_func['high']['args'])
-        xdf['chanl'] = self.chan_low(xdf['low'], self.chan, **self.chan_func['low']['args'])
-        xdf['ATR'] = dh.ATR(xdf, n = self.atr_len)
-        xdf['MA'] = dh.MA(xdf, n=self.atr_len, field = 'close')
-        xdata = pd.concat([xdf['TR'].shift(1), xdf['MA'].shift(1), xdf['ATR'].shift(1),
-                           xdf['chanh'].shift(1), xdf['chanl'].shift(1),
-                           xdf['open']], axis=1, keys=['tr','ma', 'atr', 'chanh', 'chanl', 'dopen']).fillna(0)
-        self.df = mdf.join(xdata, how = 'left').fillna(method='ffill')
-        self.df['datetime'] = self.df.index
-        self.df['cost'] = 0
-        self.df['pos'] = 0
-        self.df['traded_price'] = self.df['open']
+        self.df = mdf
     
     def run_vec_sim(self):
         xdf = self.proc_func(self.df, **self.proc_args)
