@@ -1,5 +1,4 @@
 # -*- coding:utf-8 -*-
-import json
 import misc
 import workdays
 import datetime
@@ -7,21 +6,31 @@ from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
     'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', \
                 'active_mths': range(1, 13), \
-                'parent_curve': '', 'spotID': 'tsi_io62', 'vol_index': 'SGXIRO',\
+                'parent_curve': '', 'spotID': 'plt_io62', 'vol_index': 'SGXIRO',\
                 '': '', },
+    'SGXIOLP': {'instID': 'iolp', 'exch': 'SGX', 'calendar': 'PLIO', \
+               'active_mths': range(1, 13), \
+               'parent_curve': '', 'spotID': 'plt_lp', 'vol_index': 'SGXIROLP', \
+               '': '', },
     'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN', \
                 'active_mths': [1, 5, 10], \
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
-    'SHFEHC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', \
+    'SHFEHRC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', \
                 'active_mths': [1, 5, 10], \
-                'parent_curve': '', 'spotID': 'hc', 'vol_index': 'SHFEHC',},
-    'DCEIRO': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN',\
+                'parent_curve': '', 'spotID': 'hc', 'vol_index': 'SHFEHRC',},
+    'DCEIOE': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN',\
                 'active_mths': [1, 5, 9],
-                'parent_curve': '', 'spotID': 'i', 'vol_index': 'DCEIRO',},
+                'parent_curve': '', 'spotID': 'i', 'vol_index': 'DCEIOE',},
+    'DCECOK': {'instID': 'j', 'exch': 'DCE', 'calendar': 'CHN',\
+                'active_mths': [1, 5, 9],
+                'parent_curve': '', 'spotID': 'j', 'vol_index': 'DCECOK',},
+    'LMESCR': {'instID': 'sc', 'exch': 'LME', 'calendar': 'PLIO',\
+                'active_mths': range(1,13),
+                'parent_curve': '', 'spotID': 'tsi_scrap', 'vol_index': 'LMESCR',},
 }
 
 FX_Curve_Map = {
-    'USDCNY': {'ccy': 'USD/CNY', 'src': 'PriceStore', 'calendar': 'USDCNY',
+    'USD/CNY': {'ccy': 'USD/CNY', 'src': 'PriceStore', 'calendar': 'USDCNY',
                 'parent_curve': '', 'fx_spot': '', 'vol_index': 'USDCNY',},
 }
 
