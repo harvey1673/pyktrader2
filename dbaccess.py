@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 import datetime
 import numpy
-import sec_bits
 import mysql.connector as sqlconn
-import copy
-import csv
 import os.path
 import misc
 import pandas as pd
+import sec_bits
 
 dbconfig = sec_bits.dbconfig
 hist_dbconfig = sec_bits.hist_dbconfig
@@ -27,10 +25,17 @@ cmvol_columns = ['date', 'tenor_label', 'expiry_date', 'delta', 'vol', 'price', 
 cmdv_columns = ['date', 'expiry', 'vol']
 price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': vol_columns, 'cmvol': cmvol_columns, \
                  'cmdv': cmdv_columns, 'ccy': fx_columns, 'ir_index': ir_columns, }
-deal_columns = ['id', 'status', 'internal_id', 'external_id', 'cpty', 'positions', \
+deal_columns = ['status', 'internal_id', 'external_id', 'cpty', 'positions', \
                 'strategy', 'book', 'external_src', 'last_updated', \
-                'trader', 'sales', 'desk', 'business', 'portfolio', \
+                'trader', 'sales', 'desk', 'business', 'portfolio', 'premium', 'product', \
                 'enter_date', 'last_date', 'commission', 'day1_comments']
+
+def get_proxy_server():
+    user = sec_bits.PROXY_CREDENTIALS['user']
+    passwd = sec_bits.PROXY_CREDENTIALS['passwd']
+    server_dict = {'http':'http://%s:%s@10.252.22.102:4200' % (user, passwd),
+                'https':'https://%s:%s@10.252.22.102:4200' % (user, passwd)}
+    return server_dict
 
 def connect(**args):
     return sqlconn.connect(**args)
@@ -283,14 +288,21 @@ def load_min_data_to_df(cnx, dbtable, inst, d_start, d_end, minid_start=1500, mi
     df = pd.io.sql.read_sql(stmt, cnx, index_col=index_col)
     return df
 
-def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', field = 'instID'):
+def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', field = 'instID', date_as_str = False):
     stmt = "select {variables} from {table} where {field} like '{instID}' ".format( \
                                     variables=','.join(price_fields[field]),
                                     table=dbtable, field = field, instID=inst)
     stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
     stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by date"
-    df = pd.io.sql.read_sql(stmt, cnx, index_col=index_col)
+    df = pd.io.sql.read_sql(stmt, cnx)
+    if index_col == None:
+        index_col = 'date'
+    if (isinstance(df[index_col][0], basestring)) and (date_as_str == False):
+        if len(df[index_col][0])> 12:
+            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
+        else:
+            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
     return df
 
 def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'instID'):
@@ -309,7 +321,7 @@ def load_deal_data(cnx, dbtable = 'deal', book = 'BOF', deal_status = [2]):
         stmt = stmt + "and status = {deal_status} ".format(deal_status = deal_status[0])
     else:
         stmt = stmt + "and status in {deal_status} ".format(deal_status = tuple(deal_status))
-    stmt = stmt + "order by id"
+    stmt = stmt + "order by internal_id"
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
 
