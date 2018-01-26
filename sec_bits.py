@@ -2,7 +2,7 @@ import platform
 from base import *
 
 datayes_token = 'xxxxx'
-
+PROXY_CREDENTIALS = {'user': 'xxxxx', 'passwd': 'xxxxx'}
 dbconfig = {'user': 'xxxxx', 
           'password':'xxxxx', 
           'host':'localhost',
