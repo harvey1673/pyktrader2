@@ -2,22 +2,39 @@
 import json
 import datetime
 import weakref
+import cmq_curve
+import numpy as np
 
 class CurveShiftType:
     Abs, Rel = range(2)
 
 inst_type_map = {
+    "ComCalSwapFut": "cmq_calendarswap.CMQCalSwapFuture",
     "ComCalSwap": "cmq_calendarswap.CMQCalendarSwap",
+    "ComFut": "cmq_cmfwd.CMQCommodFuture",
+    "ComFwd": "cmq_cmfwd.CMQCommodForward",
     "ComMthAsian": "cmq_mthlyasian.CMQMthlyAsian",
     "ComEuroOption": "cmq_commodeuopt.CMQCommodEuOpt",
     "ComDVolCSO": "cmq_normcso.CMQNormalCSO",
 }
 
+
+def disc_factor(value_date, end_date, rate_quotes):
+    df = 1.0
+    if (end_date >= value_date):
+        tenors = [(quote[1] - value_date).days for quote in rate_quotes]
+        irates = [quote[2] for quote in rate_quotes]
+        mode = cmq_curve.ForwardCurve.InterpMode.Linear
+        rate_curve = cmq_curve.ForwardCurve.from_array(tenors, irates, interp_mode=mode)
+        t_exp = (end_date - value_date).days
+        df = np.exp(-rate_curve(t_exp) * t_exp / 365.0)
+    return df
+
 class CMQInstrument(object):
     _get_obj_cache = weakref.WeakValueDictionary()
-    inst_key = [ 'start', 'end', 'ccy']
+    inst_key = [ 'start', 'end', 'ccy', 'volume']
     class_params = {'ccy': 'USD', 'start': datetime.date.today() + datetime.timedelta(days = 2), \
-                    'end': datetime.date.today() + datetime.timedelta(days = 3), }
+                    'end': datetime.date.today() + datetime.timedelta(days = 3), 'volume': 1}
 
     @classmethod
     def create_instrument(cls, inst_data, market_data = {}, model_setting = {}):
@@ -57,7 +74,7 @@ class CMQInstrument(object):
         d = self.__dict__
         for key in self.class_params:
             d[key] = trade_data.get(key, self.class_params[key])
-            if key in ['start', 'end'] and isinstance(d[key], basestring):
+            if key in ['start', 'end', 'contract'] and isinstance(d[key], basestring):
                 d[key] = datetime.datetime.strptime(d[key], "%Y-%m-%d %H:%M:%S").date()
         self.mkt_deps = {}
 
@@ -69,7 +86,7 @@ class CMQInstrument(object):
         self.eod_flag = market_data.get('eod_flag', False)
 
     def price(self):
-        return getattr(self, self.price_func)()
+        return getattr(self, self.price_func)() * self.volume
 
     def clean_price(self):
         return 0.0
