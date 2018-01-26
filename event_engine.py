@@ -5,7 +5,7 @@ import sys, traceback
 import threading
 
 # 自己开发的模块
-from eventType import *
+from event_type import *
 import event_priority 
 
 class RepeatTimer():
