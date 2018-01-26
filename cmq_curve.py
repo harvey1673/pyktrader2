@@ -45,7 +45,7 @@ class DiscountCurve(object):
     @classmethod 
     def load(cls, filename, sheetname, t0=None):
         sheet = pd.read_excel(filename, sheetname)
-        tenors = np.array([Date.from_timestamp(d).t for d in sheet['dates']])
+        tenors = np.array([d for d in sheet['dates']])
         discounts = np.array(sheet['discounts'].tolist())
         return cls.from_array(tenors, discounts, t0)
         
@@ -107,7 +107,7 @@ class ForwardCurve(object):
     @classmethod
     def load(cls, filename, sheetname, t0=None):
         sheet = pd.read_excel(filename, sheetname)
-        tenors = np.array([Date.from_timestamp(d).t for d in sheet['dates']])
+        tenors = np.array([d for d in sheet['dates']])
         forwards = np.array(sheet['forwards'].tolist())
         return cls.from_array(tenors, forwards, t0)
 
@@ -153,7 +153,7 @@ class VolCurve(object):
     @classmethod
     def load(cls, filename, sheetname, t0=None):
         sheet = pd.read_excel(filename, sheetname)
-        tenors = np.array([Date.from_timestamp(d).t for d in sheet['dates']])
+        tenors = np.array([d for d in sheet['dates']])
         forwards = np.array(sheet['forwards'].tolist())
         return cls.from_array(tenors, forwards, t0)
         
