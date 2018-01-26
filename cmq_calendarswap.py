@@ -2,7 +2,7 @@ import datetime
 import pandas as pd
 import numpy as np
 import cmq_crv_defn
-from cmq_inst import CMQInstrument
+from cmq_inst import *
 import cmq_curve
 import misc
 
@@ -44,25 +44,23 @@ class CMQCalendarSwap(CMQInstrument):
         #fwd_quotes = map(list, zip(*fwd_quotes))
         mode = cmq_curve.ForwardCurve.InterpMode.PiecewiseConst
         self.fwd_curve = cmq_curve.ForwardCurve.from_array(fwd_tenors, fwd_prices, interp_mode = mode)
-        fix_quotes = market_data['COMFix'][self.spotID]
-        fix_quotes = map(list, zip(*fix_quotes))
-        self.fix_series = pd.Series(fix_quotes[1], index = fix_quotes[0])
-        self.past_fix = [d for d in self.fixing_dates if
+        if self.start <= self.value_date:
+            fix_quotes = market_data['COMFix'][self.spotID]
+            fix_quotes = map(list, zip(*fix_quotes))
+            self.fix_series = pd.Series(fix_quotes[1], index = fix_quotes[0])
+            self.past_fix = [d for d in self.fixing_dates if
                      (d < self.value_date) or ((d == self.value_date) and self.eod_flag)]
+        else:
+            self.fix_series = pd.Series()
+            self.pasf_fix = []
         fut_t = [(self.value_date - d).days for d in self.fixing_dates if d not in self.past_fix]
         if len(self.past_fix) > 0:
             self.past_avg = np.mean(self.fix_series[self.past_fix])
         else:
             self.past_avg = 0.0
         self.fwd_avg = np.mean(self.fwd_curve(fut_t))
-        if self.need_disc and (self.end >= self.value_date):
-            rate_quotes = market_data['IRCurve'][self.ccy.lower() + '_disc']
-            tenors = [(quote[1] - self.value_date).days for quote in rate_quotes]
-            irates = [quote[2] for quote in rate_quotes]
-            mode = cmq_curve.ForwardCurve.InterpMode.Linear
-            rate_curve = cmq_curve.ForwardCurve.from_array(tenors, irates, interp_mode = mode)
-            t_exp = (self.end-self.value_date).days
-            self.df = np.exp(-rate_curve(t_exp)*t_exp/365.0)
+        if self.need_disc:
+            self.df = disc_factor(self.value_date, self.end, market_data['IRCurve'][self.ccy.lower() + '_disc'])
         else:
             self.df = 1.0
 
@@ -70,3 +68,10 @@ class CMQCalendarSwap(CMQInstrument):
         r = float(len(self.past_fix))/float(len(self.fixing_dates))
         avg = self.past_avg * r + self.fwd_avg * (1-r)
         return (avg - self.strike) * self.df
+
+class CMQCalSwapFuture(CMQCalendarSwap):
+    class_params = dict(CMQCalendarSwap.class_params, **{'need_disc': False})
+    inst_key = ['fwd_index', 'strike', 'start', 'end', 'ccy', 'volume']
+
+    def __init__(self, trade_data, market_data = {}, model_settings = {}):
+        super(CMQCalSwapFuture, self).__init__(trade_data, market_data, model_settings)
