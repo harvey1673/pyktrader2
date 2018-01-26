@@ -73,6 +73,7 @@ class RpcServer(DataPacker):
         self.__active = False
         if self.__thread.isAlive():
             self.__thread.join()
+        self.__context.destroy()
 
     def run(self):
         while self.__active:
@@ -95,7 +96,6 @@ class RpcServer(DataPacker):
         self.__pub_socket.send_multipart([topic, datab])
 
     def register(self, func):
-        """注册函数"""
         self.__func_map[func.__name__] = func
 
 class RpcClient(DataPacker):
@@ -113,25 +113,15 @@ class RpcClient(DataPacker):
     # ----------------------------------------------------------------------
     def __getattr__(self, name):
         def dorpc(*args, **kwargs):
-            # 生成请求
             req = [name, args, kwargs]
-
-            # 序列化打包请求
             reqb = self.pack(req)
-
-            # 发送请求并等待回应
             self.__req_socket.send(reqb)
             repb = self.__req_socket.recv()
-
-            # 序列化解包回应
             rep = self.unpack(repb)
-
-            # 若正常则返回结果，调用失败则触发异常
             if rep[0]:
                 return rep[1]
             else:
                 raise RemoteException(rep[1])
-
         return dorpc
 
     def start(self):
