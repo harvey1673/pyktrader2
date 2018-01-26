@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import numpy as np
 import data_handler as dh
-import strategy as strat
+import trade_position as tradepos
 import dbaccess
 import misc
 import platform
@@ -189,18 +189,21 @@ def simdf_to_trades1(df, slippage = 0):
     tradeid = 0
     pos_list = []
     closed_trades = []
-    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf.index):
-        if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
-            if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
-                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)
-            new_pos = strat.TradePos(insts = [cont], volumes = [1], pos = pos - prev_pos, entry_target = tprice, exit_target = tprice)
+    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'],
+                                              xdf['contract'], xdf.index):
+        if (prev_pos * pos >= 0) and (abs(prev_pos) < abs(pos)):
+            if len(pos_list) > 0 and (pos_list[-1].pos * (pos - prev_pos) < 0):
+                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (
+                cont, prev_pos, pos, dtime)
+            new_pos = tradepos.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
+                                     exit_target=tprice)
             tradeid += 1
             new_pos.entry_tradeid = tradeid
             new_pos.open(tprice, pos - prev_pos, dtime)
             pos_list.append(new_pos)
         else:
             for i, tp in enumerate(reversed(pos_list)):
-                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
+                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:
                     break
                 else:
                     tp.close(tprice, dtime)
@@ -208,16 +211,18 @@ def simdf_to_trades1(df, slippage = 0):
                     tradeid += 1
                     tp.exit_tradeid = tradeid
                     closed_trades.append(tp)
-            pos_list = [ tp for tp in pos_list if not tp.is_closed ]
+            pos_list = [tp for tp in pos_list if not tp.is_closed]
             if prev_pos != pos:
                 if len(pos_list) == 0:
-                    new_pos = strat.TradePos(insts = [cont], volumes = [1], pos = pos - prev_pos, entry_target = tprice, exit_target = tprice)
+                    new_pos = tradepos.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
+                                             exit_target=tprice)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(tprice, pos - prev_pos, dtime)
                     pos_list.append(new_pos)
-                else:  
-                    print "Warning: handling partial position for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
+                else:
+                    print "Warning: handling partial position for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (
+                    prev_pos, pos, cont, dtime)
                     partial_tp = copy.deepcopy(pos_list[-1])
                     partial_tp.pos = prev_pos - pos
                     partial_tp.close(tprice, dtime)
@@ -226,36 +231,41 @@ def simdf_to_trades1(df, slippage = 0):
                     closed_trades.append(partial_tp)
                     pos_list[-1].pos -= prev_pos - pos
         prev_pos = pos
-    if (len(pos_list) !=0) or (prev_pos!=0):
+    if (len(pos_list) != 0) or (prev_pos != 0):
         print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
     return closed_trades
 
-def simdf_to_trades2(df, slippage = 0.0):
+
+def simdf_to_trades2(df, slippage=0.0):
     xdf = df[df['pos'] != df['pos'].shift(1)]
     prev_pos = 0
     tradeid = 0
     pos_list = []
     closed_trades = []
-    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'], xdf['contract'], xdf.index):
-        if (prev_pos * pos >=0) and (abs(prev_pos)<abs(pos)):
-            if len(pos_list)>0 and (pos_list[-1].pos*(pos - prev_pos) < 0):
-                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (cont, prev_pos, pos, dtime)            
-            npos = int(abs(pos-prev_pos))
-            new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
+    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'],
+                                              xdf['contract'], xdf.index):
+        if (prev_pos * pos >= 0) and (abs(prev_pos) < abs(pos)):
+            if len(pos_list) > 0 and (pos_list[-1].pos * (pos - prev_pos) < 0):
+                print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (
+                cont, prev_pos, pos, dtime)
+            npos = int(abs(pos - prev_pos))
+            new_pos = [tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+                                      exit_target=tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
+                tpos.open(tprice, misc.sign(pos - prev_pos), dtime)
             pos_list = pos_list + new_pos
-            new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
+            new_pos = [tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+                                      exit_target=tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
-                tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
+                tpos.open(tprice, misc.sign(pos - prev_pos), dtime)
             pos_list = pos_list + new_pos
         else:
             for i, tp in enumerate(reversed(pos_list)):
-                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:                    
+                if (prev_pos - tp.pos - pos) * (prev_pos) < 0:
                     break
                 else:
                     tp.close(tprice, dtime)
@@ -263,38 +273,43 @@ def simdf_to_trades2(df, slippage = 0.0):
                     tradeid += 1
                     tp.exit_tradeid = tradeid
                     closed_trades.append(tp)
-            pos_list = [ tp for tp in pos_list if not tp.is_closed ]
+            pos_list = [tp for tp in pos_list if not tp.is_closed]
             if prev_pos != pos:
                 if len(pos_list) == 0:
-                    npos = int(abs(pos-prev_pos))
-                    new_pos = [ strat.TradePos(insts = [cont], volumes = [1], pos = misc.sign(pos-prev_pos), entry_target = tprice, exit_target = tprice) for i in range(npos)]
+                    npos = int(abs(pos - prev_pos))
+                    new_pos = [
+                        tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+                                       exit_target=tprice) for i in range(npos)]
                     for tpos in new_pos:
                         tradeid += 1
                         tpos.entry_tradeid = tradeid
-                        tpos.open(tprice, misc.sign(pos-prev_pos), dtime)
-                    pos_list = pos_list + new_pos                    
-                else:  
-                    print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (prev_pos, pos, cont, dtime) 
+                        tpos.open(tprice, misc.sign(pos - prev_pos), dtime)
+                    pos_list = pos_list + new_pos
+                else:
+                    print "Warning: This should not happen for unit tradepos for prev_pos=%s, pos=%s, cont=%s, time=%s, should avoid this situation!" % (
+                    prev_pos, pos, cont, dtime)
         prev_pos = pos
-    if (len(pos_list) !=0) or (prev_pos!=0):
+    if (len(pos_list) != 0) or (prev_pos != 0):
         print "ERROR: something wrong with the backtest position management - there are unclosed positions after the test"
     return closed_trades
-    
-def check_bktest_bar_stop(bar, stop_price, direction = 1):
+
+
+def check_bktest_bar_stop(bar, stop_price, direction=1):
     price_traded = np.nan
-    if (bar.open - stop_price)*direction <= 0:
+    if (bar.open - stop_price) * direction <= 0:
         price_traded = bar.open
     else:
         if direction > 0:
             compare_price = bar.low
         else:
             compare_price = bar.high
-        if (compare_price - stop_price)*direction <= 0:
+        if (compare_price - stop_price) * direction <= 0:
             price_traded = compare_price
     return price_traded
-    
+
+
 def get_pnl_stats(df_list, start_capital, marginrate, freq):
-    sum_pnl = pd.Series(name = 'pnl')
+    sum_pnl = pd.Series(name='pnl')
     sum_margin = pd.Series(name='margin')
     sum_cost = pd.Series(name='cost')
     if freq == 'm':
@@ -303,26 +318,28 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
         index_col = ['date']
     for df in df_list:
         xdf = df.reset_index().set_index(index_col)
-        pnl = xdf['pos'].shift(1).fillna(0.0)*(xdf['close'] - xdf['close'].shift(1)).fillna(0.0)
+        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf['close'] - xdf['close'].shift(1)).fillna(0.0)
         if 'traded_price' in xdf.columns:
-            pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0))*(xdf['close'] - xdf['traded_price'])
+            pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
         if len(sum_pnl) == 0:
-            sum_pnl = pd.Series(pnl, name = 'pnl')
+            sum_pnl = pd.Series(pnl, name='pnl')
         else:
-            sum_pnl = sum_pnl.add(pnl, fill_value = 0)
-        margin = pd.Series(pd.concat([xdf.pos*marginrate[0]*xdf.close, -xdf.pos*marginrate[1]*xdf.close], join='outer', axis=1).max(1), name='margin')
+            sum_pnl = sum_pnl.add(pnl, fill_value=0)
+        margin = pd.Series(
+            pd.concat([xdf.pos * marginrate[0] * xdf.close, -xdf.pos * marginrate[1] * xdf.close], join='outer',
+                      axis=1).max(1), name='margin')
         if len(sum_margin) == 0:
             sum_margin = margin
         else:
-            sum_margin = sum_margin.add( margin, fill_value = 0)
+            sum_margin = sum_margin.add(margin, fill_value=0)
         if len(sum_cost) == 0:
             sum_cost = xdf['cost']
         else:
-            sum_cost = sum_cost.add(xdf['cost'], fill_value = 0)
+            sum_cost = sum_cost.add(xdf['cost'], fill_value=0)
     if freq == 'm':
-        daily_pnl = pd.Series(sum_pnl.groupby(level=0).sum(), name = 'daily_pnl')
-        daily_margin = pd.Series(sum_margin.groupby(level=0).last(), name = 'daily_margin')
-        daily_cost = pd.Series(sum_cost.groupby(level=0).sum(), name = 'daily_cost')
+        daily_pnl = pd.Series(sum_pnl.groupby(level=0).sum(), name='daily_pnl')
+        daily_margin = pd.Series(sum_margin.groupby(level=0).last(), name='daily_margin')
+        daily_cost = pd.Series(sum_cost.groupby(level=0).sum(), name='daily_cost')
     else:
         daily_pnl = sum_pnl
         daily_margin = sum_margin
@@ -330,7 +347,7 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     daily_pnl.name = 'daily_pnl'
     daily_margin.name = 'daily_margin'
     daily_cost.name = 'daily_cost'
-    cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + start_capital, name = 'cum_pnl')
+    cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + start_capital, name='cum_pnl')
     available = cum_pnl - daily_margin
     res = {}
     res['avg_pnl'] = float(daily_pnl.mean())
@@ -341,12 +358,12 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     res['max_margin'] = float(daily_margin.max())
     res['min_avail'] = float(available.min())
     if res['std_pnl'] > 0:
-        res['sharp_ratio'] = float(res['avg_pnl']/res['std_pnl']*np.sqrt(252.0))
+        res['sharp_ratio'] = float(res['avg_pnl'] / res['std_pnl'] * np.sqrt(252.0))
         max_dd, max_dur = max_drawdown(cum_pnl)
-        res['max_drawdown'] =  float(max_dd)
-        res['max_dd_period'] =  int(max_dur)
+        res['max_drawdown'] = float(max_dd)
+        res['max_dd_period'] = int(max_dur)
         if abs(max_dd) > 0:
-            res['profit_dd_ratio'] = float(res['tot_pnl']/abs(max_dd))
+            res['profit_dd_ratio'] = float(res['tot_pnl'] / abs(max_dd))
         else:
             res['profit_dd_ratio'] = 0
     else:
@@ -357,18 +374,19 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
     return res, ts
 
+
 def get_trade_stats(trade_list):
     res = {}
     res['n_trades'] = len(trade_list)
     res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
-    res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit>0]))
-    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit<=0]))
+    res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit > 0]))
+    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit <= 0]))
     sorted_profit = sorted([trade.profit for trade in trade_list])
-    if len(sorted_profit)>5:
+    if len(sorted_profit) > 5:
         res['largest_profit'] = float(sorted_profit[-1])
     else:
         res['largest_profit'] = 0
-    if len(sorted_profit)>4:
+    if len(sorted_profit) > 4:
         res['second largest'] = float(sorted_profit[-2])
     else:
         res['second largest'] = 0
@@ -388,23 +406,24 @@ def get_trade_stats(trade_list):
         res['third_loss'] = float(sorted_profit[2])
     else:
         res['third_loss'] = 0
-    res['num_win'] = len([trade.profit for trade in trade_list if trade.profit>0])
-    res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit<0])
+    res['num_win'] = len([trade.profit for trade in trade_list if trade.profit > 0])
+    res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit < 0])
     res['win_ratio'] = 0
     if res['n_trades'] > 0:
-        res['win_ratio'] = float(res['num_win'])/float(res['n_trades'])
+        res['win_ratio'] = float(res['num_win']) / float(res['n_trades'])
     res['profit_per_win'] = 0
     if res['num_win'] > 0:
-        res['profit_per_win'] = float(res['win_profit']/float(res['num_win']))
+        res['profit_per_win'] = float(res['win_profit'] / float(res['num_win']))
     res['profit_per_loss'] = 0
-    if res['num_loss'] > 0:    
-        res['profit_per_loss'] = float(res['loss_profit']/float(res['num_loss']))
+    if res['num_loss'] > 0:
+        res['profit_per_loss'] = float(res['loss_profit'] / float(res['num_loss']))
     return res
+
 
 def create_drawdowns(ts):
     """
     Calculate the largest peak-to-trough drawdown of the PnL curve
-    as well as the duration of the drawdown. Requires that the 
+    as well as the duration of the drawdown. Requires that the
     pnl_returns is a pandas Series.
     Parameters:
     pnl - A pandas Series representing period percentage returns.
@@ -412,35 +431,36 @@ def create_drawdowns(ts):
     drawdown, duration - Highest peak-to-trough drawdown and duration.
     """
 
-    # Calculate the cumulative returns curve 
+    # Calculate the cumulative returns curve
     # and set up the High Water Mark
     # Then create the drawdown and duration series
     ts_idx = ts.index
-    drawdown = pd.Series(index = ts_idx)
-    duration = pd.Series(index = ts_idx)
-    hwm = pd.Series([0]*len(ts), index = ts_idx)
+    drawdown = pd.Series(index=ts_idx)
+    duration = pd.Series(index=ts_idx)
+    hwm = pd.Series([0] * len(ts), index=ts_idx)
     last_t = ts_idx[0]
     # Loop over the index range
     for idx, t in enumerate(ts_idx):
         if idx > 0:
             cur_hwm = max(hwm[last_t], ts_idx[idx])
             hwm[t] = cur_hwm
-            drawdown[t]= hwm[t] - ts[t]
-            duration[t]= 0 if drawdown[t] == 0 else duration[last_t] + 1
+            drawdown[t] = hwm[t] - ts[t]
+            duration[t] = 0 if drawdown[t] == 0 else duration[last_t] + 1
         last_t = t
     return drawdown.max(), duration.max()
 
+
 def max_drawdown(ts):
-    i = np.argmax(np.maximum.accumulate(ts)-ts)
+    i = np.argmax(np.maximum.accumulate(ts) - ts)
     j = np.argmax(ts[:i])
     max_dd = ts[i] - ts[j]
     max_duration = (i - j).days
     return max_dd, max_duration
 
 def scen_dict_to_df(data):
-    res = pd.DataFrame.from_dict(data, orient = 'index')
+    res = pd.DataFrame.from_dict(data, orient='index')
     res.index.name = 'scenario'
-    res = res.sort_values(by = ['sharp_ratio'], ascending=False)
+    res = res.sort_values(by=['sharp_ratio'], ascending=False)
     res = res.reset_index()
     res.set_index(['asset', 'scenario'])
     return res
@@ -846,7 +866,7 @@ class ContBktestManager(BacktestManager):
                 print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
                 all_trades = {}
                 for i, tradepos in enumerate(closed_trades):
-                    all_trades[i] = strat.tradepos2dict(tradepos)
+                    all_trades[i] = tradepos.tradepos2dict(tradepos)
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
