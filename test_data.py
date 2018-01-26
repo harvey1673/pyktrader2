@@ -5,9 +5,7 @@ import pandas as pd
 import misc
 import os
 import talib
-import quandl
-import urllib2
-import pytz
+import urllib
 import csv
 import patoolib
 import dbaccess
@@ -378,6 +376,66 @@ def load_dates_from_csv(filename):
                     except:
                         continue
     return datelist
+
+CREDENTIALS = "credentials.txt"
+
+def get_credentials(path=CREDENTIALS):
+    output = list()
+    f = open(path, 'r')
+    txt = f.read()
+    txt = txt.split('\n')
+    for line in txt:
+        line = line.split(' ')
+        output.append(line[1])
+    f.close()
+    return tuple(output)
+
+
+PROXIES = {'http': 'http://%s:%s@10.252.22.102:4200' % get_credentials(),
+           'https': 'https://%s:%s@10.252.22.102:4200' % get_credentials()}
+
+
+def sina_fut_live(*args, **kwargs):
+    lst = ",".join(args)
+    url = "http://hq.sinajs.cn/list=%s" % lst
+    proxy = kwargs.get('proxies', dbaccess.get_proxy_server())
+    raw = urllib.urlopen(url, proxies=proxy).read()
+    raw = raw.split('\n')
+    result = dict()
+    time_now = datetime.datetime.now()
+    for i in range(len(raw) - 1):
+        txt = raw[i].split(',')
+        data = {
+            'date': time_now.date(),
+            'tick_id': misc.get_tick_id(time_now),
+            'open': txt[2],
+            'high': txt[3],
+            'low': txt[4],
+            'bidPrice1': txt[6],
+            'askPrice1': txt[7],
+            'price': txt[8],
+            'settlement': txt[9],
+            'bidVol1': txt[11],
+            'askVol1': txt[12],
+            'openInterest': txt[13],
+            'volume': txt[14]
+        }
+        result[args[i]] = data
+    return result
+
+
+def sina_fut_hist(ticker, daily=True, proxies=None):
+    # choose daily or 5 mins historical data
+    if daily:
+        url = 'http://stock2.finance.sina.com.cn/futures/api/json.php/IndexService.getInnerFuturesDailyKLine?symbol=%s' % ticker
+    else:
+        url = 'http://stock2.finance.sina.com.cn/futures/api/json.php/IndexService.getInnerFuturesMiniKLine5m?symbol=%s' % ticker
+
+    proxy_server = proxies if proxies else dbaccess.get_proxy_server()
+    raw = urllib.urlopen(url, proxies=proxy_server).read()
+    result = json.loads(raw)
+
+    return result
 
 if __name__ == '__main__':
     print
