@@ -1,7 +1,7 @@
 import datetime
 import numpy as np
 import cmq_crv_defn
-from cmq_inst import CMQInstrument
+from cmq_inst import *
 import cmq_curve
 import misc
 import cmq_volgrid
@@ -17,7 +17,7 @@ class CMQNormalCSO(CMQInstrument):
                                                         'otype': 'C',
                                                         'leg_diff': 1,
                                                         'need_disc': True})
-    inst_key = ['fwd_index', 'leg_a', 'leg_b', 'otype', 'strike', 'end', 'ccy']
+    inst_key = ['fwd_index', 'leg_a', 'leg_b', 'otype', 'strike', 'end', 'ccy', 'volume']
 
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQNormalCSO, self).__init__(trade_data, market_data, model_settings)
@@ -51,14 +51,8 @@ class CMQNormalCSO(CMQInstrument):
         volmark = cmq_crv_defn.lookup_vol_mark(self.fwd_index, market_data, self.end, \
                                                     vol_fields=['COMDV'+str(self.leg_diff)])
         self.ivol = volmark['COMDV'+str(self.leg_diff)]
-        if self.need_disc and (self.end >= self.value_date):
-            rate_quotes = market_data['IRCurve'][self.ccy.lower() + '_disc']
-            tenors = [(quote[1] - self.value_date).days for quote in rate_quotes]
-            irates = [quote[2] for quote in rate_quotes]
-            mode = cmq_curve.ForwardCurve.InterpMode.Linear
-            rate_curve = cmq_curve.ForwardCurve.from_array(tenors, irates, interp_mode = mode)
-            t_exp = (self.end-self.value_date).days
-            self.df = np.exp(-rate_curve(t_exp)*t_exp/365.0)
+        if self.need_disc:
+            self.df = disc_factor(self.value_date, self.end, market_data['IRCurve'][self.ccy.lower() + '_disc'])
         else:
             self.df = 1.0
 
