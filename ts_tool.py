@@ -1,57 +1,72 @@
 # -*- coding: utf-8 -*-
-import backtest
 import misc
-import math
-import bsopt
 import dbaccess
 import data_handler as dh
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import pandas as pd
-import pprint
-from statsmodels.tsa.stattools import adfuller
-from johansen_test import coint_johansen
+import statsmodels.formula.api as smf
+from pykalman import KalmanFilter
+from scipy import poly1d
+from stats_test import test_mean_reverting, half_life
+from sklearn.linear_model import LinearRegression
+from sklearn import metrics
+from sklearn.cross_validation import train_test_split
+from statsmodels.tsa.stattools import coint, adfuller
+import seaborn as sns
 
-def plot_price_series(df, ts_lab1, ts_lab2):
-    #months = mdates.MonthLocator()  # every month
-    fig, ax = plt.subplots()
-    ax.plot(df.index, df[ts_lab1], label=ts_lab1)
-    ax.plot(df.index, df[ts_lab2], label=ts_lab2)
-    #ax.xaxis.set_major_locator(months)
-    #ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    ax.grid(True)
-    fig.autofmt_xdate()
-    plt.xlabel('Month/Year')
-    plt.ylabel('Price ($)')
-    plt.title('%s and %s Daily Prices' % (ts_lab1, ts_lab2))
-    plt.legend()
-    plt.show()
+def colored_scatter(dep, indep, df, reg=True):
+    points = plt.scatter(df[dep], df[indep], c=df['date'], s=20, cmap='jet')
+    cb = plt.colorbar(points)
+    cb.ax.set_yticklabels([str(x.date()) for x in df['date'][::len(df)//5]])
+    if reg:
+        sns.regplot(dep, indep, df, scatter=False, color='.1')
 
-def plot_scatter_series(df, ts_lab1, ts_lab2):
-    plt.xlabel('%s Price ($)' % ts_lab1)
-    plt.ylabel('%s Price ($)' % ts_lab2)
-    plt.title('%s and %s Price Scatterplot' % (ts_lab1, ts_lab2))
-    plt.scatter(df[ts_lab1], df[ts_lab2])
-    plt.show()
+def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_col = 'date', fx_pair = None, field = 'spotID', args = None):
+    cnx = dbaccess.connect(**dbaccess.dbconfig)
+    if args:
+        args['start_date'] = start
+        args['end_date'] = end
+        df = misc.nearby(spotID, **args)
+    else:
+        df = dbaccess.load_daily_data_to_df(cnx, spot_table, spotID, start, end, index_col = None, field = field)
+    if isinstance(df[index_col][0], basestring):
+        if len(df[index_col][0])> 12:
+            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
+        else:
+            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    df = df.set_index(index_col)
+    if name:
+        col_name = name
+    else:
+        col_name = spotID
+    if field == 'ccy':
+        df = df[df.tenor=='0W']
+        data_field = 'rate'
+    elif field == 'spotID':
+        data_field = 'close'
+    df = df[[data_field]]
+    df.rename(columns = {data_field: col_name}, inplace = True)
+    if fx_pair:
+        fx = dbaccess.load_daily_data_to_df(cnx, 'fx_daily', fx_pair, start, end, index_col = None, field = 'ccy')
+        fx = fx[fx['tenor']=='0W']
+        if isinstance(fx[index_col][0], basestring):
+            fx[index_col] = fx[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
+            fx = fx.set_index(index_col)
+        fx = fx.set_index(index_col)
+        df[col_name] = df[col_name]/fx['rate']
+    return df
 
-def plot_series(ts):
-    #months = mdates.MonthLocator()  # every month
-    fig, ax = plt.subplots()
-    ax.plot(ts.index, ts, label=ts.name)
-    #ax.xaxis.set_major_locator(months)
-    #ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    #ax.set_xlim(datetime.datetime(2012, 1, 1), datetime.datetime(2013, 1, 1))
-    ax.grid(True)
-    fig.autofmt_xdate()
-    plt.xlabel('Month/Year')
-    plt.ylabel('Price ($)')
-    plt.title('Residual Plot')
-    plt.legend()
-    plt.plot(ts)
-    plt.show()
-    
+def merge_df(df_list):
+    if len(df_list) == 0:
+        return None
+    xdf = df_list[0]
+    for i in range(1, len(df_list)):
+        xdf = xdf.merge(df_list[i], left_index = True, right_index = True, how = 'outer')
+        #xdf.rename(columns={ col_name: "x"+str(i)}, inplace=True )
+    return xdf
+
 def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule = '-10b'):
     cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
     if nearby == 0:
@@ -59,7 +74,7 @@ def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule
         mdf['contract'] = asset
     else:
         mdf = misc.nearby(asset, nearby, start_date, end_date, rollrule, 'm', need_shift=True, database = 'hist_data')
-    mdf = backtest.cleanup_mindata(mdf, asset)
+    mdf = misc.cleanup_mindata(mdf, asset)
     xdf = dh.conv_ohlc_freq(mdf, freq, extra_cols = ['contract'], bar_func = dh.bar_conv_func2)
     return xdf
 
@@ -83,114 +98,309 @@ def validate_db_data(tday, filter = False):
             inst_list['min'].append(output)        
     print inst_list
 
-def variance_ratio(ts, freqs):
-    data = ts.values
-    nlen = len(data)
-    res = {'n': [], 'ln':[]}
-    var1 = np.var(data[1:] - data[:-1])
-    lnvar1 = np.var(np.log(data[1:]/data[:-1]))
-    for freq in freqs:
-        nrow = nlen/freq
-        nsize = freq * nrow
-        shaped_arr = np.reshape(data[:nsize], (nrow, freq))
-        diff = shaped_arr[1:,freq-1] - shaped_arr[:-1,freq-1]
-        res['n'].append(np.var(diff)/freq/var1)
-        ln_diff = np.log(shaped_arr[1:,freq-1]/shaped_arr[:-1,freq-1])
-        res['ln'].append(np.var(ln_diff)/freq/lnvar1)
-    return res
+class Regression(object):
+    def __init__(self, df, dependent=None, independent=None):
+        """
+        Initialize the class object
+        Pre-condition:
+            dependent - column name
+            independent - list of column names
+        """
+        if not dependent:
+            dependent = df.columns[1]
+        if not independent:
+            independent = [df.columns[2], ]
 
-def vratio(ts, lag = 2, cor = 'hom'):  
-    """ the implementation found in the blog Leinenbock  
-    http://www.leinenbock.com/variance-ratio-test/  
-    """  
-    #t = (std((a[lag:]) - (a[1:-lag+1])))**2;  
-    #b = (std((a[2:]) - (a[1:-1]) ))**2;  
-    n = len(ts)  
-    mu  = sum(ts[1:]-ts[:-1])/n
-    m= (n-lag+1)*(1-lag/n)
-    #print( mu, m, lag)  
-    b=sum(np.square(ts[1:]-ts[:-1]-mu))/(n-1)  
-    t=sum(np.square(ts[lag:]-ts[:-lag]-lag*mu))/m  
-    vratio = t/(lag*b)
-    la = float(lag)  
-    if cor == 'hom':  
-        varvrt=2*(2*la-1)*(la-1)/(3*la*n)  
-    elif cor == 'het':  
-        varvrt=0;  
-        sum2=sum(np.square(ts[1:]-ts[:-1]-mu))
-        for j in range(lag-1):  
-            sum1a=np.square(ts[j+1:]-ts[j:-1]-mu)
-            sum1b=np.square(ts[1:n-j]-ts[0:n-j-1]-mu)  
-            sum1=np.dot(sum1a,sum1b)
-            delta=sum1/(sum2**2)
-            varvrt=varvrt+((2*(la-j)/la)**2)*delta  
-    zscore = (vratio - 1) / np.sqrt(float(varvrt))
-    pval = bsopt.cnorm(zscore)
-    return  vratio, zscore, pval
-        
-def hurst(ts, max_shift = 100):
-    """Returns the Hurst Exponent of the time series vector ts"""
-    # Create the range of lag values
-    lags = range(2, max_shift)
-    # Calculate the array of the variances of the lagged differences
-    tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
-    # Use a linear fit to estimate the Hurst Exponent
-    poly = np.polyfit(np.log(lags), np.log(tau), 1)
-    # Return the Hurst exponent from the polyfit output
-    return poly[0]*2.0
+        formula = '{} ~ '.format(dependent)
+        first = True
+        for element in independent:
+            if first:
+                formula += element
+                first = False
+            else:
+                formula += ' + {}'.format(element)
 
-def adf_test(tseries, order = 1):
-    return adfuller(tseries, order)
+        self.df = df
+        self.dependent = dependent
+        self.independent = independent
+        self.result = smf.ols(formula, df).fit()
 
-def cadf_test(df1, df2, sdat, edate, idx = 'close', order = 1):
-    df = pd.concat([df1[idx], df2[idx]], axis = 1, keys = ['asset1', 'asset2'])
-    plot_price_series(df, 'asset1', 'asset2')
-    plot_scatter_series(df, 'asset1', 'asset2')
-    res = pd.stats.api.ols(y = df['asset1'], x = df['asset2'])
-    beta_hr = res.beta.x
-    res = df['asset1'] - beta_hr*df['asset2']
-    plot_series(res)
-    cadf = adf_test(res, order)
-    pprint.pprint(cadf)
+    def summary(self):
+        """
+        Return linear regression summary
+        """
+        return self.result.summary()
 
-    res = pd.stats.api.ols(y = df['asset2'], x = df['asset1'])
-    beta_hr = res.beta.x
-    res = df['asset2'] - beta_hr*df['asset1']
-    plot_series(res)
-    cadf = adf_test(res, order)
-    pprint.pprint(cadf)
-    
-def half_time(ts):
-    ndata = ts.values
-    dts = ndata[1:] - ndata[:-1]
-    xlag = ndata[:-1]
-    res = np.polyfit(xlag, dts, 1)
-    return -np.log(2)/res[0]
-    
-def get_johansen(y, p):
-    """
-    Get the cointegration vectors at 95% level of significance
-    given by the trace statistic test.
-    """
-    N, l = y.shape
-    jres = coint_johansen(y, 0, p)
-    trstat = jres.lr1                       # trace statistic
-    tsignf = jres.cvt                       # critical values
-    for i in range(l):
-        if trstat[i] > tsignf[i, 1]:     # 0: 90%  1:95% 2: 99%
-            r = i + 1
-    jres.r = r
-    jres.evecr = jres.evec[:, :r]
-    return jres
-        
-def signal_stats(df, signal, time_limit = None):
-    long_signal = pd.Series(np.nan, index = df.index)
-    long_signal[(signal > 0) & (signal.shift(1) <= 0)] = 1
-    long_signal[(signal <= 0)] = 0
-    long_signal = long_signal.fillna(method = 'ffill', limit = time_limit)
+    def plot_all(self):
+        """
+        Plot all dependent and independent variables against time. To visualize
+        there relations
+        """
+        df = self.df
+        independent = self.independent
+        dependent = self.dependent
 
-    short_signal = pd.Series(np.nan, index = df.index)
-    short_signal[(signal < 0) & (signal.shift(1) >= 0)] = 1
-    short_signal[(signal >= 0)] = 0
-    short_signal = short_signal.fillna(method = 'ffill', limit = time_limit)
-    
+        plt.figure(figsize=(10, 5))
+        plt.plot(df.index, df[dependent], label=dependent)
+        for indep in independent:
+            plt.plot(df.index, df[indep], label=indep)
+        plt.xticks(rotation='vertical')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        plt.show()
+
+    def plot2D(self, rotation=False):
+        """
+        Print scatter plot and the best fit line
+        Pre-condition:
+            graph must be of 2D
+        """
+        if len(self.independent) > 1:
+            raise ValueError("Not a single independent variable regression")
+        params = self.result.params
+        df = self.df
+        k = params[1]
+        b = params[0]
+        independent = self.independent[0]
+        dependent = self.dependent
+        model = k * df[independent] + b
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(df[independent], df[dependent], 'o')
+        plt.plot(df[independent], model)
+        plt.xlabel(independent)
+        plt.ylabel(dependent)
+        plt.title(dependent + ' vs. ' + independent)
+        if rotation:
+            plt.xticks(rotation='vertical')
+        plt.show()
+
+    def residual(self):
+        """
+        Return a pandas Series of residual
+        Pre-condition:
+            There should be no NAN in data. Hence length of date is equal to length
+            of data
+        """
+        df = self.result.resid
+        df.index = self.df.index
+        return df
+
+    def residual_plot(self, std_line=2, rotation=True):
+        """
+        Plot the residual against time
+        Pre-condition:
+            std_line - plot n std band. Set to zero to disable the feature.
+        """
+        plt.figure(figsize=(10, 5))
+        plt.plot(self.df.index, self.result.resid, label='residual')
+        if rotation:
+            plt.xticks(rotation='vertical')
+        plt.title('residual plot')
+        if std_line != 0:
+            df = self.df
+            std = self.residual().describe()['std']
+            mean = self.residual().describe()['mean']
+            num = len(df.index)
+            plt.plot(df.index, std_line * std * np.ones(num) + mean, 'r--')
+            plt.plot(df.index, -std_line * std * np.ones(num) + mean, 'r--')
+            plt.title('residual plot ({} STD band)'.format(std_line))
+        plt.show()
+
+    def residual_vs_fit(self):
+        residual = self.residual()
+        df = self.df
+        y_predict = self.result.predict(df[self.independent])
+        plt.plot(y_predict, residual, 'o')
+        plt.plot(y_predict, np.zeros(len(residual)), 'r--')
+        plt.xlabel("predict")
+        plt.ylabel('residual')
+        plt.title('Residual vs fit')
+        plt.show()
+
+    def train_test_sets(self):
+        """
+        test regression by seperating data to a train set and a test set
+        """
+        dependent = self.dependent
+        independent = self.independent
+        df = self.df
+        y = df[dependent]
+        X = df[independent]
+
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=1)
+        # Instantiate model
+        lm = LinearRegression()
+        # Fit Model
+        lm.fit(X_train, y_train)
+        # Predict
+        y_pred = lm.predict(X_test)
+
+        RMSE = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
+        print ("RMSE: %.5f" % RMSE)
+        return RMSE
+
+    def coeff_consistency(self, index_list):
+        df = self.df
+        if type(df.index[0]).__name__ == 'Timestamp' and type(index_list[0]).__name__ != 'Timestamp':
+            index_list = [pd.to_datetime(idx) for idx in index_list]
+        for start, end in zip(index_list[:-1], index_list[1:]):
+            reg = Regression(df[(df.index>= start) & (df.index <= end)], self.dependent, self.independent)
+            string = []
+            for indep in reg.independent:
+                string.append("%.4f * %s" % (reg.result.params[indep], indep))
+            print ("Period %s - %s: %s = %s + %.4f" % (str(start), str(end), reg.dependent, ' + '.join(string), reg.result.params[0]))
+        string = []
+        for indep in self.independent:
+            string.append("%.4f * %s" % (self.result.params[indep], indep))
+        print ("Whole period: %s = %s + %.4f" % (self.dependent, ' + '.join(string), self.result.params[0]))
+
+    def run_all(self):
+        """
+        Lazy ass's ultimate solution. Run all available analysis
+        Pre-condition:
+            There should be only one independent variable
+        """
+        _2D = len(self.independent) == 1
+        print
+        self.plot_all()
+        print
+        print self.summary()
+        if _2D:
+            self.plot2D()
+        print
+        print 'Error statistics'
+        print self.residual().describe()
+        print
+        self.train_test_sets()
+        self.residual_vs_fit()
+        self.residual_plot()
+        residual = self.residual()
+        test_mean_reverting(residual)
+        print
+        print  'Halflife = ', half_life(residual)
+
+    def summarize_all(self):
+        if len(self.independent) == 1:
+            dependent = self.dependent
+            independent = self.independent[0]
+            params = self.result.params
+            result = self.result
+            k = params[1]
+            b = params[0]
+            conf = result.conf_int()
+            cadf = adfuller(result.resid)
+            if cadf[0] <= cadf[4]['5%']:
+                boolean = 'likely'
+            else:
+                boolean = 'unlikely'
+            print
+            print ("{:^40}".format("{} vs {}".format(dependent.upper(), independent.upper())))
+            print ("%20s %s = %.4f * %s + %.4f" % ("Model:", dependent, k, independent, b))
+            print ("%20s %.4f" % ("R square:", result.rsquared))
+            print ("%20s [%.4f, %.4f]" % ("Confidence interval:", conf.iloc[1, 0], conf.iloc[1, 1]))
+            print ("%20s %.4f" % ("Model error:", result.resid.std()))
+            print ("%20s %s" % ("Mean reverting:", boolean))
+            print ("%20s %d" % ("Half life:", half_life(result.resid)))
+        else:
+            dependent = self.dependent
+            independent = self.independent  # list
+            params = self.result.params
+            result = self.result
+            b = params[0]
+            conf = result.conf_int()  # pandas
+            cadf = adfuller(result.resid)
+            if cadf[0] <= cadf[4]['5%']:
+                boolean = 'likely'
+            else:
+                boolean = 'unlikely'
+            print
+            print ("{:^40}".format("{} vs {}".format(dependent.upper(), (', '.join(independent)).upper())))
+            string = []
+            for i in range(len(independent)):
+                string.append("%.4f * %s" % (params[independent[i]], independent[i]))
+            print ("%20s %s = %s + %.4f" % ("Model:", dependent, ' + '.join(string), b))
+            print ("%20s %.4f" % ("R square:", result.rsquared))
+            string = []
+            for i in range(len(independent)):
+                string.append("[%.4f, %.4f]" % (conf.loc[independent[i], 0], conf.loc[independent[i], 1]))
+            print ("%20s %s" % ("Confidence interval:", ' , '.join(string)))
+            print ("%20s %.4f" % ("Model error:", result.resid.std()))
+            print ("%20s %s" % ("Mean reverting:", boolean))
+            print ("%20s %d" % ("Half life:", half_life(result.resid)))
+
+
+class KalmanRegression(object):
+    def __init__(self, df, dependent=None, independent=None, delta=None, trans_cov=None, obs_cov=None):
+        if not dependent:
+            dependent = df.columns[1]
+        if not independent:
+            independent = df.columns[2]
+
+        self.x = df[independent]
+        self.x.index = df.index
+        self.y = df[dependent]
+        self.y.index = df.index
+        self.dependent = dependent
+        self.independent = independent
+
+        self.delta = delta or 1e-5
+        self.trans_cov = trans_cov or self.delta / (1 - self.delta) * np.eye(2)
+        self.obs_mat = np.expand_dims(
+            np.vstack([[self.x.values], [np.ones(len(self.x))]]).T,
+            axis=1
+        )
+        self.obs_cov = obs_cov or 1
+        self.kf = KalmanFilter(n_dim_obs=1, n_dim_state=2,
+                               initial_state_mean=np.zeros(2),
+                               initial_state_covariance=np.ones((2, 2)),
+                               transition_matrices=np.eye(2),
+                               observation_matrices=self.obs_mat,
+                               observation_covariance=self.obs_cov,
+                               transition_covariance=self.trans_cov)
+        self.state_means, self.state_covs = self.kf.filter(self.y.values)
+
+    def slope(self):
+        state_means = self.state_means
+        return pd.Series(state_means[:, 0], index=self.x.index)
+
+    def plot_params(self):
+        state_means = self.state_means
+        x = self.x
+        _, axarr = plt.subplots(2, sharex=True)
+        axarr[0].plot(x.index, state_means[:, 0], label='slope')
+        axarr[0].legend()
+        axarr[1].plot(x.index, state_means[:, 1], label='intercept')
+        axarr[1].legend()
+        plt.tight_layout()
+        plt.show()
+        return state_means[:, 0]
+
+    def plot2D(self):
+        x = self.x
+        y = self.y
+        state_means = self.state_means
+
+        cm = plt.get_cmap('jet')
+        colors = np.linspace(0.1, 1, len(x))
+        # Plot data points using colormap
+        sc = plt.scatter(x, y, s=30, c=colors, cmap=cm, edgecolor='k', alpha=0.7)
+        cb = plt.colorbar(sc)
+        cb.ax.set_yticklabels([str(p.date()) for p in x[::len(x) // 9].index])
+
+        # Plot every fifth line
+        step = 100
+        xi = np.linspace(x.min() - 5, x.max() + 5, 2)
+        colors_l = np.linspace(0.1, 1, len(state_means[::step]))
+        for i, beta in enumerate(state_means[::step]):
+            plt.plot(xi, beta[0] * xi + beta[1], alpha=.2, lw=1, c=cm(colors_l[i]))
+
+        # Plot the OLS regression line
+        plt.plot(xi, poly1d(np.polyfit(x, y, 1))(xi), '0.4')
+
+        plt.title(self.dependent + ' vs. ' + self.independent)
+        plt.show()
+
+    def run_all(self):
+        self.plot_params()
+        self.plot2D()
