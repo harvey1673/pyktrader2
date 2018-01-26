@@ -12,7 +12,7 @@ import datetime
 
 class CMQMthlyAsian(CMQCalendarSwap):
     class_params = dict(CMQCalendarSwap.class_params, **{ 'otype': 'C', 'accrual': 'act252', 'need_disc': False})
-    inst_key = ['fwd_index', 'otype', 'strike', 'start', 'end', 'ccy']
+    inst_key = ['fwd_index', 'otype', 'strike', 'start', 'end', 'ccy', 'volume']
 
     def __init__(self, trade_data, market_data = {}, model_settings = {}):
         super(CMQMthlyAsian, self).__init__(trade_data, market_data, model_settings)
