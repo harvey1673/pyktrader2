@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-'''
-optstrat.py
-Created on Feb 03, 2015
-@author: Harvey
-'''
 import json
 import os
 import csv
@@ -13,8 +8,8 @@ import trade
 import instrument
 import pandas as pd
 import data_handler as dh
-from eventType import *
-from eventEngine import Event
+from event_type import *
+from event_engine import Event
 from misc import *
 
 class OptionStrategy(object):
