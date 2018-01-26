@@ -4,6 +4,7 @@ import datetime
 import itertools
 import cmq_inst
 import dbaccess
+import misc
 
 class CMQDealStatus:
     Perspective, PendingSignoff, Live, Matured, Unwinded, Cancelled = range(6)
@@ -32,7 +33,7 @@ class CMQDeal(object):
                     'external_id': 'dummy', 'external_src': 'dummy', \
                     'internal_id': 'dummy', 'business': 'commod', \
                     'desk': 'CST', 'prtfolio': 'test', 'product': 'SGIRO', \
-                    'day1_comments': '', 'commission': 0.0, 'ccy': 'USD'}
+                    'day1_comments': '', 'commission': 0.0, 'premium': 0.0}
     def __init__(self, deal_data):
         self.mkt_deps = {}
         if isinstance(deal_data, (str, unicode)):
@@ -115,6 +116,21 @@ class CMQBook(object):
                     self.inst_dict[inst] = 0
                 self.inst_dict[inst] += pos
         agg_mkt_deps(self.mkt_deps, self.deal_list)
+        for inst in self.inst_dict:
+            if inst.ccy != self.reporting_ccy:
+                fx_pair = None
+                fx_direction = misc.get_mkt_fxpair(self.reporting_ccy, inst.ccy)
+                if fx_direction > 0 :
+                    fx_pair =  '/'.join([self.reporting_ccy, inst.ccy])
+                elif fx_direction < 0:
+                    fx_pair = '/'.join([inst.ccy, self.reporting_ccy])
+                else:
+                    print "ERROR: unsupported FX pair: %s - %s" % (self.reporting_ccy, inst.ccy)
+                    fx_pair = None
+                if fx_pair != None:
+                    if 'FXFwd' not in self.mkt_deps:
+                        self.mkt_deps['FXFwd'] = {}
+                    self.mkt_deps['FXFwd'][fx_pair] = ['ALL']
 
     def price(self):
         return sum([ deal.price() for deal in self.deal_list])
@@ -124,9 +140,9 @@ class CMQBook(object):
         output['deal_list'] = [ str(deal) for deal in self.deal_list]
         return json.dumps(output)
 
-def get_book_from_db(book_name, status):
+def get_book_from_db(book_name, status, dbtable = 'trade_data'):
     cnx = dbaccess.connect(**dbaccess.trade_dbconfig)
-    df = dbaccess.load_deal_data(cnx, dbtable = 'deals', book = book_name, deal_status = status)
+    df = dbaccess.load_deal_data(cnx, dbtable, book = book_name, deal_status = status)
     deal_list = df.to_dict(orient = 'record')
     book_data = {'book': book_name,  'owner': 'harvey', 'reporting_ccy': 'USD', \
                  'status': CMQBookStatus.Prod, 'deal_list': deal_list }
