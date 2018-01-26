@@ -76,9 +76,10 @@ CHN_Holidays = [datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.d
                 datetime.date(2017, 5, 29), datetime.date(2017, 5, 30),
                 datetime.date(2017, 10, 2), datetime.date(2017, 10, 3), datetime.date(2017, 10, 4),
                 datetime.date(2017, 10, 5), datetime.date(2017, 10, 6),
-                datetime.date(2018, 1, 1), datetime.date(2018, 2, 16), datetime.date(2018, 2, 19),
-                datetime.date(2018, 2, 20), datetime.date(2018, 2, 21),
-                datetime.date(2018, 4, 5), datetime.date(2018, 5, 1), datetime.date(2018, 6, 18),
+                datetime.date(2018, 1, 1), datetime.date(2018, 2, 15), datetime.date(2018, 2, 16),
+                datetime.date(2018, 2, 19), datetime.date(2018, 2, 20), datetime.date(2018, 2, 21),
+                datetime.date(2018, 4, 5), datetime.date(2018, 4, 6),  datetime.date(2018, 4, 30),
+                datetime.date(2018, 5, 1), datetime.date(2018, 6, 18),
                 datetime.date(2018, 9, 24), datetime.date(2018, 10, 1), datetime.date(2018, 10, 2),
                 datetime.date(2018, 10, 3), datetime.date(2018, 10, 4), datetime.date(2018, 10, 5)]
 
@@ -129,7 +130,8 @@ product_code = {'SHFE': ['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', '
                 'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'm_Opt', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
                 'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF', 'CY', 'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG',
                          'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC'],
-                'SGX': ['fef'], }
+                'SGX': ['fef', 'iolp'], \
+                'LME': ['sc'], }
 
 CHN_Stock_Exch = {
     'SSE': ["000300", "510180", "510050", "11000011", "11000016", "11000021", "11000026", "000002", "000003", "000004",
@@ -353,6 +355,27 @@ def get_tick_id(dt):
 def is_workday(d, calendar = '', we_cutoff = 5):
     return (d.weekday() < we_cutoff) and (d not in Holiday_Map.get(calendar, []))
 
+def get_mkt_fxpair(fx1, fx2):
+    ccy1 = fx1.upper()
+    ccy2 = fx2.upper()
+    if ccy1 == ccy2:
+        return 0
+    ccy_list = ['GBP', 'EUR', 'AUD', 'NZD', 'USD', 'CNY', 'JPY']
+    rank1 = 100
+    rank2 = 100
+    if ccy1 in ccy_list:
+        rank1 = ccy_list.index(ccy1)
+    if ccy2 in ccy_list:
+        rank2 = ccy_list.index(ccy2)
+    if (rank1 > 99) or (rank2 > 99):
+        direction = 0
+    elif rank1 < rank2:
+        direction = 1
+    elif rank1 > rank2:
+        direction = -1
+    else:
+        direction = 0
+    return direction
 
 def filter_main_cont(sdate, filter=False):
     insts, prods = dbaccess.load_alive_cont(sdate)
@@ -393,7 +416,11 @@ def spreadinst2underlying(inst_name):
 
 
 def inst2product(inst):
-    if inst[2].isalpha():
+    if inst[4].isalpha():
+        key = inst[:5]
+    elif inst[3].isalpha():
+        key = inst[:4]
+    elif inst[2].isalpha():
         key = inst[:3]
     elif inst[1].isalpha():
         key = inst[:2]
@@ -501,7 +528,7 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
         expiry = workdays.workday(expiry_month, -1, PLIO_Holidays)
     return datetime.datetime.combine(expiry, datetime.time(15, 0))
 
-def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False, database='hist_data'):
+def nearby(prodcode, n = 1, start_date = None, end_date = None, roll_rule = '-20b', freq = 'd', need_shift=False, database = None):
     if start_date > end_date:
         return None
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
@@ -511,7 +538,8 @@ def nearby(prodcode, n, start_date, end_date, roll_rule, freq, need_shift=False,
     sdate = start_date
     is_new = True
     dbconf = copy.deepcopy(dbaccess.dbconfig)
-    dbconf['database'] = database
+    if database:
+        dbconf['database'] = database
     cnx = dbaccess.connect(**dbconf)
     for idx, exp in enumerate(exp_dates):
         if exp < start_date:
@@ -642,6 +670,8 @@ def contract_expiry(cont, hols='db'):
         out = [exp for exp in cursor]
         if len(out) > 0:
             expiry = out[0][0]
+            if isinstance(expiry, basestring):
+                expiry = datetime.datetime.strptime(expiry, "%Y-%m-%d").date()
         else:
             expiry = contract_expiry(cont, CHN_Holidays)
         cnx.close()
