@@ -39,7 +39,6 @@ def generate_scen(base_market, curve_type, curve_name, curve_tenor = 'ALL', shif
                         while fwd_quotes[idy][1] < fix_date:
                             idy += 1
                         fixes.append([fix_date, fwd_quotes[idy][2]])
-                        print [fix_date, fwd_quotes[idy][2]]
     elif (curve_type in market_scen) and (curve_name in market_scen[curve_type]):
             for idx, value in enumerate(market_scen[curve_type][curve_name]):
                 if curve_tenor == 'ALL' or value[0] == curve_tenor:
@@ -74,36 +73,54 @@ class CMQInstRiskStore(object):
                     theta_shift = int(greek_keys[1])
                 scens += [("value_date", "value_date", "ALL", 0), ("value_date", "value_date", "ALL", theta_shift)]
             elif greek in ['cmdelta', 'cmgamma']:
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     scens += [('COMFwd',  fwd_idx, 'ALL', inst_obj.cmdelta_shift), ('COMFwd', fwd_idx, 'ALL', -inst_obj.cmdelta_shift)]
             elif greek == 'cmvega':
                 vol_key = 'COMVol'+ greek_keys[1].upper()
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     scens += [(vol_key, vol_idx, 'ALL', inst_obj.cmvega_shift), (vol_key, vol_idx, 'ALL', -inst_obj.cmvega_shift)]
             elif greek in ['cmdeltas', 'cmgammas']:
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     for tenor in inst_obj.mkt_deps['COMFwd'][fwd_idx]:
                         scens += [('COMFwd',  fwd_idx, tenor, inst_obj.cmdelta_shift), ('COMFwd', fwd_idx, tenor, -inst_obj.cmdelta_shift)]
             elif greek == 'cmvegas':
                 vol_key = 'COMVol' + greek_keys[1].upper()
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     for tenor in inst_obj.mkt_deps[vol_key][vol_idx]:
                         scens += [(vol_key, vol_idx, tenor, inst_obj.cmvega_shift), (vol_key, vol_idx, tenor, -inst_obj.cmvega_shift)]
             elif greek in ['ycdelta', 'ycgamma']:
+                if 'IRCurve' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in self.instrument.mkt_deps['IRCurve']:
                     scens += [('IRCurve', fwd_idx, 'ALL', inst_obj.ycdelta_shift), ('IRCurve', fwd_idx, 'ALL', -inst_obj.ycdelta_shift)]
             elif greek == 'swnvega':
+                if 'IRSWNVol' not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps['IRSWNVol']:
                     scens += [('IRSWNVol', vol_idx, 'ALL', inst_obj.swnvega_shift), ('IRSWNVol', vol_idx, 'ALL', -inst_obj.swnvega_shift)]
             elif greek in ['fxdelta', 'fxgamma']:
+                if 'FXFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['FXFwd']:
                     scens += [('FXFwd', fwd_idx, 'ALL', inst_obj.fxdelta_shift), ('FXFwd', fwd_idx, 'ALL', -inst_obj.fxdelta_shift)]
             elif greek == 'fxvega':
                 vol_key = 'FXVol' + greek_keys[1].upper()
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     scens += [(vol_key, vol_idx, 'ALL', inst_obj.fxvega_shift), (vol_key, vol_idx, 'ALL', -inst_obj.fxvega_shift)]
             elif greek == 'fxvegas':
                 vol_key = 'FXVol' + greek_keys[1].upper()
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     for tenor in inst_obj.mkt_deps[vol_key][vol_idx]:
                         scens += [(vol_key, vol_idx, tenor, inst_obj.fxvega_shift), (vol_key, vol_idx, tenor, -inst_obj.fxvega_shift)]
@@ -140,12 +157,16 @@ class CMQInstRiskStore(object):
                                          - self.results[("value_date", "value_date", "ALL", 0)]
             elif greek == 'cmdelta':
                 self.calc_risks[greek_str] = {}
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('COMFwd', fwd_idx, 'ALL', inst_obj.cmdelta_shift)] \
                                           - self.results[('COMFwd', fwd_idx, 'ALL', -inst_obj.cmdelta_shift)]) / ( \
                                              2.0 * inst_obj.cmdelta_shift )
             elif greek == 'cmgamma':
                 self.calc_risks[greek_str] = {}
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('COMFwd', fwd_idx, 'ALL', inst_obj.cmdelta_shift)] \
                                           - 2 * self.results[("value_date", "value_date", "ALL", 0)] \
@@ -153,6 +174,8 @@ class CMQInstRiskStore(object):
                                         / ( inst_obj.cmdelta_shift ** 2)
             elif greek == 'cmdeltas':
                 self.calc_risks[greek_str] = {}
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     self.calc_risks[greek_str][fwd_idx] = {}
                     for tenor in inst_obj.mkt_deps['COMFwd'][fwd_idx]:
@@ -161,6 +184,8 @@ class CMQInstRiskStore(object):
                                              2.0 * inst_obj.cmdelta_shift )
             elif greek == 'cmgammas':
                 self.calc_risks[greek_str] = {}
+                if 'COMFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['COMFwd']:
                     self.calc_risks[greek_str][fwd_idx] = {}
                     for tenor in inst_obj.mkt_deps['COMFwd'][fwd_idx]:
@@ -171,6 +196,8 @@ class CMQInstRiskStore(object):
             elif greek == 'cmvega':
                 vol_key = 'COMVol' + greek_keys[1].upper()
                 self.calc_risks[greek_str] = {}
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     self.calc_risks[greek_str][vol_idx] = (self.results[(vol_key, vol_idx, 'ALL', inst_obj.cmvega_shift)] \
                                                                   - self.results[(vol_key, vol_idx, 'ALL', -inst_obj.cmvega_shift)]) \
@@ -178,6 +205,8 @@ class CMQInstRiskStore(object):
             elif greek == 'cmvegas':
                 vol_key = 'COMVol' + greek_keys[1].upper()
                 self.calc_risks[greek_str] = {}
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     self.calc_risks[greek_str][vol_idx] = {}
                     for tenor in inst_obj.mkt_deps[vol_key][vol_idx]:
@@ -186,12 +215,16 @@ class CMQInstRiskStore(object):
                                                                  / (2.0 * inst_obj.cmvega_shift * 100.0)
             elif greek == 'ycdelta':
                 self.calc_risks[greek_str] = {}
+                if 'IRCurve' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['IRCurve']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('IRYCurve', fwd_idx, 'ALL', inst_obj.ycdelta_shift)] \
                                         - self.results[('IRYCurve', fwd_idx, 'ALL', -inst_obj.ycdelta_shift)]) \
                                         / 2.0 / (inst_obj.ycdelta_shift * 10000)
             elif greek == 'ycgamma':
                 self.calc_risks[greek_str] = {}
+                if 'IRCurve' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['IRCurve']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('IRYCurve', fwd_idx, 'ALL', inst_obj.ycdelta_shift)] \
                                           - 2 * self.results[("value_date", "value_date", "ALL", 0)] \
@@ -199,12 +232,16 @@ class CMQInstRiskStore(object):
                                          (inst_obj.ycdelta_shift * 10000) ** 2)
             elif greek == 'fxdelta':  ## need to be careful here FX shift is assumed to be ratio multiplier
                 self.calc_risks[greek_str] = {}
+                if 'FXFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['FXFwd']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('FXFwd', fwd_idx, 'ALL', inst_obj.fxdelta_shift)] \
                                         - self.results[('FXFwd', fwd_idx, 'ALL', -inst_obj.fxdelta_shift)]) \
                                         / (2 * inst_obj.fxdelta_shift)
             elif greek == 'fxgamma':
                 self.calc_risks[greek_str] = {}
+                if 'FXFwd' not in inst_obj.mkt_deps:
+                    continue
                 for fwd_idx in inst_obj.mkt_deps['FXFwd']:
                     self.calc_risks[greek_str][fwd_idx] = (self.results[('FXFwd', fwd_idx, 'ALL', inst_obj.fxdelta_shift)] \
                                         - 2*self.results[("value_date", "value_date", "ALL", 0)] \
@@ -212,6 +249,8 @@ class CMQInstRiskStore(object):
                                         / (inst_obj.fxdelta_shift ** 2)
             elif greek == 'swnvega':
                 self.calc_risks[greek_str] = {}
+                if 'IRSWNVol' not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps['IRSWNVol']:
                     self.calc_risks[greek_str][vol_idx] = (self.results[('IRSWNVol', vol_idx, 'ALL', inst_obj.swnvega_shift)] \
                                         - self.results[('IRSWNVol', vol_idx, 'ALL', -inst_obj.swnvega_shift)]) \
@@ -219,6 +258,8 @@ class CMQInstRiskStore(object):
             elif greek == 'fxvega':
                 vol_key = 'FXVol' + greek_keys[1].upper()
                 self.calc_risks[greek_str] = {}
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     self.calc_risks[greek_str][vol_idx] = (self.results[(vol_key, vol_idx, 'ALL', inst_obj.fxvega_shift)] \
                                           - self.results[(vol_key, vol_idx, 'ALL', -inst_obj.fxvega_shift)]) \
@@ -226,6 +267,8 @@ class CMQInstRiskStore(object):
             elif greek == 'fxvegas':
                 vol_key = 'FXVol' + greek_keys[1].upper()
                 self.calc_risks[greek_str] = {}
+                if vol_key not in inst_obj.mkt_deps:
+                    continue
                 for vol_idx in inst_obj.mkt_deps[vol_key]:
                     self.calc_risks[greek_str][vol_idx] = {}
                     for tenor in inst_obj.mkt_deps[vol_key][vol_idx]:
