@@ -3,6 +3,7 @@ from base import *
 from misc import *
 import data_handler as dh
 import copy
+from trade_position import *
 from strategy import *
  
 class RsiAtrStrat(Strategy):
