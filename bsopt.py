@@ -58,11 +58,10 @@ def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
     d2 = d1 - Sigma*sqrt(Texp)
     x1 = scipy.stats.norm.cdf(d1)
     x2 = scipy.stats.norm.cdf(d2)
-    res = {}
     if IsCall:
-        res['Price'] = (F2+K)*(FA * x1 - x2) * exp(-r*Texp)
+        res = (F2+K)*(FA * x1 - x2) * exp(-r*Texp)
     else:
-        res['Price'] = (F2+K)*((1 - x2) - FA*(1 - x1)) * exp(-r*Texp)
+        res = (F2+K)*((1 - x2) - FA*(1 - x1)) * exp(-r*Texp)
     return res
 
 def MinOptionOnSpdCall(F1, F2, dv1, dv2, rho, K1, K2, T):
@@ -653,4 +652,3 @@ def AsianFwdVega(Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
         Asiand1 = (log(Fwd / x) + volA * volA * 0.5 * Texp) / (volA * sqrt(Texp))
         ND = exp(-(Asiand1 * Asiand1 * 0.5)) / sqrt(2 * pi)
         return multi * Fwd * exp(-Rd * Texp) * ND * sqrt(Texp) * dvA * 0.01
-    
