@@ -125,9 +125,12 @@ def process_BOM(market_data, mkt_deps):
     mdate = market_data['market_date']
     for fwd_idx in market_data['COMFwd']:
         crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
-        if crv_info['exch'] == 'SGX':
+        if crv_info['exch'] in ['SGX', 'LME', 'NYM']:
             fwd_quotes = market_data['COMFwd'][fwd_idx]
             if (fwd_quotes[0][0] < mdate):
+                spotID = crv_info['spotID']
+                if spotID not in mkt_deps['COMFix']:
+                    continue
                 hols = getattr(misc, crv_info['calendar'] + '_Holidays')
                 bzdays = workdays.networkdays(fwd_quotes[0][0], fwd_quotes[0][1], hols)
                 spotID = crv_info['spotID']
