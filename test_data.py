@@ -377,28 +377,10 @@ def load_dates_from_csv(filename):
                         continue
     return datelist
 
-CREDENTIALS = "credentials.txt"
-
-def get_credentials(path=CREDENTIALS):
-    output = list()
-    f = open(path, 'r')
-    txt = f.read()
-    txt = txt.split('\n')
-    for line in txt:
-        line = line.split(' ')
-        output.append(line[1])
-    f.close()
-    return tuple(output)
-
-
-PROXIES = {'http': 'http://%s:%s@10.252.22.102:4200' % get_credentials(),
-           'https': 'https://%s:%s@10.252.22.102:4200' % get_credentials()}
-
-
 def sina_fut_live(*args, **kwargs):
     lst = ",".join(args)
     url = "http://hq.sinajs.cn/list=%s" % lst
-    proxy = kwargs.get('proxies', dbaccess.get_proxy_server())
+    proxy = kwargs.get('proxies', {})
     raw = urllib.urlopen(url, proxies=proxy).read()
     raw = raw.split('\n')
     result = dict()
@@ -424,17 +406,14 @@ def sina_fut_live(*args, **kwargs):
     return result
 
 
-def sina_fut_hist(ticker, daily=True, proxies=None):
+def sina_fut_hist(ticker, daily=True, proxies={}):
     # choose daily or 5 mins historical data
     if daily:
         url = 'http://stock2.finance.sina.com.cn/futures/api/json.php/IndexService.getInnerFuturesDailyKLine?symbol=%s' % ticker
     else:
         url = 'http://stock2.finance.sina.com.cn/futures/api/json.php/IndexService.getInnerFuturesMiniKLine5m?symbol=%s' % ticker
-
-    proxy_server = proxies if proxies else dbaccess.get_proxy_server()
-    raw = urllib.urlopen(url, proxies=proxy_server).read()
+    raw = urllib.urlopen(url, proxies = proxies).read()
     result = json.loads(raw)
-
     return result
 
 if __name__ == '__main__':
