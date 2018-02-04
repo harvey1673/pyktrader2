@@ -1,5 +1,5 @@
 #-*- coding:utf-8 -*-
-from eventType import *
+from event_type import *
 Event_Priority_Basic = {}
 
 Event_Priority_Basic[EVENT_TIMER] = 50
