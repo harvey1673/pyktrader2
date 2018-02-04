@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import numpy as np
 import data_handler as dh
-import trade_position as tradepos
+import trade_position
 import dbaccess
 import misc
 import platform
@@ -195,7 +195,7 @@ def simdf_to_trades1(df, slippage = 0):
             if len(pos_list) > 0 and (pos_list[-1].pos * (pos - prev_pos) < 0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (
                 cont, prev_pos, pos, dtime)
-            new_pos = tradepos.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
+            new_pos = trade_position.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
                                      exit_target=tprice)
             tradeid += 1
             new_pos.entry_tradeid = tradeid
@@ -214,7 +214,7 @@ def simdf_to_trades1(df, slippage = 0):
             pos_list = [tp for tp in pos_list if not tp.is_closed]
             if prev_pos != pos:
                 if len(pos_list) == 0:
-                    new_pos = tradepos.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
+                    new_pos = trade_position.TradePos(insts=[cont], volumes=[1], pos=pos - prev_pos, entry_target=tprice,
                                              exit_target=tprice)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
@@ -249,14 +249,14 @@ def simdf_to_trades2(df, slippage=0.0):
                 print "Error: the new trade should be on the same direction of the existing trade cont=%s, prev_pos=%s, pos=%s, time=%s" % (
                 cont, prev_pos, pos, dtime)
             npos = int(abs(pos - prev_pos))
-            new_pos = [tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+            new_pos = [trade_position.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
                                       exit_target=tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
                 tpos.entry_tradeid = tradeid
                 tpos.open(tprice, misc.sign(pos - prev_pos), dtime)
             pos_list = pos_list + new_pos
-            new_pos = [tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+            new_pos = [trade_position.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
                                       exit_target=tprice) for i in range(npos)]
             for tpos in new_pos:
                 tradeid += 1
@@ -278,7 +278,7 @@ def simdf_to_trades2(df, slippage=0.0):
                 if len(pos_list) == 0:
                     npos = int(abs(pos - prev_pos))
                     new_pos = [
-                        tradepos.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
+                        trade_position.TradePos(insts=[cont], volumes=[1], pos=misc.sign(pos - prev_pos), entry_target=tprice,
                                        exit_target=tprice) for i in range(npos)]
                     for tpos in new_pos:
                         tradeid += 1
@@ -736,7 +736,7 @@ class BacktestManager(object):
                 print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
                 all_trades = {}
                 for i, tradepos in enumerate(closed_trades):
-                    all_trades[i] = strat.tradepos2dict(tradepos)
+                    all_trades[i] = trade_position.tradepos2dict(tradepos)
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
@@ -866,7 +866,7 @@ class ContBktestManager(BacktestManager):
                 print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
                 all_trades = {}
                 for i, tradepos in enumerate(closed_trades):
-                    all_trades[i] = tradepos.tradepos2dict(tradepos)
+                    all_trades[i] = trade_position.tradepos2dict(tradepos)
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
                 ts.to_csv(fname2)
