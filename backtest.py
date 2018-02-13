@@ -307,8 +307,30 @@ def check_bktest_bar_stop(bar, stop_price, direction=1):
             price_traded = compare_price
     return price_traded
 
+def pnl_stats(pnl_df):
+    res = {}
+    res['avg_pnl'] = float(pnl_df['daily_pnl'].mean())
+    res['std_pnl'] = float(pnl_df['daily_pnl'].std())
+    res['tot_pnl'] = float(pnl_df['daily_pnl'].sum())
+    res['tot_cost'] = float(pnl_df['daily_cost'].sum())
+    res['num_days'] = len(pnl_df['daily_pnl'])
+    if res['std_pnl'] > 0:
+        res['sharp_ratio'] = float(res['avg_pnl'] / res['std_pnl'] * np.sqrt(252.0))
+        max_dd, max_dur = max_drawdown(pnl_df['cum_pnl'])
+        res['max_drawdown'] = float(max_dd)
+        res['max_dd_period'] = int(max_dur)
+        if abs(max_dd) > 0:
+            res['profit_dd_ratio'] = float(res['tot_pnl'] / abs(max_dd))
+        else:
+            res['profit_dd_ratio'] = 0
+    else:
+        res['sharp_ratio'] = 0
+        res['max_drawdown'] = 0
+        res['max_dd_period'] = 0
+        res['profit_dd_ratio'] = 0
+    return res
 
-def get_pnl_stats(df_list, start_capital, marginrate, freq):
+def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '3y'], start_capital = 10000.0):
     sum_pnl = pd.Series(name='pnl')
     sum_margin = pd.Series(name='margin')
     sum_cost = pd.Series(name='cost')
@@ -318,9 +340,14 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
         index_col = ['date']
     for df in df_list:
         xdf = df.reset_index().set_index(index_col)
-        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf['close'] - xdf['close'].shift(1)).fillna(0.0)
         if 'traded_price' in xdf.columns:
-            pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
+            field = 'traded_price'
+        else:
+            field  = 'close'
+        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
+        if 'closeout' in xdf.columns:
+            pnl = pnl + xdf['closeout']
+        # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
         if len(sum_pnl) == 0:
             sum_pnl = pd.Series(pnl, name='pnl')
         else:
@@ -348,77 +375,36 @@ def get_pnl_stats(df_list, start_capital, marginrate, freq):
     daily_margin.name = 'daily_margin'
     daily_cost.name = 'daily_cost'
     cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + start_capital, name='cum_pnl')
-    available = cum_pnl - daily_margin
+    df = pd.concat([cum_pnl, daily_pnl, daily_margin, daily_cost], join='outer', axis=1)
     res = {}
-    res['avg_pnl'] = float(daily_pnl.mean())
-    res['std_pnl'] = float(daily_pnl.std())
-    res['tot_pnl'] = float(daily_pnl.sum())
-    res['tot_cost'] = float(daily_cost.sum())
-    res['num_days'] = len(daily_pnl)
-    res['max_margin'] = float(daily_margin.max())
-    res['min_avail'] = float(available.min())
-    if res['std_pnl'] > 0:
-        res['sharp_ratio'] = float(res['avg_pnl'] / res['std_pnl'] * np.sqrt(252.0))
-        max_dd, max_dur = max_drawdown(cum_pnl)
-        res['max_drawdown'] = float(max_dd)
-        res['max_dd_period'] = int(max_dur)
-        if abs(max_dd) > 0:
-            res['profit_dd_ratio'] = float(res['tot_pnl'] / abs(max_dd))
-        else:
-            res['profit_dd_ratio'] = 0
-    else:
-        res['sharp_ratio'] = 0
-        res['max_drawdown'] = 0
-        res['max_dd_period'] = 0
-        res['profit_dd_ratio'] = 0
-    ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
-    return res, ts
-
+    for tenor in tenors:
+        edate = df.index[-1]
+        sdate = misc.day_shift(edate, '-' + tenor)
+        pnl_df = df[df.index >= sdate]
+        res[tenor] = pnl_stats(pnl_df)
+    return res, df
 
 def get_trade_stats(trade_list):
     res = {}
-    res['n_trades'] = len(trade_list)
-    res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
-    res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit > 0]))
-    res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit <= 0]))
-    sorted_profit = sorted([trade.profit for trade in trade_list])
-    if len(sorted_profit) > 5:
-        res['largest_profit'] = float(sorted_profit[-1])
-    else:
-        res['largest_profit'] = 0
-    if len(sorted_profit) > 4:
-        res['second largest'] = float(sorted_profit[-2])
-    else:
-        res['second largest'] = 0
-    if len(sorted_profit) > 3:
-        res['third_profit'] = float(sorted_profit[-3])
-    else:
-        res['third_profit'] = 0
-    if len(sorted_profit) > 0:
-        res['largest_loss'] = float(sorted_profit[0])
-    else:
-        res['largest_loss'] = 0
-    if len(sorted_profit) > 1:
-        res['second_loss'] = float(sorted_profit[1])
-    else:
-        res['second_loss'] = 0
-    if len(sorted_profit) > 2:
-        res['third_loss'] = float(sorted_profit[2])
-    else:
-        res['third_loss'] = 0
-    res['num_win'] = len([trade.profit for trade in trade_list if trade.profit > 0])
-    res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit < 0])
-    res['win_ratio'] = 0
-    if res['n_trades'] > 0:
-        res['win_ratio'] = float(res['num_win']) / float(res['n_trades'])
-    res['profit_per_win'] = 0
-    if res['num_win'] > 0:
-        res['profit_per_win'] = float(res['win_profit'] / float(res['num_win']))
-    res['profit_per_loss'] = 0
-    if res['num_loss'] > 0:
-        res['profit_per_loss'] = float(res['loss_profit'] / float(res['num_loss']))
-    return res
+    profits = pd.Series([trade.profit for trade in trade_list])
+    wins = profits[profits > 0]
+    loss = profits[profits <= 0]
+    for ts, prefix in zip([profits, wins, loss], ['trade_', 'win_', 'loss']):
+        desc = ts.describe().to_dict()
+        desc['sum'] = ts.sum()
+        for field in desc:
+            res[prefix + field] = desc[field]
 
+    desc = wins.describe().to_dict()
+    desc['sum'] = wins.sum()
+    for field in desc:
+        res['win_' + field] = desc[field]
+
+    desc = loss.describe().to_dict()
+    for field in desc:
+        res['loss_' + field] = desc[field]
+    res['win_ratio'] = float(len(wins))/float(len(profits))
+    return res
 
 def create_drawdowns(ts):
     """
@@ -593,120 +579,6 @@ class BacktestManager(object):
         asset = self.sim_assets[asset_idx]
         self.config['mdf'] = self.min_data[asset[0]]
 
-    def get_pnl_stats(self, df_list, marginrate, freq):
-        sum_pnl = pd.Series(name='pnl')
-        sum_margin = pd.Series(name='margin')
-        sum_cost = pd.Series(name='cost')
-        if freq == 'm':
-            index_col = ['date', 'min_id']
-        else:
-            index_col = ['date']
-        for df in df_list:
-            xdf = df.reset_index().set_index(index_col)
-            if 'traded_price' in xdf.columns:
-                field = 'traded_price'
-            else:
-                field  = 'close'
-            pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
-            if 'closeout' in xdf.columns:
-                pnl = pnl + xdf['closeout']
-            # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
-            if len(sum_pnl) == 0:
-                sum_pnl = pd.Series(pnl, name='pnl')
-            else:
-                sum_pnl = sum_pnl.add(pnl, fill_value=0)
-            margin = pd.Series(
-                pd.concat([xdf.pos * marginrate[0] * xdf.close, -xdf.pos * marginrate[1] * xdf.close], join='outer',
-                          axis=1).max(1), name='margin')
-            if len(sum_margin) == 0:
-                sum_margin = margin
-            else:
-                sum_margin = sum_margin.add(margin, fill_value=0)
-            if len(sum_cost) == 0:
-                sum_cost = xdf['cost']
-            else:
-                sum_cost = sum_cost.add(xdf['cost'], fill_value=0)
-        if freq == 'm':
-            daily_pnl = pd.Series(sum_pnl.groupby(level=0).sum(), name='daily_pnl')
-            daily_margin = pd.Series(sum_margin.groupby(level=0).last(), name='daily_margin')
-            daily_cost = pd.Series(sum_cost.groupby(level=0).sum(), name='daily_cost')
-        else:
-            daily_pnl = sum_pnl
-            daily_margin = sum_margin
-            daily_cost = sum_cost
-        daily_pnl.name = 'daily_pnl'
-        daily_margin.name = 'daily_margin'
-        daily_cost.name = 'daily_cost'
-        cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + self.start_capital, name='cum_pnl')
-        available = cum_pnl - daily_margin
-        res = {}
-        res['avg_pnl'] = float(daily_pnl.mean())
-        res['std_pnl'] = float(daily_pnl.std())
-        res['tot_pnl'] = float(daily_pnl.sum())
-        res['tot_cost'] = float(daily_cost.sum())
-        res['num_days'] = len(daily_pnl)
-        res['max_margin'] = float(daily_margin.max())
-        res['min_avail'] = float(available.min())
-        if res['std_pnl'] > 0:
-            res['sharp_ratio'] = float(res['avg_pnl'] / res['std_pnl'] * np.sqrt(252.0))
-            max_dd, max_dur = max_drawdown(cum_pnl)
-            res['max_drawdown'] = float(max_dd)
-            res['max_dd_period'] = int(max_dur)
-            if abs(max_dd) > 0:
-                res['profit_dd_ratio'] = float(res['tot_pnl'] / abs(max_dd))
-            else:
-                res['profit_dd_ratio'] = 0
-        else:
-            res['sharp_ratio'] = 0
-            res['max_drawdown'] = 0
-            res['max_dd_period'] = 0
-            res['profit_dd_ratio'] = 0
-        ts = pd.concat([cum_pnl, daily_margin, daily_cost], join='outer', axis=1)
-        return res, ts
-
-    def get_trade_stats(self, trade_list):
-        res = {}
-        res['n_trades'] = len(trade_list)
-        res['all_profit'] = float(sum([trade.profit for trade in trade_list]))
-        res['win_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit > 0]))
-        res['loss_profit'] = float(sum([trade.profit for trade in trade_list if trade.profit <= 0]))
-        sorted_profit = sorted([trade.profit for trade in trade_list])
-        if len(sorted_profit) > 5:
-            res['largest_profit'] = float(sorted_profit[-1])
-        else:
-            res['largest_profit'] = 0
-        if len(sorted_profit) > 4:
-            res['second largest'] = float(sorted_profit[-2])
-        else:
-            res['second largest'] = 0
-        if len(sorted_profit) > 3:
-            res['third_profit'] = float(sorted_profit[-3])
-        else:
-            res['third_profit'] = 0
-        if len(sorted_profit) > 0:
-            res['largest_loss'] = float(sorted_profit[0])
-        else:
-            res['largest_loss'] = 0
-        if len(sorted_profit) > 1:
-            res['second_loss'] = float(sorted_profit[1])
-        else:
-            res['second_loss'] = 0
-        if len(sorted_profit) > 2:
-            res['third_loss'] = float(sorted_profit[2])
-        else:
-            res['third_loss'] = 0
-        res['num_win'] = len([trade.profit for trade in trade_list if trade.profit > 0])
-        res['num_loss'] = len([trade.profit for trade in trade_list if trade.profit <= 0])
-        res['win_ratio'] = 0
-        if res['n_trades'] > 0:
-            res['win_ratio'] = float(res['num_win']) / float(res['n_trades'])
-        res['profit_per_win'] = 0
-        if res['num_win'] > 0:
-            res['profit_per_win'] = float(res['win_profit'] / float(res['num_win']))
-        res['profit_per_loss'] = 0
-        if res['num_loss'] > 0:
-            res['profit_per_loss'] = float(res['loss_profit'] / float(res['num_loss']))
-        return res
 
     def run_all_assets(self):
         self.restart()
@@ -727,8 +599,8 @@ class BacktestManager(object):
                 self.prepare_data(idx, cont_idx = 0)
                 sim_strat = self.sim_class(self.config)
                 sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
-                (res_pnl, ts) = self.get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
-                res_trade = self.get_trade_stats(closed_trades)
+                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
+                res_trade = get_trade_stats(closed_trades)
                 res = dict( res_pnl.items() + res_trade.items())
                 res.update(dict(zip(self.scen_keys, s)))
                 res['asset'] = '_'.join(asset)
@@ -848,24 +720,24 @@ class ContBktestManager(BacktestManager):
                     sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                     df_list.append(sim_df)
                     trade_list = trade_list + closed_trades
-                    (res_pnl, ts) = self.get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
-                    res_trade = self.get_trade_stats(closed_trades)
+                    (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
+                    res_trade = get_trade_stats(closed_trades)
                     res =  dict( res_pnl.items() + res_trade.items())
                     res.update(dict(zip(self.scen_keys, s)))
                     res['asset'] = cont
                     if cont not in output['cont']:
                         output['cont'][cont] = {}
                     output['cont'][cont][ix] = res
-                (res_pnl, ts) = self.get_pnl_stats(df_list, self.config['marginrate'], 'm')
+                (res_pnl, ts) = get_pnl_stats(df_list, self.config['marginrate'], 'm')
                 output[ix] = res
-                res_trade = self.get_trade_stats(closed_trades)
+                res_trade = get_trade_stats(trade_list)
                 res = dict(res_pnl.items() + res_trade.items())
                 res.update(dict(zip(self.scen_keys, s)))
                 res['asset'] = '_'.join(asset)
                 output['total'][ix] = res
                 print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
                 all_trades = {}
-                for i, tradepos in enumerate(closed_trades):
+                for i, tradepos in enumerate(trade_list):
                     all_trades[i] = trade_position.tradepos2dict(tradepos)
                 trades = pd.DataFrame.from_dict(all_trades).T
                 trades.to_csv(fname1)
