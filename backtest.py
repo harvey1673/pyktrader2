@@ -10,6 +10,7 @@ import trade_position
 import dbaccess
 import misc
 import platform
+import mysql_helper
 
 sim_margin_dict = { 'au': 0.06, 'ag': 0.08, 'cu': 0.07, 'al':0.05,
                 'zn': 0.06, 'rb': 0.06, 'ru': 0.12, 'a': 0.05,
@@ -52,14 +53,6 @@ trade_offset_dict = {
                 'SM': 4,    'SF': 4,    'CY': 5,
                 }
 
-def get_bktest_folder():
-    folder = ''
-    system = platform.system()
-    if system == 'Linux':
-        folder = '/home/harvey/dev/data/'
-    elif system == 'Windows':
-        folder = 'E:\\data\\'
-    return folder
 
 class StratSim(object):
     def __init__(self, config):
@@ -381,7 +374,11 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
         edate = df.index[-1]
         sdate = misc.day_shift(edate, '-' + tenor)
         pnl_df = df[df.index >= sdate]
-        res[tenor] = pnl_stats(pnl_df)
+        res_by_tenor = pnl_stats(pnl_df)
+        for field in res_by_tenor:
+            res[field + '_' + tenor] = res_by_tenor[field]
+        if sdate < df.index[0]:
+            break
     return res, df
 
 def get_trade_stats(trade_list):
@@ -389,54 +386,24 @@ def get_trade_stats(trade_list):
     profits = pd.Series([trade.profit for trade in trade_list])
     wins = profits[profits > 0]
     loss = profits[profits <= 0]
-    for ts, prefix in zip([profits, wins, loss], ['trade_', 'win_', 'loss']):
+    for ts, prefix in zip([profits, wins, loss], ['trade_', 'win_', 'loss_']):
         desc = ts.describe().to_dict()
         desc['sum'] = ts.sum()
         for field in desc:
-            res[prefix + field] = desc[field]
-
-    desc = wins.describe().to_dict()
-    desc['sum'] = wins.sum()
-    for field in desc:
-        res['win_' + field] = desc[field]
-
-    desc = loss.describe().to_dict()
-    for field in desc:
-        res['loss_' + field] = desc[field]
+            fstr = field.replace('%', 'pct')
+            res[prefix + fstr] = desc[field]
     res['win_ratio'] = float(len(wins))/float(len(profits))
     return res
 
-def create_drawdowns(ts):
-    """
-    Calculate the largest peak-to-trough drawdown of the PnL curve
-    as well as the duration of the drawdown. Requires that the
-    pnl_returns is a pandas Series.
-    Parameters:
-    pnl - A pandas Series representing period percentage returns.
-    Returns:
-    drawdown, duration - Highest peak-to-trough drawdown and duration.
-    """
-
-    # Calculate the cumulative returns curve
-    # and set up the High Water Mark
-    # Then create the drawdown and duration series
-    ts_idx = ts.index
-    drawdown = pd.Series(index=ts_idx)
-    duration = pd.Series(index=ts_idx)
-    hwm = pd.Series([0] * len(ts), index=ts_idx)
-    last_t = ts_idx[0]
-    # Loop over the index range
-    for idx, t in enumerate(ts_idx):
-        if idx > 0:
-            cur_hwm = max(hwm[last_t], ts_idx[idx])
-            hwm[t] = cur_hwm
-            drawdown[t] = hwm[t] - ts[t]
-            duration[t] = 0 if drawdown[t] == 0 else duration[last_t] + 1
-        last_t = t
-    return drawdown.max(), duration.max()
-
-
 def max_drawdown(ts):
+    dd = ts - ts.cummax()
+    max_dd = dd.min()
+    end = dd.argmin()
+    start = ts.loc[:end].argmax()
+    max_duration = (start - end).days
+    return max_dd, max_duration
+
+def max_drawdown2(ts):
     i = np.argmax(np.maximum.accumulate(ts) - ts)
     j = np.argmax(ts[:i])
     max_dd = ts[i] - ts[j]
@@ -462,17 +429,13 @@ class BacktestManager(object):
         self.sim_class = sim_class
         self.sim_func = sim_config['sim_func']
         self.need_shift = sim_config.get('need_shift', True)
-        dir_name = config_file.split('.')[0]
-        dir_name = dir_name.split(os.path.sep)[-1]
-        test_folder = self.get_bktest_folder()
-        file_prefix = test_folder + dir_name + os.path.sep
-        if not os.path.exists(file_prefix):
-            os.makedirs(file_prefix)
+        self.sim_name = sim_config['sim_name']
+        self.set_bktest_env()
+        self.dbtable = sim_config.get('dbtable', 'bktest_output')
         if type(sim_config['products'][0]).__name__ != 'list':
             self.sim_assets = [[str(asset)] for asset in sim_config['products']]
         else:
             self.sim_assets = sim_config['products']
-        # self.need_daily = sim_config.get('need_daily', False)
         self.sim_offset = sim_config.get('offset', 0)
         self.sim_mode = sim_config.get('sim_mode', 'OR')
         self.calc_coeffs = sim_config.get('calc_coeffs', [1, -1])
@@ -493,27 +456,26 @@ class BacktestManager(object):
             self.config['pos_class'] = eval(sim_config['pos_class'])
         if 'proc_func' in sim_config:
             self.config['proc_func'] = eval(sim_config['proc_func'])
-        self.file_prefix = file_prefix + sim_config['sim_name']
         self.start_capital = self.config['capital']
         self.min_data = {}
         self.contlist = {}
         self.exp_dates = {}
+        self.pnl_tenors = ['3m', '6m', '1y', '2y', '3y']
         self.restart()
 
-    def get_bktest_folder(self):
-        folder = ''
+    def set_bktest_env(self):
         system = platform.system()
         if system == 'Linux':
             folder = '/home/harvey/dev/data/'
         elif system == 'Windows':
             folder = 'E:\\data\\'
-        return folder
-
-    def output_columns(self):
-        return ['asset', 'scenario'] + self.scen_keys + ['sharp_ratio', 'tot_pnl', 'std_pnl', 'num_days', \
-                 'max_drawdown', 'max_dd_period', 'profit_dd_ratio', \
-                 'all_profit', 'tot_cost', 'win_ratio', 'num_win', 'num_loss', \
-                 'profit_per_win', 'profit_per_loss']
+        else:
+            folder = ''
+        file_prefix = folder + self.sim_name + os.path.sep
+        if not os.path.exists(file_prefix):
+            os.makedirs(file_prefix)
+        self.file_prefix = file_prefix + self.sim_name
+        self.dbconfig = dbaccess.bktest_dbconfig
 
     def restart(self):        
         fname = self.file_prefix + 'summary.csv'
@@ -557,6 +519,7 @@ class BacktestManager(object):
         file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
         fname = file_prefix + '_stats.json'
         output = {}
+        output = {}
         if os.path.isfile(fname):
             with open(fname, 'r') as fp:
                 output = json.load(fp)
@@ -591,42 +554,51 @@ class BacktestManager(object):
             for ix, s in enumerate(self.scenarios):
                 if str(ix) in output:
                     continue
-                file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
-                fname1 = file_prefix + '_'+ str(ix) + '_trades.csv'
-                fname2 = file_prefix + '_'+ str(ix) + '_dailydata.csv'
-                for key, seq in zip(self.scen_keys, s):
+                res = {'asset': '_'.join(asset), 'scen_id': ix,\
+                       'sim_name': self.sim_name, 'sim_class': self.sim_class.__name__, 'sim_func': self.sim_func,
+                       'end_date': str(self.config['end_date'])}
+                for i in range(5):
+                    res['par_name' + str(i)] = ''
+                    res['par_value' + str(i)] = 0
+                for i, (key, seq) in enumerate(zip(self.scen_keys, s)):
                     self.config[key] = self.scen_param[key][seq]
+                    res['par_name' + str(i)] = key
+                    res['par_value' + str(i)] = str(self.scen_param[key][seq])
                 self.prepare_data(idx, cont_idx = 0)
                 sim_strat = self.sim_class(self.config)
                 sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
-                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
+                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm', self.pnl_tenors)
                 res_trade = get_trade_stats(closed_trades)
-                res = dict( res_pnl.items() + res_trade.items())
-                res.update(dict(zip(self.scen_keys, s)))
-                res['asset'] = '_'.join(asset)
-                output[ix] = res
-                print 'saving results for asset = %s, scen = %s' % (asset, str(ix))
+                res.update(dict( res_pnl.items() + res_trade.items()))
+                file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
+                res['trade_file'] = file_prefix + '_'+ str(ix) + '_trades.csv'
+                res['pnl_file'] = file_prefix + '_'+ str(ix) + '_dailydata.csv'
+                output[str(ix)] = res
                 all_trades = {}
                 for i, tradepos in enumerate(closed_trades):
                     all_trades[i] = trade_position.tradepos2dict(tradepos)
                 trades = pd.DataFrame.from_dict(all_trades).T
-                trades.to_csv(fname1)
-                ts.to_csv(fname2)
+                trades.to_csv(res['trade_file'])
+                ts.to_csv(res['pnl_file'])
                 fname = file_prefix + '_stats.json'
                 with open(fname, 'w') as ofile:
                     json.dump(output, ofile)
+                cnx = dbaccess.connect(**self.dbconfig)
+                cnx.set_converter_class(mysql_helper.NumpyMySQLConverter)
+                dbaccess.insert_row_by_dict(cnx, self.dbtable, res, is_replace=True)
+                cnx.close()
+                print 'The results for asset = %s, scen = %s are saved' % (asset, str(ix))
             res = pd.DataFrame.from_dict(output, orient = 'index')
             res.index.name = 'scenario'
-            res = res.sort_values(by = ['sharp_ratio'], ascending=False)
             res = res.reset_index()
-            res.set_index(['asset', 'scenario'])
-            out_res = res[self.output_columns()]
+            del res['scenario']
+            res.set_index(['asset', 'scen_id'])
             if len(self.summary_df)==0:
-                self.summary_df = out_res[:30].copy(deep = True)
+                self.summary_df = res.copy(deep = True)
             else:
-                self.summary_df = self.summary_df.append(out_res[:30])
+                self.summary_df = self.summary_df.append(res)
             fname = self.file_prefix + 'summary.csv'
-            self.summary_df.to_csv(fname)
+            self.summary_df.to_csv(fname, sep = ';')
 
 class ContBktestManager(BacktestManager):
     def __init__(self, config_file):

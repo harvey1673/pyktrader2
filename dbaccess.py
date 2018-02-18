@@ -11,6 +11,7 @@ import pandas as pd
 
 dbconfig = sec_bits.dbconfig
 hist_dbconfig = sec_bits.hist_dbconfig
+bktest_dbconfig = sec_bits.bktest_dbconfig
 trade_dbconfig = {'database': 'deal_data.db'}
 
 fut_tick_columns = ['instID', 'date', 'tick_id', 'hour', 'min', 'sec', 'msec', 'openInterest', 'volume', 'price',
@@ -114,6 +115,23 @@ def insert_daily_data(cnx, inst, daily_data, is_replace=False, dbtable='fut_dail
                     formats=','.join(['%s'] * len(col_list)))
     args = tuple([inst, exch] + [daily_data[col] for col in col_list])
     cursor.execute(stmt, args)
+    cnx.commit()
+
+def insert_row_by_dict(cnx, dbtable, rowdict, is_replace=False):
+    cursor = cnx.cursor()
+    cursor.execute("describe %s" % dbtable)
+    allowed_keys = set(row[0] for row in cursor.fetchall())
+    keys = allowed_keys.intersection(rowdict)
+    columns = ", ".join(keys)
+    values_template = ", ".join(["%s"] * len(keys))
+    if is_replace:
+        cmd = "REPLACE"
+    else:
+        cmd = "INSERT IGNORE"
+    sql = "%s into %s (%s) values (%s)" % (
+        cmd, dbtable, columns, values_template)
+    values = tuple(rowdict[key] for key in keys)
+    cursor.execute(sql, values)
     cnx.commit()
 
 def import_tick_from_file(dbtable, conn = None):
@@ -298,6 +316,7 @@ def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', 
             df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
         else:
             df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    df = df.set_index(index_col)
     return df
 
 def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'instID'):

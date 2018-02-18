@@ -302,10 +302,8 @@ product_ticksize = {'zn': 5,
 def reverse_direction(direction):
     return ORDER_SELL if direction == ORDER_BUY else ORDER_BUY
 
-
 def date2xl(d):
     return (d - datetime.date(1970, 1, 1)).days + 25569.0
-
 
 def datetime2xl(dt):
     t = dt - datetime.datetime(1970, 1, 1, 0, 0, 0)
@@ -343,14 +341,11 @@ def merge_dict(src_dict, dest_dict, w_src = 1, w_dest = 1):
             dest_dict[key] = dest_dict[key] * w_dest + value * w_src
     return dest_dict
 
-
 def min2time(min_id):
     return int((min_id / 100 - 6) % 24) / 24.0 + (min_id % 100) / 1440.0
 
-
 def get_tick_id(dt):
     return ((dt.hour + 6) % 24) * 100000 + dt.minute * 1000 + dt.second * 10 + dt.microsecond / 100000
-
 
 def is_workday(d, calendar = '', we_cutoff = 5):
     return (d.weekday() < we_cutoff) and (d not in Holiday_Map.get(calendar, []))
@@ -392,7 +387,6 @@ def filter_main_cont(sdate, filter=False):
             main_insts.append(inst)
     return main_insts
 
-
 def trading_hours(product, exch):
     hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
     if exch in ['SSE', 'SZE']:
@@ -407,13 +401,11 @@ def trading_hours(product, exch):
             hrs = [night_trading_hrs[night_idx]] + hrs
     return hrs
 
-
 def spreadinst2underlying(inst_name):
     spread_keys = inst_name.split(' ')
     instIDs = spread_keys[1].split('&')
     units = [1, -1]
     return (instIDs, units)
-
 
 def inst2product(inst):
     if inst[4].isalpha():

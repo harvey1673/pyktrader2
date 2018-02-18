@@ -38,7 +38,7 @@ class DTChanSim(StratSim):
         self.min_rng = config['min_range']
         self.chan = config['chan']
         self.machan = config['machan']
-        self.use_chan = config['use_chan']
+        self.use_chan = (self.machan > 0)
         self.no_trade_set = config['no_trade_set']
         self.pos_freq = config.get('pos_freq', 1)
         self.exit_min = config.get('exit_min', 2058)
@@ -67,11 +67,11 @@ class DTChanSim(StratSim):
         xdf['tr'] = tr
         xdf['chan_h'] = self.chan_high(xdf, self.chan, **self.chan_func['high']['args'])
         xdf['chan_l'] = self.chan_low(xdf, self.chan, **self.chan_func['low']['args'])
-        xdf['atr'] = dh.ATR(xdf, self.machan)
-        xdf['ma'] = pd.rolling_mean(xdf.close, self.machan)
+        #xdf['atr'] = dh.ATR(xdf, self.machan)
+        xdf['ma'] = pd.rolling_mean(xdf.close, min(self.machan, 1))
         xdf['rng'] = pd.DataFrame([self.min_rng * xdf['open'], self.k * xdf['tr'].shift(1)]).max()
-        xdf['upper'] = xdf['open'] + xdf['rng'] * (1 + (xdf['open'] < xdf['ma'].shift(1))*self.f)
-        xdf['lower'] = xdf['open'] - xdf['rng'] * (1 + (xdf['open'] > xdf['ma'].shift(1))*self.f)
+        xdf['upper'] = xdf['open'] + xdf['rng'] * (1 + ((xdf['open'] < xdf['ma'].shift(1)) & self.use_chan) *self.f)
+        xdf['lower'] = xdf['open'] - xdf['rng'] * (1 + ((xdf['open'] > xdf['ma'].shift(1)) & self.use_chan) *self.f)
         xdata = pd.concat([xdf['upper'], xdf['lower'],
                            xdf['chan_h'].shift(1), xdf['chan_l'].shift(1),
                            xdf['open']], axis=1, keys=['upper','lower', 'chan_h', 'chan_l', 'xopen']).fillna(0)
