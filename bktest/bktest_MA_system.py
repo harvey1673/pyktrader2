@@ -8,7 +8,7 @@ import json
 import data_handler as dh
 import pandas as pd
 import numpy as np
-import strategy as strat
+import trade_position
 import datetime
 from backtest import *
 import sys
@@ -47,7 +47,10 @@ class MASystemSim(StratSim):
         self.low_args = config['channel_args'][1]
 
     def run_vec_sim(self):
-        xdf = dh.conv_ohlc_freq(self.df, self.freq, extra_cols=['contract'])
+        if int(self.freq[:-3]) == 1:
+            xdf = self.df
+        else:
+            xdf = dh.conv_ohlc_freq(self.df, self.freq, extra_cols=['contract'])
         for idx, win in enumerate(self.win_list):
             xdf['MA'+str(idx+1)] = self.ma_func(xdf, win).shift(1)
         if self.use_chan:
@@ -108,7 +111,7 @@ def gen_config_file(filename):
                              [10, 40, 80], [10, 40, 120],\
                              [5, 10], [5, 20], [5, 40], \
                              [10, 20], [10, 30], [10, 40] ]
-    sim_config['pos_class'] = 'strat.TradePos'
+    sim_config['pos_class'] = 'trade_position.TradePos'
     sim_config['offset']    = 1
     config = {'capital': 10000,
               'trans_cost': 0.0,

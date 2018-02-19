@@ -2,12 +2,10 @@ import sys
 import misc
 import data_handler as dh
 import pandas as pd
-import tradeagent as agent
 import numpy as np
-import strategy as strat
+import trade_position as tradepos
 import datetime
 import json
-import backtest
 import base
 
 def conv_xslice(mslice):
@@ -154,13 +152,13 @@ def gen_config_file(filename):
     sim_config['start_date'] = '20150105'
     sim_config['end_date']   = '20160603'
     sim_config['need_daily'] = True
-    sim_config['pos_param'] = [('strat.TradePos', {}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1.5}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 2}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.01, 'incr': 0.01, 'cap': 0.2, 'reset_margin': 1}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
-                               ('strat.ParSARProfitTrig', {'af': 0.01, 'incr': 0.005, 'cap': 0.2, 'reset_margin': 1}) ]
+    sim_config['pos_param'] = [('tradepos.TradePos', {}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1.5}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 2}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.01, 'incr': 0.01, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.02, 'incr': 0.02, 'cap': 0.2, 'reset_margin': 1}), \
+                               ('tradepos.ParSARProfitTrig', {'af': 0.01, 'incr': 0.005, 'cap': 0.2, 'reset_margin': 1}) ]
     sim_config['update_freq'] = [15, 30, 60]
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1

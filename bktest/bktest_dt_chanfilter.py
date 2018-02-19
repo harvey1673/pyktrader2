@@ -2,12 +2,10 @@ import sys
 import misc
 import data_handler as dh
 import pandas as pd
-import tradeagent as agent
 import numpy as np
-import strategy as strat
+import trade_position as tradepos
 import datetime
 import json
-import backtest
 
 def dual_thrust_sim( mdf, config):
     ddf = config['ddf']
@@ -114,7 +112,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos = []
                     mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                 if mslice.high >= dslice.H1:
-                    new_pos = strat.TradePos([mslice.contract], [1], unit, mslice.close + offset, mslice.close + offset)
+                    new_pos = tradepos.TradePos([mslice.contract], [1], unit, mslice.close + offset, mslice.close + offset)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(mslice.close + offset, dd)
@@ -130,7 +128,7 @@ def dual_thrust_sim( mdf, config):
                     curr_pos = []
                     mdf.set_value(dd, 'cost', mdf.at[dd, 'cost'] - abs(pos) * (offset + mslice.close*tcost))
                 if mslice.low <= dslice.L1:
-                    new_pos = strat.TradePos([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset)
+                    new_pos = tradepos.TradePos([mslice.contract], [1], -unit, mslice.close - offset, mslice.close - offset)
                     tradeid += 1
                     new_pos.entry_tradeid = tradeid
                     new_pos.open(mslice.close - offset, dd)
@@ -160,7 +158,7 @@ def gen_config_file(filename):
             #(0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
             ]
     sim_config['chan'] = [10, 20]
-    sim_config['pos_class'] = 'strat.TradePos'
+    sim_config['pos_class'] = 'tradepos.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.PCT_CHANNEL', 'args':{'pct': 90, 'field': 'high'}},
