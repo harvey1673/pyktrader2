@@ -28,9 +28,9 @@ cmvol_columns = ['date', 'tenor_label', 'expiry_date', 'delta', 'vol', 'price', 
 cmdv_columns = ['date', 'expiry', 'vol']
 price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': vol_columns, 'cmvol': cmvol_columns, \
                  'cmdv': cmdv_columns, 'ccy': fx_columns, 'ir_index': ir_columns, }
-deal_columns = ['status', 'internal_id', 'external_id', 'cpty', 'positions', \
+deal_columns = ['id', 'status', 'internal_id', 'external_id', 'cpty', 'positions', \
                 'strategy', 'book', 'external_src', 'last_updated', \
-                'trader', 'sales', 'desk', 'business', 'portfolio', 'premium', 'product', \
+                'trader', 'sales', 'desk', 'business', 'portfolio', \
                 'enter_date', 'last_date', 'commission', 'day1_comments']
 
 def connect(**args):
