@@ -309,14 +309,14 @@ def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', 
     stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by date"
     df = pd.io.sql.read_sql(stmt, cnx)
-    if index_col == None:
-        index_col = 'date'
-    if (isinstance(df[index_col][0], basestring)) and (date_as_str == False):
-        if len(df[index_col][0])> 12:
-            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
+    col_name = 'date'
+    if (isinstance(df[col_name][0], basestring)) and (date_as_str == False):
+        if len(df[col_name][0])> 12:
+            df[col_name] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
         else:
-            df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
-    df = df.set_index(index_col)
+            df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    if index_col:
+        df = df.set_index(index_col)
     return df
 
 def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'instID'):
