@@ -24,6 +24,9 @@ class BBTrailStop(StratSim):
         self.band_func = eval(config.get('band_func', 'dh.ATR'))
         self.boll_len = config['boll_len']
         self.chan_len = config['chan_ratio'] * self.boll_len
+        self.filter_func = eval(config.get('filter_func', 'dh.CCI'))
+        self.filter_args = config.get('filter_args', 10)
+        self.filter_thres = config.get('filter_args', [0, 0])
         self.pos_update = config['pos_update']
         self.pos_class = config['pos_class']
         self.pos_args  = config['pos_args']        
@@ -47,6 +50,7 @@ class BBTrailStop(StratSim):
         xdf['band_mid'] = self.ma_func(xdf, n=self.boll_len)
         xdf['band_up'] = xdf['band_mid'] + xdf['band_wth']
         xdf['band_dn'] = xdf['band_mid'] - xdf['band_wth']
+        xdf['filter'] = self.filter_func(xdf, self.filter_args)
         if (self.chan_len > 0):
             xdf['chan_h'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high')
             xdf['chan_l'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low')
@@ -76,11 +80,14 @@ class BBTrailStop(StratSim):
         gap = (int((self.SL * sim_data['band_wth'][n-1]) / float(self.tick_base)) + 1) * float(self.tick_base)
         return gap
 
+    def run_vec_sim(self):
+        pass
+
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
         curr_pos = 0
-        next_pos = (sim_data['high'][n] >= max(sim_data['band_up'][n], sim_data['chan_h'][n])) * 1 - \
-                   (sim_data['low'][n] <= min(sim_data['band_dn'][n], sim_data['chan_l'][n])) * 1
+        next_pos = (sim_data['high'][n] >= max(sim_data['band_up'][n], sim_data['chan_h'][n])) * (sim_data['filter'] > self.filter_thres[0]) * 1.0 - \
+                   (sim_data['low'][n] <= min(sim_data['band_dn'][n], sim_data['chan_l'][n])) * (sim_data['filter'] < self.filter_thres[1]) * 1.0
         if len(self.positions)>0:
             curr_pos = self.positions[0].pos
             need_close = (self.close_daily or (self.scur_day == sim_data['date'][-1])) and (sim_data['min_id'][n] >= self.exit_min)
@@ -100,21 +107,23 @@ def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_class']  = 'bktest.bktest_bband_trailstop.BBTrailStop'
     sim_config['sim_func'] = 'run_loop_sim'
-    sim_config['scen_keys'] = ['boll_len', 'chan_ratio', 'band_ratio', 'stoploss']
+    sim_config['scen_keys'] = ['boll_len', 'band_ratio', 'filter_args', 'stoploss']
+    sim_config['filter_args'] = [20, 40]
     sim_config['sim_name']   = 'band_trailstop'
     sim_config['products']   = ['m', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j' ]
-    sim_config['start_date'] = '20160102'
-    sim_config['end_date']   = '20170707'
-    sim_config['boll_len'] = [80, 120, 160]
-    sim_config['chan_ratio'] = [0.125, 0.25, 0.5]
+    sim_config['start_date'] = '20150201'
+    sim_config['end_date']   = '20180214'
+    sim_config['boll_len'] = [20, 40, 80, 100, 120, 160]
     sim_config['band_ratio'] = [1.0, 1.5, 2.0]
     sim_config['stoploss'] = [0.5, 1.0, 1.5, 2.0]
-    sim_config['pos_class'] = 'strat.TargetTrailTradePos'
+    sim_config['pos_class'] = 'trade_position.TargetTrailTradePos'
     sim_config['offset']    = 1
 
     config = {'capital': 10000,
               'trans_cost': 0.0,
               'close_daily': False,
+              'chan_ratio': 0.0,
+              'filter_func': 'dh.CCI',
               'unit': 1,                           
               'pos_args': {},
               'freq': 3,

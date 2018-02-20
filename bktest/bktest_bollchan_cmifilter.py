@@ -3,7 +3,7 @@ import json
 import data_handler as dh
 import pandas as pd
 import numpy as np
-import strategy as strat
+import trade_position
 import datetime
 import backtest
 import sys
@@ -111,7 +111,7 @@ def gen_config_file(filename):
     sim_config['param'] = [(20, 1, 5), (20, 1, 10), (20, 1, 20), (20, 1, 40), (20, 1.5, 5), (20, 1.5, 10), (20, 1.5, 20), (20, 1.5, 40), \
                            (40, 1, 10), (40, 1, 20), (40, 1, 40), (40, 1, 80), (40, 1.5, 10), (40, 1.5, 20), (40, 1.5, 40), (40, 1.5, 80), \
                            (80, 1, 10), (80, 1, 20), (80, 1, 40), (80, 1, 80), (80, 1.5, 10), (80, 1.5, 20), (80, 1.5, 40), (80, 1.5, 80)]
-    sim_config['pos_class'] = 'strat.TradePos'
+    sim_config['pos_class'] = 'trade_position.TradePos'
     sim_config['offset']    = 1
     chan_func = { 'high': {'func': 'dh.DONCH_H', 'args':{'field': 'high'}},
                   'low':  {'func': 'dh.DONCH_L', 'args':{'field': 'low'}}}
