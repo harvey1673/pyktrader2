@@ -39,4 +39,3 @@ def test_run():
     df = load_btest_res(sim_names)
     weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
     df['weighted_SR'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
-    
