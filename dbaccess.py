@@ -33,6 +33,13 @@ deal_columns = ['status', 'internal_id', 'external_id', 'cpty', 'positions', \
                 'trader', 'sales', 'desk', 'business', 'portfolio', 'premium', 'product', \
                 'enter_date', 'last_date', 'commission', 'day1_comments']
 
+def get_proxy_server():
+    user = sec_bits.PROXY_CREDENTIALS['user']
+    passwd = sec_bits.PROXY_CREDENTIALS['passwd']
+    server_dict = {'http':'http://%s:%s@10.252.22.102:4200' % (user, passwd),
+                'https':'https://%s:%s@10.252.22.102:4200' % (user, passwd)}
+    return server_dict
+
 def connect(**args):
     return sqlconn.connect(**args)
 
@@ -312,7 +319,7 @@ def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', 
     col_name = 'date'
     if (isinstance(df[col_name][0], basestring)) and (date_as_str == False):
         if len(df[col_name][0])> 12:
-            df[col_name] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
+            df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
         else:
             df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
     if index_col:
