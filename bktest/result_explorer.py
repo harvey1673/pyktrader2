@@ -1,3 +1,8 @@
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
+
 import json
 import pandas as pd
 import dbaccess
@@ -38,4 +43,32 @@ def test_run():
                  'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214']
     df = load_btest_res(sim_names)
     weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
-    df['weighted_SR'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
+    df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
+    df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
+    df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
+    assets = ["rb", "hc", "i", "j", "jm", "ZC", "ni", "ru", \
+              "m", "RM", "FG", "y", "p", "OI", "a", "cs", "c", \
+              "jd", "SR", "CF", "pp", "l", "v", "TA", "MA", "ag", \
+              "au", "cu", "al", "zn", "SM", "SF", \
+              "IF", "IH", "IC", "TF", "T", "sn"]
+    res = pd.DataFrame()
+    for asset in assets:
+        xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
+        xdf1 = xdf[(xdf.sim_name == 'DTvec_180214') & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1)
+        xdf2 = xdf[xdf.sim_name != 'DTvec_180214'].sort_values('w_sharp', ascending=False)
+        if len(xdf2) > 10:
+            xdf2 = xdf2[:10]
+        res = res.append(xdf2)
+
+    out_cols = ['asset', 'sim_name', 'scen_id', 'std_unit', \
+                'w_sharp', 'sharp_ratio_3m', 'sharp_ratio_6m', 'sharp_ratio_1y', 'sharp_ratio_2y', 'sharp_ratio_3y',\
+                'tot_pnl_3m', 'tot_pnl_6m','tot_pnl_1y', 'tot_pnl_2y','tot_pnl_3y', \
+                'par_name0', 'par_value0', 'par_name1', 'par_value1','par_name2', 'par_value2',\
+                'par_name3', 'par_value3', 'par_name4', 'par_value4']
+    out = res[out_cols]
+    out.to_csv('DTvec.csv')
+
+

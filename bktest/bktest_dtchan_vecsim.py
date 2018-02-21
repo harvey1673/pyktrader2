@@ -68,7 +68,7 @@ class DTChanSim(StratSim):
         xdf['chan_h'] = self.chan_high(xdf, self.chan, **self.chan_func['high']['args'])
         xdf['chan_l'] = self.chan_low(xdf, self.chan, **self.chan_func['low']['args'])
         #xdf['atr'] = dh.ATR(xdf, self.machan)
-        xdf['ma'] = pd.rolling_mean(xdf.close, min(self.machan, 1))
+        xdf['ma'] = pd.rolling_mean(xdf.close, max(self.machan, 1))
         xdf['rng'] = pd.DataFrame([self.min_rng * xdf['open'], self.k * xdf['tr'].shift(1)]).max()
         xdf['upper'] = xdf['open'] + xdf['rng'] * (1 + ((xdf['open'] < xdf['ma'].shift(1)) & self.use_chan) *self.f)
         xdf['lower'] = xdf['open'] - xdf['rng'] * (1 + ((xdf['open'] > xdf['ma'].shift(1)) & self.use_chan) *self.f)
