@@ -376,7 +376,7 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
         pnl_df = df[df.index >= sdate]
         res_by_tenor = pnl_stats(pnl_df)
         for field in res_by_tenor:
-            res[field + '_' + tenor] = res_by_tenor[field]
+            res[field + '_' + tenor] = 0 if np.isnan(res_by_tenor[field]) else res_by_tenor[field]
         if sdate < df.index[0]:
             break
     return res, df
@@ -391,8 +391,8 @@ def get_trade_stats(trade_list):
         desc['sum'] = ts.sum()
         for field in desc:
             fstr = field.replace('%', 'pct')
-            res[prefix + fstr] = desc[field]
-    res['win_ratio'] = float(len(wins))/float(len(profits))
+            res[prefix + fstr] = 0 if np.isnan(desc[field]) else desc[field]
+    res['win_ratio'] = float(len(wins))/float(len(profits)) if len(profits) > 0 else 0.0
     return res
 
 def max_drawdown(ts):
