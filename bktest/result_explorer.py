@@ -62,7 +62,8 @@ def process_DTsim():
     res = pd.DataFrame()
     for asset in assets:
         xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
-        xdf1 = xdf[(xdf.sim_name == 'DTvec_180214') & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
+        xdf1 = xdf[((xdf.sim_name == 'DTvec_180214') | (xdf.sim_name == 'DTasyn_180214')) \
+                   & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
         if len(xdf1) > 10:
             xdf1 = xdf1[:10]
         res = res.append(xdf1, ignore_index=True)
@@ -76,8 +77,13 @@ def process_DTsim():
                 'tot_pnl_3m', 'tot_pnl_6m','tot_pnl_1y', 'tot_pnl_2y','tot_pnl_3y', \
                 'tot_cost_3m', 'tot_cost_6m', 'tot_cost_1y', 'tot_cost_2y', 'tot_cost_3y',\
                 'par_name0', 'par_value0', 'par_name1', 'par_value1','par_name2', 'par_value2',\
-                'par_name3', 'par_value3', 'par_name4', 'par_value4']
+                'par_name3', 'par_value3', 'par_name4', 'par_value4', \
+                'chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
+    return out
+
+def config_strat_json(df, asset_list, asset_keys, common_keys):
+    pass
 
 

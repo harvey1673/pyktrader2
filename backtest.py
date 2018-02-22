@@ -461,7 +461,6 @@ class BacktestManager(object):
         self.contlist = {}
         self.exp_dates = {}
         self.pnl_tenors = ['3m', '6m', '1y', '2y', '3y']
-        self.restart()
 
     def set_bktest_env(self):
         system = platform.system()
@@ -476,13 +475,6 @@ class BacktestManager(object):
             os.makedirs(file_prefix)
         self.file_prefix = file_prefix + self.sim_name
         self.dbconfig = dbaccess.bktest_dbconfig
-
-    def restart(self):        
-        fname = self.file_prefix + 'summary.csv'
-        if os.path.isfile(fname):
-            self.summary_df = pd.DataFrame.from_csv(fname)
-        else:
-            self.summary_df = pd.DataFrame()
 
     def set_config(self, idx):
         assets = self.sim_assets[idx]
@@ -544,7 +536,6 @@ class BacktestManager(object):
 
 
     def run_all_assets(self):
-        self.restart()
         for idx, asset in enumerate(self.sim_assets):
             output = self.load_curr_results(idx)
             if len(output.keys()) == len(self.scenarios):
@@ -588,17 +579,6 @@ class BacktestManager(object):
                 dbaccess.insert_row_by_dict(cnx, self.dbtable, res, is_replace=True)
                 cnx.close()
                 print 'The results for asset = %s, scen = %s are saved' % (asset, str(ix))
-            res = pd.DataFrame.from_dict(output, orient = 'index')
-            res.index.name = 'scenario'
-            res = res.reset_index()
-            del res['scenario']
-            res.set_index(['asset', 'scen_id'])
-            if len(self.summary_df)==0:
-                self.summary_df = res.copy(deep = True)
-            else:
-                self.summary_df = self.summary_df.append(res)
-            fname = self.file_prefix + 'summary.csv'
-            self.summary_df.to_csv(fname, sep = ';')
 
 class ContBktestManager(BacktestManager):
     def __init__(self, config_file):
@@ -665,7 +645,6 @@ class ContBktestManager(BacktestManager):
         self.config['mdf'] = mdf
 
     def run_all_assets(self):
-        summary_df = pd.DataFrame()
         for idx, asset in enumerate(self.sim_assets):
             cont_map = self.cont_maplist[idx]
             output = self.load_curr_results(idx)
