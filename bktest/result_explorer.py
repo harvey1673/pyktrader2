@@ -83,7 +83,54 @@ def process_DTsim():
     out.to_csv('DTvec.csv')
     return out
 
-def config_strat_json(df, asset_list, asset_keys, common_keys):
-    pass
+def process_RSIATRsim():
+    sim_names = ['rsi_atr_1m', 'rsi_atr_5m', \
+                 'rsi_atr_3m', 'rsi_atr_15m', 'rsi_atr_2m']
+    df = load_btest_res(sim_names)
+    weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
+    df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
+    df['price_mode'] = df['par_value2']
+    df['chan'] = df['par_value1']
+    df['lookbacks'] = extract_element(df, 'par_value0', 1)
+    df['ratios'] = extract_element(df, 'par_value0', 0)
+    df['trend_factor'] = extract_element(df, 'par_value0', 2)
+    df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
+    df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
+    assets = ["rb", "hc", "i", "j", "jm", "ZC", "ni", "ru", \
+              "m", "RM", "FG", "y", "p", "OI", "a", "cs", "c", \
+              "jd", "SR", "CF", "pp", "l", "v", "TA", "MA", "ag", \
+              "au", "cu", "al", "zn", "SM", "SF", \
+              "IF", "IH", "IC", "TF", "T", "sn"]
+    res = pd.DataFrame()
+    for asset in assets:
+        xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
+        xdf1 = xdf[((xdf.sim_name == 'DTvec_180214') | (xdf.sim_name == 'DTasyn_180214')) \
+                   & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1, ignore_index=True)
+        xdf2 = xdf[xdf.sim_name != 'DTvec_180214'].sort_values('w_sharp', ascending=False)
+        if len(xdf2) > 10:
+            xdf2 = xdf2[:10]
+        res = res.append(xdf2, ignore_index=True)
+
+    out_cols = ['asset', 'sim_name', 'scen_id', 'std_unit', \
+                'w_sharp', 'sharp_ratio_3m', 'sharp_ratio_6m', 'sharp_ratio_1y', 'sharp_ratio_2y', 'sharp_ratio_3y',\
+                'tot_pnl_3m', 'tot_pnl_6m','tot_pnl_1y', 'tot_pnl_2y','tot_pnl_3y', \
+                'tot_cost_3m', 'tot_cost_6m', 'tot_cost_1y', 'tot_cost_2y', 'tot_cost_3y',\
+                'par_name0', 'par_value0', 'par_name1', 'par_value1','par_name2', 'par_value2',\
+                'par_name3', 'par_value3', 'par_name4', 'par_value4', \
+                'chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size']
+    out = res[out_cols]
+    out.to_csv('RSI_ATR.csv')
+    return out
+
+
+
+
+
+
+
+
 
 
