@@ -12,16 +12,14 @@ from scipy import poly1d
 from stats_test import test_mean_reverting, half_life
 from sklearn.linear_model import LinearRegression
 from sklearn import metrics
-from sklearn.cross_validation import train_test_split
 from statsmodels.tsa.stattools import coint, adfuller
 import seaborn as sns
 
-def colored_scatter(dep, indep, df, reg=True):
-    points = plt.scatter(df[dep], df[indep], c=df['date'], s=20, cmap='jet')
+def colored_scatter(ts_a, ts_b, ts_c):
+    points = plt.scatter(ts_a, ts_b, c = [float((d-ts_c.min()).days) for d in ts_c], s=20, cmap='jet')
     cb = plt.colorbar(points)
-    cb.ax.set_yticklabels([str(x.date()) for x in df['date'][::len(df)//5]])
-    if reg:
-        sns.regplot(dep, indep, df, scatter=False, color='.1')
+    cb.ax.set_yticklabels([str(x) for x in ts_c[::len(ts_c)//7]])
+    plt.show()
 
 def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_col = 'date', fx_pair = None, field = 'spotID', args = None):
     cnx = dbaccess.connect(**dbaccess.dbconfig)
@@ -31,6 +29,7 @@ def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_c
         df = misc.nearby(spotID, **args)
     else:
         df = dbaccess.load_daily_data_to_df(cnx, spot_table, spotID, start, end, index_col = None, field = field)
+    print df
     if isinstance(df[index_col][0], basestring):
         if len(df[index_col][0])> 12:
             df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
@@ -53,7 +52,6 @@ def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_c
         fx = fx[fx['tenor']=='0W']
         if isinstance(fx[index_col][0], basestring):
             fx[index_col] = fx[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
-            fx = fx.set_index(index_col)
         fx = fx.set_index(index_col)
         df[col_name] = df[col_name]/fx['rate']
     return df
@@ -66,6 +64,21 @@ def merge_df(df_list):
         xdf = xdf.merge(df_list[i], left_index = True, right_index = True, how = 'outer')
         #xdf.rename(columns={ col_name: "x"+str(i)}, inplace=True )
     return xdf
+
+
+def split_df(df, date_list, split_col = 'date'):
+    output = []
+    if len(date_list) == 0:
+        output.append(df)
+        return  output
+    if split_col == 'index':
+        ts = df.index
+    else:
+        ts = df[split_col]
+    index_list = [ts[0]] + date_list + [ts[-1]]
+    for sdate, edate in zip(index_list[:-1], index_list[1:]):
+        output.append(df[(ts <= edate) & (ts >= sdate)])
+    return output
 
 def get_cont_data(asset, start_date, end_date, freq = '1m', nearby = 1, rollrule = '-10b'):
     cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
@@ -206,54 +219,41 @@ class Regression(object):
             plt.title('residual plot ({} STD band)'.format(std_line))
         plt.show()
 
-    def residual_vs_fit(self):
-        residual = self.residual()
-        df = self.df
-        y_predict = self.result.predict(df[self.independent])
-        plt.plot(y_predict, residual, 'o')
-        plt.plot(y_predict, np.zeros(len(residual)), 'r--')
-        plt.xlabel("predict")
-        plt.ylabel('residual')
-        plt.title('Residual vs fit')
-        plt.show()
+    def residual_vs_fit(self, colorbar=False):
+        if colorbar:
+            df = self.df
+            y_predict = self.result.predict(df[self.independent])
+            colored_scatter(y_predict, self.result.resid, df.index)
+        else:
+            residual = self.residual()
+            df = self.df
+            y_predict = self.result.predict(df[self.independent])
+            plt.plot(y_predict, residual, 'o')
+            plt.plot(y_predict, np.zeros(len(residual)), 'r--')
+            plt.xlabel("predict")
+            plt.ylabel('residual')
+            plt.title('Residual vs fit')
+            plt.show()
 
-    def train_test_sets(self):
-        """
-        test regression by seperating data to a train set and a test set
-        """
-        dependent = self.dependent
-        independent = self.independent
-        df = self.df
-        y = df[dependent]
-        X = df[independent]
-
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=1)
-        # Instantiate model
-        lm = LinearRegression()
-        # Fit Model
-        lm.fit(X_train, y_train)
-        # Predict
-        y_pred = lm.predict(X_test)
-
-        RMSE = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
-        print ("RMSE: %.5f" % RMSE)
-        return RMSE
-
-    def coeff_consistency(self, index_list):
-        df = self.df
-        if type(df.index[0]).__name__ == 'Timestamp' and type(index_list[0]).__name__ != 'Timestamp':
-            index_list = [pd.to_datetime(idx) for idx in index_list]
-        for start, end in zip(index_list[:-1], index_list[1:]):
-            reg = Regression(df[(df.index>= start) & (df.index <= end)], self.dependent, self.independent)
+    def cross_validation(self, split_dates, split_col = 'index'):
+        if type(self.df.index[0]).__name__ == 'Timestamp' and type(split_dates[0]).__name__ != 'Timestamp':
+            split_dates = [pd.to_datetime(idx) for idx in split_dates]
+        data_set = split_df(self.df, split_dates, split_col = split_col)
+        for idx, train in enumerate(data_set):
+            reg_train = Regression(train, self.dependent, self.independent)
             string = []
-            for indep in reg.independent:
-                string.append("%.4f * %s" % (reg.result.params[indep], indep))
-            print ("Period %s - %s: %s = %s + %.4f" % (str(start), str(end), reg.dependent, ' + '.join(string), reg.result.params[0]))
-        string = []
-        for indep in self.independent:
-            string.append("%.4f * %s" % (self.result.params[indep], indep))
-        print ("Whole period: %s = %s + %.4f" % (self.dependent, ' + '.join(string), self.result.params[0]))
+            for indep in reg_train.independent:
+                string.append("%.4f * %s" % (reg_train.result.params[indep], indep))
+            print "Train set %s: %s = %s + %.4f\t\nR-sqr: %.2f\tResid std: %.4f" % (idx,
+                reg_train.dependent, ' + '.join(string), reg_train.result.params[0],
+                reg_train.result.rsquared, reg_train.result.resid.std())
+            for idy in range(len(data_set)):
+                if idx != idy:
+                    test_sum = 0
+                    for indep in self.independent:
+                        test_sum += data_set[idy][indep] * reg_train.result.params[indep]
+                    test_resid = data_set[idy][self.dependent] - test_sum
+                    print ("Test set %s: Resid std: %.4f\tResid mean: %.4f" % (idy, test_resid.std(), test_resid.mean(),))
 
     def run_all(self):
         """
@@ -272,7 +272,6 @@ class Regression(object):
         print 'Error statistics'
         print self.residual().describe()
         print
-        self.train_test_sets()
         self.residual_vs_fit()
         self.residual_plot()
         residual = self.residual()
