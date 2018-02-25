@@ -52,6 +52,10 @@ def calc_w_col(df, key = 'sharp_ratio', weight = {'6m': 0.2, '1y': 0.4, '2y': 0.
 def extract_element(df, col_name, n):
     return df[col_name].apply(lambda x: json.loads(x)[n])
 
+def create_strat_json(df, selections):
+    
+    pass
+
 def process_DTsim():
     sim_names = ['DTvec_180214', 'DTvec_dchan_180214', \
                  'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214']
@@ -60,7 +64,14 @@ def process_DTsim():
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
     df['price_mode'] = df['par_value2']
     df['ma_chan'] = 0
-    df['chan'] = df['par_value1']
+    df['channels'] = 0
+    df['min_rng'] = 0.0035
+    df['freq'] = 1
+    df['vol_ratio'] = '[1.0, 0.0]'
+    filter = (df.sim_name == 'DTvec_180214') | (df.sim_name == 'DTasym_180214')
+    df['ma_chan'][filter] = df['par_value1'][filter]
+    df['channels'][~filter] = df['par_value'][~filter]
+    df['vol_ratio'][~filter] = '[0.0, 1.0]'
     df['lookbacks'] = extract_element(df, 'par_value0', 1)
     df['ratios'] = extract_element(df, 'par_value0', 0)
     df['trend_factor'] = extract_element(df, 'par_value0', 2)
@@ -80,7 +91,7 @@ def process_DTsim():
             xdf2 = xdf2[:10]
         res = res.append(xdf2, ignore_index=True)
 
-    out_cols = output_columns + ['chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size']
+    out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
     return out
