@@ -52,12 +52,36 @@ def calc_w_col(df, key = 'sharp_ratio', weight = {'6m': 0.2, '1y': 0.4, '2y': 0.
 def extract_element(df, col_name, n):
     return df[col_name].apply(lambda x: json.loads(x)[n])
 
-def create_strat_json(df, selections):
-    
-    pass
+def create_strat_json(df, inst_list, asset_keys, capital = 4000.0):
+    xdf = df.dropna(subset = ['name'])
+    inst_dict = dict([(misc.inst2product(instID), instID) for instID in inst_list])
+    xdf['instID'] = xdf['asset'].apply(lambda x: inst_dict[x])
+    output = {}
+    sim_names = xdf['sim_name'].unique()
+    sim_dict = load_sim_config(sim_names, config_folder = sim_config_folder)
+    for i in range(len(xdf)):
+        if str(df['name']) not in output:
+            output[str(df['name'])]  = {'config': {'name': str(df['name']), 'num_tick': 1, 'daily_close_buffer': 5, \
+                                                   'trade_valid_time': 600, 'open_period': [300, 2115], 'assets':[]},
+                                        'class': 'strat_dtchan_addon.DTSplitChanAddon', }
+        conf_dict = {"underliers": [xdf['instID'][i]], }
+        for key in asset_keys:
+            if key == 'alloc_w':
+                conf_dict[key] = capital/xdf['std_unit'][i]*xdf['w_sharp'][i]
+            elif key in xdf:
+                if isinstance(xdf[key][i], basestring) and '[' in xdf[key][i]:
+                    conf_dict[key] = json.loads(xdf[key][i])
+                else:
+                    conf_dict[key] = xdf[key][i]
+            elif key in sim_dict[xdf['sim_name'][i]]:
+                conf_dict[key] = sim_dict[xdf['sim_name'][i]][key]
+            elif key in sim_dict[xdf['sim_name'][i]]['config']:
+                conf_dict[key] = sim_dict[xdf['sim_name'][i]]['config'][key]
+        output[str(df['name'])]['config']['assets'].append(conf_dict)
+    return output
 
 def process_DTsim():
-    sim_names = ['DTvec_180214', 'DTvec_dchan_180214', \
+    sim_names = ['DTvec_180214', 'DTasym_180214', 'DTvec_dchan_180214', \
                  'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214']
     df = load_btest_res(sim_names)
     weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
@@ -67,11 +91,12 @@ def process_DTsim():
     df['channels'] = 0
     df['min_rng'] = 0.0035
     df['freq'] = 1
+    df['volumes'] = '[1]'
     df['vol_ratio'] = '[1.0, 0.0]'
     filter = (df.sim_name == 'DTvec_180214') | (df.sim_name == 'DTasym_180214')
-    df['ma_chan'][filter] = df['par_value1'][filter]
-    df['channels'][~filter] = df['par_value'][~filter]
-    df['vol_ratio'][~filter] = '[0.0, 1.0]'
+    df.ix[filter, 'ma_chan'] = df.ix[filter, 'par_value1']
+    df.ix[~filter, 'channels'] = df.ix[~filter, 'par_value1']
+    df.ix[~filter, 'vol_ratio'] = '[0.0, 1.0]'
     df['lookbacks'] = extract_element(df, 'par_value0', 1)
     df['ratios'] = extract_element(df, 'par_value0', 0)
     df['trend_factor'] = extract_element(df, 'par_value0', 2)
@@ -81,16 +106,14 @@ def process_DTsim():
     res = pd.DataFrame()
     for asset in assets:
         xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
-        xdf1 = xdf[((xdf.sim_name == 'DTvec_180214') | (xdf.sim_name == 'DTasyn_180214')) \
-                   & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
-        if len(xdf1) > 10:
-            xdf1 = xdf1[:10]
+        xdf1 = xdf[((xdf.sim_name == 'DTvec_180214') | (xdf.sim_name == 'DTasym_180214'))].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 20:
+            xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-        xdf2 = xdf[xdf.sim_name != 'DTvec_180214'].sort_values('w_sharp', ascending=False)
-        if len(xdf2) > 10:
-            xdf2 = xdf2[:10]
+        xdf2 = xdf[(xdf.sim_name != 'DTvec_180214') & (xdf.sim_name != 'DTasym_180214')].sort_values('w_sharp', ascending=False)
+        if len(xdf2) > 20:
+            xdf2 = xdf2[:20]
         res = res.append(xdf2, ignore_index=True)
-
     out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
