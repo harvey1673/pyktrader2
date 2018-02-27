@@ -7,7 +7,7 @@ import json
 import pandas as pd
 import dbaccess
 import misc
-
+from collections import OrderedDict
 sim_config_folder = "C:/dev/pyktlib/pyktrader2/btest_setup/"
 
 output_columns = ['asset', 'sim_name', 'scen_id', 'std_unit', \
@@ -52,32 +52,39 @@ def calc_w_col(df, key = 'sharp_ratio', weight = {'6m': 0.2, '1y': 0.4, '2y': 0.
 def extract_element(df, col_name, n):
     return df[col_name].apply(lambda x: json.loads(x)[n])
 
-def create_strat_json(df, inst_list, asset_keys, capital = 4000.0):
+def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
     xdf = df.dropna(subset = ['name'])
     inst_dict = dict([(misc.inst2product(instID), instID) for instID in inst_list])
     xdf['instID'] = xdf['asset'].apply(lambda x: inst_dict[x])
-    output = {}
+    output = OrderedDict()
     sim_names = xdf['sim_name'].unique()
     sim_dict = load_sim_config(sim_names, config_folder = sim_config_folder)
-    for i in range(len(xdf)):
-        if str(df['name']) not in output:
-            output[str(df['name'])]  = {'config': {'name': str(df['name']), 'num_tick': 1, 'daily_close_buffer': 5, \
-                                                   'trade_valid_time': 600, 'open_period': [300, 2115], 'assets':[]},
-                                        'class': 'strat_dtchan_addon.DTSplitChanAddon', }
-        conf_dict = {"underliers": [xdf['instID'][i]], }
+    for idx, row in xdf.iterrows():
+        if row['name'] not in output:
+            output[row['name']]  = {'class': 'strat_dtchan_addon.DTSplitChanAddon',
+                                    'config': OrderedDict([('name', row['name']), ('num_tick', 1), ('daily_close_buffer', 5), \
+                                                           ('pos_scaler', 1.0), ('trade_valid_time', 600), ]),}
+            for key in common_keys:
+                if key in sim_dict[row['sim_name']]:
+                    output[row['name']]['config'][key] = sim_dict[row['sim_name']][key]
+                elif key in sim_dict[row['sim_name']]['config']:
+                    output[row['name']]['config'][key] = sim_dict[row['sim_name']]['config'][key]
+            output[row['name']]['config']['assets'] = []
+        conf_dict = OrderedDict()
+        conf_dict["underliers"] = [row['instID']]
         for key in asset_keys:
             if key == 'alloc_w':
-                conf_dict[key] = capital/xdf['std_unit'][i]*xdf['w_sharp'][i]
+                conf_dict[key] = round(capital/row['std_unit'] * row['w_sharp'], 1)
             elif key in xdf:
-                if isinstance(xdf[key][i], basestring) and '[' in xdf[key][i]:
-                    conf_dict[key] = json.loads(xdf[key][i])
+                if isinstance(row[key], basestring) and ('[' in row[key] and ']' in row[key]):
+                    conf_dict[key] = json.loads(row[key])
                 else:
-                    conf_dict[key] = xdf[key][i]
-            elif key in sim_dict[xdf['sim_name'][i]]:
-                conf_dict[key] = sim_dict[xdf['sim_name'][i]][key]
-            elif key in sim_dict[xdf['sim_name'][i]]['config']:
-                conf_dict[key] = sim_dict[xdf['sim_name'][i]]['config'][key]
-        output[str(df['name'])]['config']['assets'].append(conf_dict)
+                    conf_dict[key] = row[key]
+            elif key in sim_dict[row['sim_name']]:
+                conf_dict[key] = sim_dict[row['sim_name']][key]
+            elif key in sim_dict[row['sim_name']]['config']:
+                conf_dict[key] = sim_dict[row['sim_name']]['config'][key]
+        output[row['name']]['config']['assets'].append(conf_dict)
     return output
 
 def process_DTsim():
@@ -114,7 +121,7 @@ def process_DTsim():
         if len(xdf2) > 20:
             xdf2 = xdf2[:20]
         res = res.append(xdf2, ignore_index=True)
-    out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio']
+    out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio', 'volumes']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
     return out
@@ -150,6 +157,21 @@ def process_RSIATRsim():
     out = res[out_cols]
     out.to_csv('RSI_ATR.csv')
     return out
+
+def create_DT_strat():
+    inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
+                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', \
+                 'pp1805', 'l1805', 'v1805', 'MA805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
+
+    asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
+                  'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
+    common_keys = ['open_period']
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\DTvec.xlsx', 'rb'), sheetname = 'DTvec')
+    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1700.0)
+    for key in output:
+        with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
+            json.dump(output[key], outfile)
+
 
 
 
