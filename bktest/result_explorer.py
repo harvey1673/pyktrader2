@@ -65,7 +65,12 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
                                     'config': OrderedDict([('name', row['name']), ('num_tick', 1), ('daily_close_buffer', 5), \
                                                            ('pos_scaler', 1.0), ('trade_valid_time', 600), ]),}
             for key in common_keys:
-                if key in sim_dict[row['sim_name']]:
+                if key in xdf:
+                    if isinstance(row[key], basestring) and ('[' in row[key] and ']' in row[key]):
+                        conf_dict[key] = json.loads(row[key])
+                    else:
+                        conf_dict[key] = row[key]
+                elif key in sim_dict[row['sim_name']]:
                     output[row['name']]['config'][key] = sim_dict[row['sim_name']][key]
                 elif key in sim_dict[row['sim_name']]['config']:
                     output[row['name']]['config'][key] = sim_dict[row['sim_name']]['config'][key]
@@ -89,7 +94,8 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
 
 def process_DTsim():
     sim_names = ['DTvec_180214', 'DTasym_180214', 'DTvec_dchan_180214', \
-                 'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214']
+                 'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214',\
+                 'DTsplit_180214', 'DT3sp_180214', 'DT4sp_180214']
     df = load_btest_res(sim_names)
     weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
@@ -100,7 +106,12 @@ def process_DTsim():
     df['freq'] = 1
     df['volumes'] = '[1]'
     df['vol_ratio'] = '[1.0, 0.0]'
-    filter = (df.sim_name == 'DTvec_180214') | (df.sim_name == 'DTasym_180214')
+    df['open_period'] = '[300, 2115]'
+    df.ix[df.sim_name == 'DTsplit_180214', 'open_period'] = '[300, 1500, 2115]'
+    df.ix[df.sim_name == 'DT3sp_180214', 'open_period'] = '[300, 1500, 1900, 2115]'
+    df.ix[df.sim_name == 'DT4sp_180214', 'open_period'] = '[300, 1500, 1630, 1900, 2115]'
+    filter = (df.sim_name == 'DTvec_180214') | (df.sim_name == 'DTasym_180214') \
+             | (df.sim_name == 'DT3sp_180214') | (df.sim_name == 'DT4sp_180214') | (df.sim_name == 'DTsplit_180214')
     df.ix[filter, 'ma_chan'] = df.ix[filter, 'par_value1']
     df.ix[~filter, 'channels'] = df.ix[~filter, 'par_value1']
     df.ix[~filter, 'vol_ratio'] = '[0.0, 1.0]'
@@ -117,10 +128,15 @@ def process_DTsim():
         if len(xdf1) > 20:
             xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-        xdf2 = xdf[(xdf.sim_name != 'DTvec_180214') & (xdf.sim_name != 'DTasym_180214')].sort_values('w_sharp', ascending=False)
-        if len(xdf2) > 20:
-            xdf2 = xdf2[:20]
-        res = res.append(xdf2, ignore_index=True)
+        xdf1 = xdf[((xdf.sim_name == 'DTsplit_180214') | (xdf.sim_name == 'DT3sp_180214') | (xdf.sim_name == 'DT4sp_180214'))].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 20:
+            xdf1 = xdf1[:20]
+        res = res.append(xdf1, ignore_index=True)
+        xdf1 = xdf[(xdf.sim_name != 'DTvec_180214') & (xdf.sim_name != 'DTasym_180214') & (xdf.sim_name != 'DTsplit_180214')\
+            & (xdf.sim_name != 'DT3sp_180214') & (xdf.sim_name != 'DT4sp_180214')].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 20:
+            xdf1 = xdf1[:20]
+        res = res.append(xdf1, ignore_index=True)
     out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio', 'volumes']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
