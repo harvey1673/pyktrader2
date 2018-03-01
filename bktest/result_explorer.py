@@ -128,32 +128,32 @@ def process_DTsim():
 
 def process_RSIATRsim():
     sim_names = ['rsi_atr_1m', 'rsi_atr_5m', \
-                 'rsi_atr_3m', 'rsi_atr_15m', 'rsi_atr_2m']
+                 'rsi_atr_3m', 'rsi_atr_15m', 'rsi_atr_1m']
     df = load_btest_res(sim_names)
     weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
-    df['price_mode'] = df['par_value2']
-    df['chan'] = df['par_value1']
-    df['lookbacks'] = extract_element(df, 'par_value0', 1)
-    df['ratios'] = extract_element(df, 'par_value0', 0)
-    df['trend_factor'] = extract_element(df, 'par_value0', 2)
+    df['close_daily'] = df['par_value1']
+    df['atr_len'] = extract_element(df, 'par_value0', 1)
+    df['atrma_len'] = extract_element(df, 'par_value0', 0)
+    df['rsi_trigger'] = extract_element(df, 'par_value0', 2)
+    df['rsi_len'] = extract_element(df, 'par_value0', 2)
     df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
     df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
     assets = asset_list
     res = pd.DataFrame()
     for asset in assets:
         xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
-        xdf1 = xdf[((xdf.sim_name == 'DTvec_180214') | (xdf.sim_name == 'DTasyn_180214')) \
-                   & (df.par_value1 == '0')].sort_values('w_sharp', ascending=False)
-        if len(xdf1) > 10:
-            xdf1 = xdf1[:10]
+        xdf1 = xdf[(xdf.sim_name == 'rsi_atr_1m') | (xdf.sim_name == 'rsi_atr_2m') | (xdf.sim_name == 'rsi_atr_3m')].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 20:
+            xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-        xdf2 = xdf[xdf.sim_name != 'DTvec_180214'].sort_values('w_sharp', ascending=False)
-        if len(xdf2) > 10:
-            xdf2 = xdf2[:10]
+        xdf2 = xdf[(xdf.sim_name == 'rsi_atr_15m') | (xdf.sim_name == 'rsi_atr_5m')].sort_values('w_sharp', ascending=False)
+        if len(xdf2) > 20:
+            xdf2 = xdf2[:20]
         res = res.append(xdf2, ignore_index=True)
 
-    out_cols = output_columns + ['chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size']
+    out_cols = output_columns + ['chan', 'atr_len', 'atrma_len', 'rsi_len', 'rsi_trigger', 'close_daily', \
+                                 'std_unit', 'w_sharp', 'lot_size']
     out = res[out_cols]
     out.to_csv('RSI_ATR.csv')
     return out
