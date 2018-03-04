@@ -95,9 +95,12 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
 def process_DTsim():
     sim_names = ['DTvec_180214', 'DTasym_180214', 'DTvec_dchan_180214', \
                  'DTvec_pct10_180214', 'DTvec_pct25_180214', 'DTvec_pct45_180214',\
-                 'DTsplit_180214', 'DT3sp_180214', 'DT4sp_180214']
+                 'DTsplit_180214', 'DT3sp_180214', 'DT4sp_180214', \
+                  'DTsplit_pct10_180214', 'DTsplit_dchan_180214', 'DT3sp_dchan_180214', 'DT4sp_dchan_180214']
     df = load_btest_res(sim_names)
-    weight = {'6m': 0.5/2.5, '1y': 1.0/2.5, '2y': 1.0/2.5}
+    filter = df['sharp_ratio_3y'].isnull()
+    df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
+    weight = {'6m': 0.5/2.5, '1y': 1.0/3.5, '2y': 1.0/3.5, '3y': 1.0/3.5}
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
     df['price_mode'] = df['par_value2']
     df['ma_chan'] = 0
@@ -107,9 +110,9 @@ def process_DTsim():
     df['volumes'] = '[1]'
     df['vol_ratio'] = '[1.0, 0.0]'
     df['open_period'] = '[300, 2115]'
-    df.ix[df.sim_name == 'DTsplit_180214', 'open_period'] = '[300, 1500, 2115]'
-    df.ix[df.sim_name == 'DT3sp_180214', 'open_period'] = '[300, 1500, 1900, 2115]'
-    df.ix[df.sim_name == 'DT4sp_180214', 'open_period'] = '[300, 1500, 1630, 1900, 2115]'
+    df.ix[(df.sim_name == 'DTsplit_180214') | (df.sim_name == 'DTsplit_dchan_180214'), 'open_period'] = '[300, 1500, 2115]'
+    df.ix[(df.sim_name == 'DT3sp_180214') | (df.sim_name == 'DT3sp_dchan_180214'), 'open_period'] = '[300, 1500, 1900, 2115]'
+    df.ix[(df.sim_name == 'DT4sp_180214') | (df.sim_name == 'DT4sp_dchan_180214'), 'open_period'] = '[300, 1500, 1630, 1900, 2115]'
     filter = (df.sim_name == 'DTvec_180214') | (df.sim_name == 'DTasym_180214') \
              | (df.sim_name == 'DT3sp_180214') | (df.sim_name == 'DT4sp_180214') | (df.sim_name == 'DTsplit_180214')
     df.ix[filter, 'ma_chan'] = df.ix[filter, 'par_value1']
