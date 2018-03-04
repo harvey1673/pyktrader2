@@ -322,14 +322,16 @@ def ROC(df, n):
     return pd.Series(M / N, name = 'ROC' + str(n))
 
 #Bollinger Bands
-def BBANDS(df, n, k = 2):
-    MA = pd.Series(pd.rolling_mean(df['close'], n))
-    MSD = pd.Series(pd.rolling_std(df['close'], n))
+def BBANDS(df, n, k = 2, field = 'close'):
+    MA = pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field.upper() + '_' + str(n))
+    MSD = pd.Series(pd.rolling_std(df[field], n))
     b1 = 2 * k * MSD / MA
-    B1 = pd.Series(b1, name = 'BollingerB' + str(n))
-    b2 = (df['close'] - MA + k * MSD) / (2 * k * MSD)
-    B2 = pd.Series(b2, name = 'Bollingerb' + str(n))
-    return pd.concat([B1,B2], join='outer', axis=1)
+    B1 = pd.Series(b1, name='BollingerB_' + str(n))
+    b2 = (df[field] - MA + k * MSD) / (2 * k * MSD)
+    B2 = pd.Series(b2, name='Bollingerb_' + str(n))
+    UB = pd.Series(MA + k * MSD, name = 'BollingerU_' + str(n))
+    LB = pd.Series(MA - k * MSD, name = 'BollingerL_' + str(n))
+    return pd.concat([B1, B2, MA, UB, LB], join='outer', axis=1)
 
 #Pivot Points, Supports and Resistances
 def PPSR(df):
@@ -975,7 +977,7 @@ def dt_rng(df, win = 2, ratio = 0.7):
         df[key][-1] = max(max(df['high'][-win:]) - min(df['close'][-win:]),
                                 max(df['close'][-win:]) - min(df['low'][-win:]))
     elif win == 0:
-        df[key][-1] = max(max(df['high'][-2:]) - min(df['close'][-2:]),
+        tr = max(max(df['high'][-2:]) - min(df['close'][-2:]),
                                 max(df['close'][-2:]) - min(df['low'][-2:]))
-        df[key][-1] = max(df[key][-1] * 0.5, df['high'][-1] - df['close'][-1],
+        df[key][-1] = max(tr * 0.5, df['high'][-1] - df['close'][-1],
                                 df['close'][-1] - df['low'][-1])

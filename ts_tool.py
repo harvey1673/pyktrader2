@@ -27,9 +27,9 @@ def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_c
         args['start_date'] = start
         args['end_date'] = end
         df = misc.nearby(spotID, **args)
+        df = df.reset_index()
     else:
         df = dbaccess.load_daily_data_to_df(cnx, spot_table, spotID, start, end, index_col = None, field = field)
-    print df
     if isinstance(df[index_col][0], basestring):
         if len(df[index_col][0])> 12:
             df[index_col] = df[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
@@ -44,6 +44,8 @@ def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_c
         df = df[df.tenor=='0W']
         data_field = 'rate'
     elif field == 'spotID':
+        data_field = 'close'
+    elif field == 'instID':
         data_field = 'close'
     df = df[[data_field]]
     df.rename(columns = {data_field: col_name}, inplace = True)
