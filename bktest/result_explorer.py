@@ -67,9 +67,9 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
             for key in common_keys:
                 if key in xdf:
                     if isinstance(row[key], basestring) and ('[' in row[key] and ']' in row[key]):
-                        conf_dict[key] = json.loads(row[key])
+                        output[row['name']]['config'][key] = json.loads(row[key])
                     else:
-                        conf_dict[key] = row[key]
+                        output[row['name']]['config'][key] = row[key]
                 elif key in sim_dict[row['sim_name']]:
                     output[row['name']]['config'][key] = sim_dict[row['sim_name']][key]
                 elif key in sim_dict[row['sim_name']]['config']:
@@ -140,7 +140,8 @@ def process_DTsim():
         if len(xdf1) > 20:
             xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-    out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio', 'volumes']
+    out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', \
+                                 'trend_factor', 'lot_size', 'min_rng', 'vol_ratio', 'volumes', 'open_period']
     out = res[out_cols]
     out.to_csv('DTvec.csv')
     return out
@@ -180,13 +181,13 @@ def process_RSIATRsim():
 def create_DT_strat():
     inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
                  'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', \
-                 'pp1805', 'l1805', 'v1805', 'MA805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
+                 'pp1805', 'l1805', 'v1805', 'MA805', 'al1805', 'cu1805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
 
     asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
                   'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
     common_keys = ['open_period']
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\DTvec.xlsx', 'rb'), sheetname = 'DTvec')
-    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1700.0)
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\pyktrader2\\DTsim_180214.xlsx', 'rb'), sheetname = 'DTvec')
+    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 2000.0)
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
             json.dump(output[key], outfile)
