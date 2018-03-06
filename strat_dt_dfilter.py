@@ -24,14 +24,12 @@ class DTSplitChanAddon(Strategy):
         self.open_idx = [0] * numAssets
         self.max_pos = [1] * numAssets
         self.split_data = [None] * numAssets
-        for infunc in self.data_func:
-            name  = infunc[0]
-            sfunc = eval(infunc[1])
-            rfunc = eval(infunc[2])
-            if len(infunc) > 3:
-                fargs = infunc[3]
-            else:
-                fargs = {}
+        self.high_func = None
+        self.low_func = None
+        self.high_sfunc = fcustom(eval(self.data_func[0][1]), **self.data_func[0][3])
+        self.high_rfunc = fcustom(eval(self.data_func[0][2]), **self.data_func[0][3])
+        self.low_sfunc = fcustom(eval(self.data_func[1][1]), **self.data_func[1][3])
+        self.low_rfunc = fcustom(eval(self.data_func[1][2]), **self.data_func[1][3])
 
     def register_bar_freq(self):
         for idx, under in enumerate(self.underliers):
@@ -81,7 +79,6 @@ class DTSplitChanAddon(Strategy):
         pass
 
     def recalc_rng(self, idx):
-        self.update_data(idx)
         win = int(self.lookbacks[idx])
         ddf = self.split_data[idx].data
         if win > 0:
@@ -113,7 +110,7 @@ class DTSplitChanAddon(Strategy):
         if (self.open_period[pid] > min_id) and (self.open_period[pid] <= curr_min):
             self.tday_open[idx] = self.agent.instruments[inst].price
             self.open_idx[idx] = pid
-            self.recalc_rng(idx, self.agent.min_data[inst][1].data)            
+            self.recalc_rng(idx)
         if min_id < 300:
             return False
         if (self.freq[idx]>0) and (freq == self.freq[idx]):

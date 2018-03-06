@@ -2,6 +2,7 @@
 import datetime
 import talib
 import numpy as np
+from numpy.lib.recfunctions import append_fields
 import pandas as pd
 import scipy.stats as stats
 import scipy.signal as signal
@@ -78,7 +79,12 @@ class DynamicRecArray(object):
         self._data = np.resize(np.array(df.to_records(index = need_index)), self.size)
         self.dtype = self._data.dtype
         self.length = df_len
-        
+
+    def append_field(self, field, field_value = None, field_type = np.float64):
+        if field_value == None:
+            field_value = np.zeros(self.size, dtype = field_type)
+        self._data = append_fields(self._data, field, field_value, usemask = False)
+
     @property
     def data(self):
         return self._data[:self.length]
@@ -322,16 +328,14 @@ def ROC(df, n):
     return pd.Series(M / N, name = 'ROC' + str(n))
 
 #Bollinger Bands
-def BBANDS(df, n, k = 2, field = 'close'):
-    MA = pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field.upper() + '_' + str(n))
-    MSD = pd.Series(pd.rolling_std(df[field], n))
+def BBANDS(df, n, k = 2):
+    MA = pd.Series(pd.rolling_mean(df['close'], n))
+    MSD = pd.Series(pd.rolling_std(df['close'], n))
     b1 = 2 * k * MSD / MA
-    B1 = pd.Series(b1, name='BollingerB_' + str(n))
-    b2 = (df[field] - MA + k * MSD) / (2 * k * MSD)
-    B2 = pd.Series(b2, name='Bollingerb_' + str(n))
-    UB = pd.Series(MA + k * MSD, name = 'BollingerU_' + str(n))
-    LB = pd.Series(MA - k * MSD, name = 'BollingerL_' + str(n))
-    return pd.concat([B1, B2, MA, UB, LB], join='outer', axis=1)
+    B1 = pd.Series(b1, name = 'BollingerB' + str(n))
+    b2 = (df['close'] - MA + k * MSD) / (2 * k * MSD)
+    B2 = pd.Series(b2, name = 'Bollingerb' + str(n))
+    return pd.concat([B1,B2], join='outer', axis=1)
 
 #Pivot Points, Supports and Resistances
 def PPSR(df):
@@ -977,7 +981,7 @@ def dt_rng(df, win = 2, ratio = 0.7):
         df[key][-1] = max(max(df['high'][-win:]) - min(df['close'][-win:]),
                                 max(df['close'][-win:]) - min(df['low'][-win:]))
     elif win == 0:
-        tr = max(max(df['high'][-2:]) - min(df['close'][-2:]),
+        df[key][-1] = max(max(df['high'][-2:]) - min(df['close'][-2:]),
                                 max(df['close'][-2:]) - min(df['low'][-2:]))
-        df[key][-1] = max(tr * 0.5, df['high'][-1] - df['close'][-1],
+        df[key][-1] = max(df[key][-1] * 0.5, df['high'][-1] - df['close'][-1],
                                 df['close'][-1] - df['low'][-1])
