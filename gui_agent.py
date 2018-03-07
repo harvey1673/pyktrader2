@@ -51,18 +51,14 @@ class Gui(tk.Tk):
     
         for strat_name in self.app.agent.strategies:
             strat = self.app.agent.strategies[strat_name]
-            if strat.__class__.__name__ in ['DTTrader']:
-                self.strat_gui[strat_name] = DTStratGui(strat, app, self)
-            elif strat.__class__.__name__ in ['DTSplitDChanFilter']:
-                self.strat_gui[strat_name] = DTSplitDChanStratGui(strat, app, self)
+            if strat.__class__.__name__ in ['DTSplitChan']:
+                self.strat_gui[strat_name] = DTSplitChanGui(strat, app, self)
             elif strat.__class__.__name__ in ['DTSplitChanAddon']:
                 self.strat_gui[strat_name] = DTSplitChanAddonStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['BbandPChanTrader']:
                 self.strat_gui[strat_name] = BBandPChanStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['MASystemTrader']:
                 self.strat_gui[strat_name] = MASystemStratGui(strat, app, self)
-            elif strat.__class__.__name__ in ['AsctrendTrader']:
-                self.strat_gui[strat_name] = AsctrendStratGui(strat, app, self)
             elif strat.__class__.__name__ in ['RsiAtrStrat']:
                 self.strat_gui[strat_name] = RsiAtrStratGui(strat, app, self)
             elif strat.__class__.__name__ == 'RBreaker':

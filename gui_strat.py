@@ -133,50 +133,30 @@ class StratGui(object):
     def save_config(self):
         self.app.run_strat_func(self.name, 'save_config')
 
-class DTStratGui(StratGui):
+class DTSplitChanGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Lookbacks', 'Ratios', 'MaWin', 'Factors', 'PriceMode', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TradeUnit', 'TdayOpen', 'CurrPrices', 'CurRng', 'CurMa']
-        self.shared_fields = ['PosScaler', 'IsDisabled']
-        self.field_types = {'RunFlag':'int',
-                            'TradeUnit':'int',
-                            'Lookbacks':'int', 
-                            'Ratios': 'float',
-                            'PriceMode': 'str',
-                            'Factors': 'float',
-                            'CloseTday': 'bool',
-                            'IsDisabled': 'bool',
-                            'TdayOpen': 'float',
-                            'CurrPrices': 'float',
-                            'CurRng':'float',
-                            'CurMa': 'float',
-                            'MaWin': 'int',
-                            'MinRng': 'float',
-                            'AllocW': 'float',
-                            'PosScaler': 'float',
-                            'Freq': 'int'}
-
-class DTSplitDChanStratGui(StratGui):
-    def __init__(self, strat, app, master):
-        StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TdayOpen', 'OpenIdx', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
+        self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday', 'IsDisabled']
+        self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow', 'MaLevel', 'MaChan']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'Lookbacks':'int',
                             'Ratios': 'float',
+                            'VolRatio': 'floatlist',
+                            'PriceMode': 'str',
                             'CloseTday': 'bool',
                             'IsDisabled': 'bool',
                             'TdayOpen': 'float',
                             'OpenIdx': 'int',
                             'CurrPrices': 'float',
                             'CurRng':'float',
+                            'MaLevel': 'float',
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
                             'Channels': 'int',
                             'MinRng': 'float',
+                            'MaChan': 'int',
                             'AllocW': 'float',
                             'PosScaler': 'float',
                             'Freq': 'int',
@@ -253,29 +233,6 @@ class MASystemStratGui(StratGui):
                             'ChanHigh': 'float',
                             'ChanLow': 'float',
                             'Channels': 'int',
-                            'AllocW': 'float',
-                            'PosScaler': 'float',
-                            'Freq': 'int',
-                            }
-
-class AsctrendStratGui(StratGui):
-    def __init__(self, strat, app, master):
-        StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiWin', 'RsiLevel', 'WprWin', 'WprLevel', \
-                              'SarParam', ]
-        self.shared_fields = ['PosScaler', 'IsDisabled']
-        self.field_types = {'RunFlag':'int',
-                            'TradeUnit':'int',
-                            'Ratios': 'float',
-                            'CloseTday': 'bool',
-                            'IsDisabled': 'bool',
-                            'CurrPrices': 'float',
-                            'RsiWin': 'int',
-                            'RsiLevel': 'intlist',
-                            'WprWin': 'int',
-                            'WprLevel': 'intlist',
-                            'SarParam': 'floatlist',
                             'AllocW': 'float',
                             'PosScaler': 'float',
                             'Freq': 'int',

@@ -7,7 +7,7 @@ import numpy as np
 import copy
 from strategy import *
  
-class DTSplitChanAddon(Strategy):
+class DTSplitChan(Strategy):
     common_params =  dict({'open_period': [300, 2115], \
                            'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
                           **Strategy.common_params)
@@ -27,10 +27,10 @@ class DTSplitChanAddon(Strategy):
         self.split_data = [None] * numAssets
         self.high_func = None
         self.low_func = None
-        self.high_func = fcustom(eval(self.data_func[0][1]), **self.data_func[0][3])
-        self.high_field = self.data_func[0][2]
-        self.low_sfunc = fcustom(eval(self.data_func[1][1]), **self.data_func[1][3])
-        self.low_field = self.data_func[1][2]
+        self.high_func = fcustom(eval(self.data_func[0][0]), **self.data_func[0][2])
+        self.high_field = self.data_func[0][1]
+        self.low_func = fcustom(eval(self.data_func[1][0]), **self.data_func[1][2])
+        self.low_field = self.data_func[1][1]
 
     def register_bar_freq(self):
         for idx, under in enumerate(self.underliers):
@@ -77,7 +77,16 @@ class DTSplitChanAddon(Strategy):
         self.save_state()
 
     def update_data(self, idx):
-        pass
+        inst = self.underliers[idx][0]
+        mdf = self.agent.min_data[inst][1].data
+        i = 1
+        while (mdf['min_id'][-i] > self.split_data[idx].data['min_id'][-1]) and (mdf['date'][-i] >= self.split_data[idx].data['date'][-1]):
+            i += 1
+        if i> 1:
+            data_dict = {'datetime': mdf['datetime'][-(i-1)], 'date': mdf['date'][-(i-1)], 'open': mdf['open'][-(i-1)], \
+                         'high': mdf['high'][-(i-1):].max(), 'low': mdf['low'][-(i-1):].min(), 'close': mdf['close'][-1], \
+                         'volume': mdf['volume'][-(i-1):].sum(), 'openInterest': mdf['openInterest'][-1], 'min_id': mdf['min_id'][-1]}
+            self.split_data[idx].append_by_dict(data_dict)
 
     def recalc_rng(self, idx):
         win = int(self.lookbacks[idx])
@@ -114,6 +123,7 @@ class DTSplitChanAddon(Strategy):
                 break
         pid = self.open_idx[idx]
         if (self.open_period[pid] > min_id) and (self.open_period[pid] <= curr_min):
+            self.update_data(idx)
             self.tday_open[idx] = self.agent.instruments[inst].price
             self.open_idx[idx] = pid
             self.recalc_rng(idx)
