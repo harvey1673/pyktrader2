@@ -16,8 +16,8 @@ class DTSplitChanAddon(Strategy):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
         self.cur_rng = [0.0] * numAssets
-        self.chan_high = [0.0] * numAssets
-        self.chan_low  = [0.0] * numAssets
+        self.chan_high = [-1000000.0] * numAssets
+        self.chan_low  = [1000000.0] * numAssets
         self.tday_open = [0.0] * numAssets
         self.ma_level = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
@@ -26,7 +26,7 @@ class DTSplitChanAddon(Strategy):
 
     def register_func_freq(self):
         for under, chan, machan in zip(self.underliers, self.channels, self.ma_chan):
-            if chan > 0:                
+            if chan > 0:
                 for infunc in self.data_func:
                     name  = infunc[0]
                     sfunc = eval(infunc[1])

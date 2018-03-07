@@ -2,7 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a1673752-28df-4089-b971-0632ae386234" name="Default" comment="">
+      <change type="DELETED" beforePath="$PROJECT_DIR$/DTsim_180214.xlsx" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/settings.7z" afterPath="" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/strat_dt_dfilter.py" afterPath="$PROJECT_DIR$/strat_dt_dfilter.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/strat_dtchan_addon.py" afterPath="$PROJECT_DIR$/strat_dtchan_addon.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -13,32 +17,41 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="dbaccess.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/dbaccess.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3477">
-              <caret line="191" column="109" lean-forward="false" selection-start-line="191" selection-start-column="4" selection-end-line="191" selection-end-column="109" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="result_explorer.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/bktest/result_explorer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="331">
-              <caret line="167" column="25" lean-forward="false" selection-start-line="167" selection-start-column="25" selection-end-line="167" selection-end-column="25" />
+            <state relative-caret-position="350">
+              <caret line="168" column="25" lean-forward="false" selection-start-line="168" selection-start-column="25" selection-end-line="168" selection-end-column="25" />
+              <folding>
+                <marker date="1520385483659" expanded="true" signature="2335:3255" ph="..." />
+                <marker date="1520385483659" expanded="true" signature="2702:3255" ph="..." />
+                <marker date="1520385483659" expanded="true" signature="2740:3255" ph="..." />
+                <marker date="1520385483659" expanded="true" signature="3100:3255" ph="..." />
+                <marker date="1520385483659" expanded="true" signature="3131:3255" ph="..." />
+                <marker date="1520385483659" expanded="true" signature="10130:10272" ph="..." />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="strat_dtchan_addon.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/strat_dtchan_addon.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="175">
+              <caret line="66" column="39" lean-forward="false" selection-start-line="66" selection-start-column="27" selection-end-line="66" selection-end-column="39" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="strat_dtchan_addon.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/strat_dtchan_addon.py">
+      <file leaf-file-name="strat_dt_dfilter.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/strat_dt_dfilter.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="836">
-              <caret line="63" column="0" lean-forward="false" selection-start-line="63" selection-start-column="0" selection-end-line="67" selection-end-column="50" />
-              <folding />
+            <state relative-caret-position="194">
+              <caret line="11" column="61" lean-forward="true" selection-start-line="11" selection-start-column="61" selection-end-line="11" selection-end-column="61" />
+              <folding>
+                <element signature="e#22#40#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -46,8 +59,8 @@
       <file leaf-file-name="data_handler.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/data_handler.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1961">
-              <caret line="982" column="64" lean-forward="false" selection-start-line="982" selection-start-column="64" selection-end-line="982" selection-end-column="64" />
+            <state relative-caret-position="346">
+              <caret line="714" column="46" lean-forward="false" selection-start-line="714" selection-start-column="46" selection-end-line="714" selection-end-column="46" />
               <folding />
             </state>
           </provider>
@@ -136,8 +149,14 @@
       <find>output = {}</find>
       <find>inst2prod</find>
       <find>strat</find>
-      <find>chan_high</find>
       <find>BBANDS</find>
+      <find>chan_high</find>
+      <find>DONCH</find>
+      <find>PCT</find>
+      <find>self.ma_level</find>
+      <find>channels</find>
+      <find>self.chan_high</find>
+      <find>channel_keys</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -163,14 +182,15 @@
         <option value="$PROJECT_DIR$/bktest/bktest_kdj_vecsim.py" />
         <option value="$PROJECT_DIR$/data_handler.py" />
         <option value="$PROJECT_DIR$/strat_dtchan_addon.py" />
+        <option value="$PROJECT_DIR$/strat_dt_dfilter.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="66" />
-    <option name="y" value="124" />
-    <option name="width" value="1214" />
-    <option name="height" value="721" />
+    <option name="x" value="1285" />
+    <option name="y" value="16" />
+    <option name="width" value="1020" />
+    <option name="height" value="707" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <ConfirmationsSetting value="2" id="Add" />
@@ -246,10 +266,10 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="66" y="124" width="1214" height="721" extended-state="0" />
+    <frame x="1285" y="16" width="1020" height="707" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.2101329" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25049505" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -277,14 +297,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/strat_dt_dfilter.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/strat_rbreaker.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -661,6 +673,21 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/bktest/result_explorer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="350">
+          <caret line="168" column="25" lean-forward="false" selection-start-line="168" selection-start-column="25" selection-end-line="168" selection-end-column="25" />
+          <folding>
+            <marker date="1520385483659" expanded="true" signature="2335:3255" ph="..." />
+            <marker date="1520385483659" expanded="true" signature="2702:3255" ph="..." />
+            <marker date="1520385483659" expanded="true" signature="2740:3255" ph="..." />
+            <marker date="1520385483659" expanded="true" signature="3100:3255" ph="..." />
+            <marker date="1520385483659" expanded="true" signature="3131:3255" ph="..." />
+            <marker date="1520385483659" expanded="true" signature="10130:10272" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/bktest/bktest_rsiatr2.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-285">
@@ -669,27 +696,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/bktest/result_explorer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="331">
-          <caret line="167" column="25" lean-forward="false" selection-start-line="167" selection-start-column="25" selection-end-line="167" selection-end-column="25" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/data_handler.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1961">
-          <caret line="982" column="64" lean-forward="false" selection-start-line="982" selection-start-column="64" selection-end-line="982" selection-end-column="64" />
+        <state relative-caret-position="346">
+          <caret line="714" column="46" lean-forward="false" selection-start-line="714" selection-start-column="46" selection-end-line="714" selection-end-column="46" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/strat_dtchan_addon.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="836">
-          <caret line="63" column="0" lean-forward="false" selection-start-line="63" selection-start-column="0" selection-end-line="67" selection-end-column="50" />
+        <state relative-caret-position="175">
+          <caret line="66" column="39" lean-forward="false" selection-start-line="66" selection-start-column="27" selection-end-line="66" selection-end-column="39" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/strat_dt_dfilter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="194">
+          <caret line="11" column="61" lean-forward="true" selection-start-line="11" selection-start-column="61" selection-end-line="11" selection-end-column="61" />
+          <folding>
+            <element signature="e#22#40#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

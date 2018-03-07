@@ -3,11 +3,12 @@ from base import *
 from misc import *
 import logging
 import data_handler as dh
+import numpy as np
 import copy
 from strategy import *
  
 class DTSplitChanAddon(Strategy):
-    common_params =  dict({'open_period': [300, 2115], 'channel_keys': ['DONCH_HH', 'DONCH_LL'], \
+    common_params =  dict({'open_period': [300, 2115], \
                            'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
                           **Strategy.common_params)
     asset_params = dict({'lookbacks': 1, 'ratios': 1.0, 'freq': 1, 'channels': 20, 'ma_chan': 0, 'trend_factor': 0.0, \
@@ -16,8 +17,8 @@ class DTSplitChanAddon(Strategy):
         Strategy.__init__(self, config, agent)
         numAssets = len(self.underliers)
         self.cur_rng = [0.0] * numAssets
-        self.chan_high = [0.0] * numAssets
-        self.chan_low  = [0.0] * numAssets
+        self.chan_high = [-1000000.0] * numAssets
+        self.chan_low  = [1000000.0] * numAssets
         self.tday_open = [0.0] * numAssets
         self.ma_level = [0.0] * numAssets
         self.tick_base = [0.0] * numAssets
@@ -26,10 +27,10 @@ class DTSplitChanAddon(Strategy):
         self.split_data = [None] * numAssets
         self.high_func = None
         self.low_func = None
-        self.high_sfunc = fcustom(eval(self.data_func[0][1]), **self.data_func[0][3])
-        self.high_rfunc = fcustom(eval(self.data_func[0][2]), **self.data_func[0][3])
+        self.high_func = fcustom(eval(self.data_func[0][1]), **self.data_func[0][3])
+        self.high_field = self.data_func[0][2]
         self.low_sfunc = fcustom(eval(self.data_func[1][1]), **self.data_func[1][3])
-        self.low_rfunc = fcustom(eval(self.data_func[1][2]), **self.data_func[1][3])
+        self.low_field = self.data_func[1][2]
 
     def register_bar_freq(self):
         for idx, under in enumerate(self.underliers):
@@ -81,6 +82,11 @@ class DTSplitChanAddon(Strategy):
     def recalc_rng(self, idx):
         win = int(self.lookbacks[idx])
         ddf = self.split_data[idx].data
+        if self.channels[idx] > 0:
+            self.chan_high[idx] = self.high_func(ddf[self.high_field][-self.channels[idx]:])
+            self.chan_low[idx] = self.low_func(ddf[self.low_field][-self.channels[idx]:])
+        if self.ma_chan[idx] > 0:
+            self.ma_level[idx] = np.mean(ddf['close'][-self.ma_chan[idx]:])
         if win > 0:
             self.cur_rng[idx] = max(max(ddf['high'][-win:])- min(ddf['close'][-win:]), \
                                     max(ddf['close'][-win:]) - min(ddf['low'][-win:]))
