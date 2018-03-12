@@ -52,7 +52,7 @@ def calc_w_col(df, key = 'sharp_ratio', weight = {'6m': 0.2, '1y': 0.4, '2y': 0.
 def extract_element(df, col_name, n):
     return df[col_name].apply(lambda x: json.loads(x)[n])
 
-def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
+def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0, strat_class = "strat_ma_system.MASystemTrader"):
     xdf = df.dropna(subset = ['name'])
     inst_dict = dict([(misc.inst2product(instID), instID) for instID in inst_list])
     xdf['instID'] = xdf['asset'].apply(lambda x: inst_dict[x])
@@ -61,7 +61,7 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0):
     sim_dict = load_sim_config(sim_names, config_folder = sim_config_folder)
     for idx, row in xdf.iterrows():
         if row['name'] not in output:
-            output[row['name']]  = {'class': 'strat_dtsp_chan.DTSplitChan',
+            output[row['name']]  = {'class': strat_class,
                                     'config': OrderedDict([('name', row['name']), ('num_tick', 1), ('daily_close_buffer', 5), \
                                                            ('pos_scaler', 1.0), ('trade_valid_time', 600), ]),}
             for key in common_keys:
@@ -154,7 +154,7 @@ def process_RSIATRsim():
     df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
     weight = {'6m': 0.5/2.5, '1y': 1.0/3.5, '2y': 1.0/3.5, '3y': 1.0/3.5}
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
-    df['atrma_period'] = 10
+    df['atrma_win'] = 10
     filter = df['sim_name'].str.contains('MA20')
     df.ix[filter, 'atrma_period'] = 20
     df['freq'] = 1
@@ -162,11 +162,11 @@ def process_RSIATRsim():
     df.ix[(df.sim_name ==  'RSI_ATRMA10_3m'), 'freq'] = 3
     df.ix[(df.sim_name ==  'RSI_ATRMA10_5m'), 'freq'] = 5
     df.ix[(df.sim_name ==  'RSI_ATRMA10_15m'), 'freq'] = 15
-    df['rsi_trigger'] = df['par_value0']
-    df['rsi_len'] = df['par_value1']
-    df['atr_period'] = df['par_value2']
+    df['rsi_th'] = df['par_value0']
+    df['rsi_win'] = df['par_value1']
+    df['atr_win'] = df['par_value2']
     df['stoploss'] = df['par_value3']
-    df['close_daily'] = df['par_value4']
+    df['close_tday'] = df['par_value4']
     df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
     df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
     df['volumes'] = '[1]'
@@ -183,39 +183,70 @@ def process_RSIATRsim():
             xdf2 = xdf2[:20]
         res = res.append(xdf2, ignore_index=True)
 
-    out_cols = output_columns + ['rsi_trigger', 'rsi_len', 'stoploss', 'atr_period', 'atrma_period', 'close_daily', \
-                                 'std_unit', 'w_sharp', 'lot_size', 'volumes', 'freq']
+    out_cols = output_columns + ['freq', 'rsi_th', 'rsi_win', 'stoploss', 'atr_win', 'atrma_win', 'close_tday', \
+                                 'std_unit', 'w_sharp', 'lot_size', 'volumes']
     out = res[out_cols]
-    out.to_csv('RSI_ATR.csv')
+    out.to_csv('RSI_ATR_180214.csv')
     return out
 
 def process_MAChanSim():
-    pass
+    sim_names = ['EMA3Chan']
+    df = load_btest_res(sim_names)
+    filter = df['sharp_ratio_3y'].isnull()
+    df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
+    weight = {'6m': 0.5/2.5, '1y': 1.0/3.5, '2y': 1.0/3.5, '3y': 1.0/3.5}
+    df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
+    df['max_win'] = extract_element(df, 'par_value1', 2)
+    df['freq'] = df['par_value0']
+    df['ma_win'] = df['par_value1']
+    df['channel_ratio'] = df['par_value2']
+    df['channels'] = df['channel_ratio'] * df['max_win']
+    df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
+    df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
+    df['volumes'] = '[1]'
+    assets = asset_list
+    res = pd.DataFrame()
+    for asset in assets:
+        xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
+        filter = (xdf['freq']=='1min') | (xdf['freq']=='3min') | (xdf['freq']=='5min') | (xdf['freq']=='9min')
+        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 20:
+            xdf1 = xdf1[:20]
+        res = res.append(xdf1, ignore_index=True)
+        xdf2 = xdf[~filter].sort_values('w_sharp', ascending=False)
+        if len(xdf2) > 20:
+            xdf2 = xdf2[:20]
+        res = res.append(xdf2, ignore_index=True)
+
+    out_cols = output_columns + ['win_list', 'channels','std_unit', 'w_sharp', 'lot_size', 'volumes', 'freq']
+    out = res[out_cols]
+    out.to_csv('EMA3Chan_180214.csv')
+    return out
 
 def create_DT_strat():
     inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
-                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', \
+                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', 'a1805',\
                  'pp1805', 'l1805', 'v1805', 'MA805', 'al1805', 'cu1805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
 
     asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
                   'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
     common_keys = ['open_period']
     df = pd.read_excel(open('C:\\dev\\pyktlib\\DTsim_180214.xlsx', 'rb'), sheetname = 'DTvec')
-    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0)
+    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_dtsp_chan.DTSplitChan")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
             json.dump(output[key], outfile)
 
 def create_RSIATR_strat():
     inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
-                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', \
+                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', 'a1805',\
                  'pp1805', 'l1805', 'v1805', 'MA805', 'al1805', 'cu1805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
 
-    asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
-                  'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
-    common_keys = ['open_period']
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\DTsim_180214.xlsx', 'rb'), sheetname = 'DTvec')
-    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0)
+    asset_keys = ['alloc_w', 'rsi_th', 'rsi_win', 'atr_win', 'atrma_win', 'stoploss',\
+                  'close_tday', 'volumes', 'freq']
+    common_keys = []
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\RSIATRsim_180214.xlsx', 'rb'), sheetname = 'RSI_ATR_180214')
+    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_rsiatr.RsiAtrStrat")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
             json.dump(output[key], outfile)
