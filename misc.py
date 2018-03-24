@@ -130,8 +130,9 @@ product_code = {'SHFE': ['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', '
                 'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'm_Opt', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
                 'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF', 'CY', 'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG',
                          'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC'],
+                'INE': ['sc',],
                 'SGX': ['fef', 'iolp'], \
-                'LME': ['sc'], }
+                'LME': ['lsc'], }
 
 CHN_Stock_Exch = {
     'SSE': ["000300", "510180", "510050", "11000011", "11000016", "11000021", "11000026", "000002", "000003", "000004",
@@ -173,6 +174,7 @@ night_session_markets = {'cu': 1,
                          'TC': 4,
                          'ZC': 4,
                          'FG': 4,
+                         'sc': 2,
                          }
 
 night_trading_hrs = {1: (300, 700),
@@ -242,7 +244,8 @@ product_lotsize = {'zn': 5,
                    'IC': 200,
                    'TF': 10000,
                    'T': 10000,
-                   'IO': 100
+                   'IO': 100,
+                   'sc': 1000,
                    }
 
 product_ticksize = {'zn': 5,
@@ -298,7 +301,8 @@ product_ticksize = {'zn': 5,
                     'IC': 0.2,
                     'TF': 0.005,
                     'T': 0.005,
-                    'IO': 0.1
+                    'IO': 0.1,
+                    'sc': 0.1,
                     }
 
 
@@ -399,7 +403,11 @@ def filter_main_cont(sdate, filter=False):
 
 
 def trading_hours(product, exch):
-    hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
+    if product in ['sc']:
+        hrs = [(1500, 1730), (1930, 2100)]
+    else:
+        hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
+
     if exch in ['SSE', 'SZE']:
         hrs = [(1530, 1730), (1900, 2100)]
     elif product in ['TF', 'T']:
@@ -663,6 +671,11 @@ def contract_expiry(cont, hols='db'):
         elif exch == 'SHFE':
             expiry = datetime.date(yr, mth, 14)
             expiry = workdays.workday(expiry, 1, CHN_Holidays)
+        elif exch == 'INE':
+            if mth != 10:
+                expiry = workdays.workday(cont_date, -1, CHN_Holidays)
+            else:
+                expiry = workdays.workday(cont_date, -6, CHN_Holidays)
         elif exch in ['SGX', 'OTC']:
             expiry = workdays.workday(cont_date + relativedelta(months = 1), -1, PLIO_Holidays)
         else:
@@ -719,7 +732,10 @@ def get_asset_tradehrs(asset):
         if asset in product_code[ex]:
             exch = ex
             break
-    hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
+    if asset in ['sc']:
+        hrs = [(1500, 1730), (1930, 2100)]
+    else:
+        hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
     if exch in ['SSE', 'SZE']:
         hrs = [(1530, 1730), (1900, 2100)]
     elif asset in ['TF', 'IF']:

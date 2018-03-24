@@ -322,7 +322,7 @@ class Agent(MktDataMixin):
 
     def gateway_map(self, instID):
         exch = self.instruments[instID].exchange
-        if exch in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
+        if exch in ['CZCE', 'DCE', 'SHFE', 'CFFEX', 'INE',]:
             for key in self.gateways:
                 gateway = self.gateways[key]
                 gway_class = type(gateway).__name__

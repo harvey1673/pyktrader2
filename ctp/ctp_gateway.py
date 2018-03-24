@@ -11,6 +11,7 @@ from base import *
 from misc import *
 from gateway import *
 from ctpDataType import *
+from vtConstant import *
 import logging
 import datetime
 import position
@@ -47,6 +48,7 @@ exchangeMap[EXCHANGE_CFFEX] = 'CFFEX'
 exchangeMap[EXCHANGE_SHFE] = 'SHFE'
 exchangeMap[EXCHANGE_CZCE] = 'CZCE'
 exchangeMap[EXCHANGE_DCE] = 'DCE'
+exchangeMap[EXCHANGE_DCE] = 'INE'
 exchangeMap[EXCHANGE_UNKNOWN] = ''
 exchangeMapReverse = {v:k for k,v in exchangeMap.items()}
 
@@ -451,7 +453,7 @@ class CtpGateway(GrossGateway):
     def rsp_qry_instrument(self, event):
         data = event.dict['data']
         last = event.dict['last']
-        if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX']:
+        if data['ProductClass'] in ['1', '2'] and data['ExchangeID'] in ['CZCE', 'DCE', 'SHFE', 'CFFEX', 'INE',]:
             cont = {}
             cont['instID'] = data['InstrumentID']           
             margin_l = data['LongMarginRatio']
