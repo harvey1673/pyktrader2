@@ -223,11 +223,11 @@ def process_MAChanSim():
     out.to_csv('EMA3Chan_180214.csv')
     return out
 
-def create_DT_strat():
-    inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
-                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', 'a1805',\
-                 'pp1805', 'l1805', 'v1805', 'MA805', 'al1805', 'cu1805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
+inst_list = ['rb1810', 'hc1810', 'i1809', 'j1809', 'jm1809', 'ZC809', 'ni1809', 'ru1809', 'FG809',
+                 'm1809', 'RM809', 'y1809', 'p1809', 'OI809', 'cs1809', 'c1809', 'jd1809', 'a1809',\
+                 'pp1809', 'l1809', 'v1809', 'MA809', 'al1807', 'cu1807', 'ag1806', 'au1806', 'SM809', 'SF809', 'T1806']
 
+def create_DT_strat():
     asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
                   'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
     common_keys = ['open_period']
@@ -238,15 +238,20 @@ def create_DT_strat():
             json.dump(output[key], outfile)
 
 def create_RSIATR_strat():
-    inst_list = ['rb1805', 'hc1805', 'i1805', 'j1805', 'jm1805', 'ZC805', 'ni1805', 'ru1805', 'FG805',
-                 'm1805', 'RM805', 'y1805', 'p1805', 'OI805', 'cs1805', 'c1805', 'jd1805', 'a1805',\
-                 'pp1805', 'l1805', 'v1805', 'MA805', 'al1805', 'cu1805', 'ag1806', 'au1806', 'cu1805', 'SM805', 'SF805', 'T1806']
-
     asset_keys = ['alloc_w', 'rsi_th', 'rsi_win', 'atr_win', 'atrma_win', 'stoploss',\
                   'close_tday', 'volumes', 'freq']
     common_keys = []
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\RSIATRsim_180214.xlsx', 'rb'), sheetname = 'RSI_ATR_180214')
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\RSI_ATR_180214.xlsx', 'rb'), sheetname = 'RSI_ATR_180214')
     output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_rsiatr.RsiAtrStrat")
+    for key in output:
+        with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
+            json.dump(output[key], outfile)
+
+def create_MAChan_strat():
+    asset_keys = ['alloc_w', 'ma_win', 'channels', 'close_tday', 'volumes', 'freq']
+    common_keys = []
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\EMAChansim_180214.xlsx', 'rb'), sheetname = 'EMA3Chan_180214')
+    output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_ma_system.MASystemTrader")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
             json.dump(output[key], outfile)

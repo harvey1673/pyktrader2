@@ -301,7 +301,7 @@ class TestApi(IbApi):
 if __name__ == '__main__':
     api = TestApi()
     
-    n = api.eConnect('127.0.0.1', 7497, 100, False)
+    n = api.eConnect('127.0.0.1', 7497, 888, False)
     print n
     
     t = api.TwsConnectionTime()
