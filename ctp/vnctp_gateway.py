@@ -1026,6 +1026,7 @@ class VnctpTdApi(TdApi):
         req['ForceCloseReason'] = defineDict['THOST_FTDC_FCC_NotForceClose'] # 非强平
         req['IsAutoSuspend'] = 0                                             # 非自动挂起
         req['MinVolume'] = 1                                                 # 最小成交量为1
+        req['UserProductInfo'] = self.gateway.product_info
         self.reqOrderInsert(req, self.reqID)
     
     #----------------------------------------------------------------------
@@ -1070,6 +1071,7 @@ class VnctpTdApi(TdApi):
             reserve_flag = defineDict["THOST_FTDC_EOPF_Reserve"]
         req['ReservePositionFlag'] = reserve_flag
         req['CloseFlag'] = close_flag
+        req['UserProductInfo'] = self.gateway.product_info
         self.reqExecOrderInsert(req, self.reqID)
     
     def cancelExecOrder(self, exec_order):

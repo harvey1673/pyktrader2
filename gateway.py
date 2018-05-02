@@ -66,7 +66,7 @@ class Gateway(object):
         eod_pos = {}
         for inst in self.positions:
             pos = self.positions[inst]
-            eod_pos[inst] = [pos.curr_pos.long, pos.curr_pos.short]
+            eod_pos[inst] = pos.curr_pos
         self.id2order  = {}
         self.working_orders = []
         self.positions = {}
@@ -75,13 +75,12 @@ class Gateway(object):
             self.order_stats[inst] = {'submit': 0, 'cancel':0, 'failure': 0, 'status': True }
             (pos_cls, pos_args) = self.get_pos_class(self.agent.instruments[inst])
             self.positions[inst] = pos_cls(self.agent.instruments[inst], self, **pos_args)
-            self.positions[inst].pos_yday.long = eod_pos[inst][0]
-            self.positions[inst].pos_yday.short = eod_pos[inst][1]
+            self.positions[inst].pos_yday = eod_pos[inst]
             self.positions[inst].re_calc()
         self.account_info['prev_capital'] = self.account_info['curr_capital']
 
     def get_pos_class(self, inst):
-        return (position.GrossPosition, {})
+        return (position.Position, {})
 
     def add_instrument(self, instID):
         self.instruments.append(instID)
@@ -288,8 +287,7 @@ class Gateway(object):
                         if inst not in self.positions:
                             (pos_cls, pos_args) = self.get_pos_class(self.agent.instruments[inst])
                             self.positions[inst] = pos_cls(self.agent.instruments[inst], self, **pos_args)
-                        self.positions[inst].pos_yday.long = int(row[2])
-                        self.positions[inst].pos_yday.short = int(row[3])
+                        self.positions[inst].update_pos('pos_yday', row[2:])
         return True
 
     def save_local_positions(self, tday):
@@ -307,8 +305,8 @@ class Gateway(object):
                 file_writer.writerow(['capital', self.account_info['curr_capital']])
                 for inst in self.positions:
                     pos = self.positions[inst]
-                    if abs(pos.curr_pos.long) + abs(pos.curr_pos.short) > 0:
-                        file_writer.writerow(['pos', inst, pos.curr_pos.long, pos.curr_pos.short])
+                    if sum([ abs(ppos) for ppos in pos.curr_pos]) > 0:
+                        file_writer.writerow(['pos', inst] + pos.curr_pos)
             return True
     
     def get_order_offset(self, instID, volume, order_num = 1):
@@ -335,18 +333,18 @@ class Gateway(object):
             self.pl_by_product[instID] = {}
             self.pl_by_product[instID]['yday_mark'] = inst.prev_close
             self.pl_by_product[instID]['tday_mark'] = inst.price
-            self.pl_by_product[instID]['new_long']  = pos.tday_pos.long
-            self.pl_by_product[instID]['new_short'] = pos.tday_pos.short
-            self.pl_by_product[instID]['new_long_avg'] = pos.tday_avp.long
-            self.pl_by_product[instID]['new_short_avg'] = pos.tday_avp.short
-            self.pl_by_product[instID]['locked_margin'] =  pos.locked_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
-            self.pl_by_product[instID]['locked_margin'] += pos.locked_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price) 
-            self.pl_by_product[instID]['used_margin'] =  pos.curr_pos.long * inst.calc_margin_amount(ORDER_BUY, under_price)
-            self.pl_by_product[instID]['used_margin'] += pos.curr_pos.short * inst.calc_margin_amount(ORDER_SELL, under_price)
-            self.pl_by_product[instID]['yday_pos'] = pos.pos_yday.long - pos.pos_yday.short
-            self.pl_by_product[instID]['yday_pnl'] = (pos.pos_yday.long - pos.pos_yday.short) * (inst.price - inst.prev_close) * inst.multiple
-            self.pl_by_product[instID]['tday_pnl'] =  pos.tday_pos.long * (inst.price-pos.tday_avp.long) * inst.multiple
-            self.pl_by_product[instID]['tday_pnl'] -= pos.tday_pos.short * (inst.price-pos.tday_avp.short) * inst.multiple            
+            self.pl_by_product[instID]['new_long']  = pos.tday_pos[0]
+            self.pl_by_product[instID]['new_short'] = pos.tday_pos[1]
+            self.pl_by_product[instID]['new_long_avg'] = pos.tday_avp[0]
+            self.pl_by_product[instID]['new_short_avg'] = pos.tday_avp[1]
+            self.pl_by_product[instID]['locked_margin'] =  abs(pos.locked_pos[0]) \
+                                                        * inst.calc_margin_amount(ORDER_BUY if pos.locked_pos[0] > 0 else ORDER_SELL, under_price)
+            self.pl_by_product[instID]['used_margin'] =  abs(pos.curr_pos[0]) \
+                                                        * inst.calc_margin_amount(ORDER_BUY if pos.curr_pos[0] > 0 else ORDER_SELL, under_price)
+            self.pl_by_product[instID]['yday_pos'] = pos.pos_yday[0]
+            self.pl_by_product[instID]['yday_pnl'] = pos.pos_yday[0] * (inst.price - inst.prev_close) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] =  pos.tday_pos[0] * (inst.price-pos.tday_avp[0]) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] -= pos.tday_pos[1] * (inst.price-pos.tday_avp[1]) * inst.multiple
         for key in ['locked_margin', 'used_margin', 'yday_pnl', 'tday_pnl']:
             self.account_info[key] = sum([self.pl_by_product[instID][key] for instID in self.positions])
         self.account_info['pnl_total'] = self.account_info['yday_pnl'] + self.account_info['tday_pnl']
@@ -401,11 +399,11 @@ class GrossGateway(Gateway):
         vol = abs(volume)
         pos = self.positions[instID]
         if volume > 0:
-            can_close = pos.can_close.long
-            can_yclose = pos.can_yclose.long
+            can_close = pos.can_close[0]
+            can_yclose = pos.can_yclose[0]
         else:
-            can_close = pos.can_close.short
-            can_yclose = pos.can_yclose.short
+            can_close = pos.can_close[1]
+            can_yclose = pos.can_yclose[1]
         is_shfe = (pos.instrument.exchange == 'SHFE')
         n_orders = order_num        
         res = []
@@ -438,7 +436,35 @@ class GrossGateway(Gateway):
         for inst in instIDs:
             self.positions[inst].re_calc()
         return [new_order]
-        
+
+    def calc_margin(self):
+        for instID in self.positions:
+            inst = self.agent.instruments[instID]
+            pos = self.positions[instID]
+            under_price = 0.0
+            if (inst.ptype == instrument.ProductType.Option):
+                under_price = self.agent.instruments[inst.underlying].price
+            self.pl_by_product[instID] = {}
+            self.pl_by_product[instID]['yday_mark'] = inst.prev_close
+            self.pl_by_product[instID]['tday_mark'] = inst.price
+            self.pl_by_product[instID]['new_long']  = pos.tday_pos[0]
+            self.pl_by_product[instID]['new_short'] = pos.tday_pos[1]
+            self.pl_by_product[instID]['new_long_avg'] = pos.tday_avp[0]
+            self.pl_by_product[instID]['new_short_avg'] = pos.tday_avp[1]
+            self.pl_by_product[instID]['locked_margin'] =  pos.locked_pos[0] * inst.calc_margin_amount(ORDER_BUY, under_price)
+            self.pl_by_product[instID]['locked_margin'] += pos.locked_pos[1] * inst.calc_margin_amount(ORDER_SELL, under_price)
+            self.pl_by_product[instID]['used_margin'] =  pos.curr_pos[0] * inst.calc_margin_amount(ORDER_BUY, under_price)
+            self.pl_by_product[instID]['used_margin'] += pos.curr_pos[1] * inst.calc_margin_amount(ORDER_SELL, under_price)
+            self.pl_by_product[instID]['yday_pos'] = pos.pos_yday[0] - pos.pos_yday[1]
+            self.pl_by_product[instID]['yday_pnl'] = (pos.pos_yday[0] - pos.pos_yday[1]) * (inst.price - inst.prev_close) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] =  pos.tday_pos[0] * (inst.price-pos.tday_avp[0]) * inst.multiple
+            self.pl_by_product[instID]['tday_pnl'] -= pos.tday_pos[1] * (inst.price-pos.tday_avp[1]) * inst.multiple
+        for key in ['locked_margin', 'used_margin', 'yday_pnl', 'tday_pnl']:
+            self.account_info[key] = sum([self.pl_by_product[instID][key] for instID in self.positions])
+        self.account_info['pnl_total'] = self.account_info['yday_pnl'] + self.account_info['tday_pnl']
+        self.account_info['curr_capital'] = self.account_info['prev_capital'] + self.account_info['pnl_total']
+        self.account_info['available'] = self.account_info['curr_capital'] - self.account_info['locked_margin']
+
 ########################################################################
 class VtBaseData(object):
     """回调函数推送数据的基础类，其他数据类继承于此"""

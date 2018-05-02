@@ -137,6 +137,10 @@ class IbGateway(Gateway):
         self.api = IbWrapper(self)      # API接口
 
     #----------------------------------------------------------------------
+
+    def get_pos_class(self, inst):
+        return (position.GrossPosition, {})
+
     def connect(self):
         """连接"""
         # 载入json文件
