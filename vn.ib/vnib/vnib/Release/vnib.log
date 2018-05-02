@@ -1,0 +1,84 @@
+﻿Build started 12/10/2017 3:53:33 AM.
+     1>Project "C:\dev\vn.ib.new\vnib\vnib\vnib.vcxproj" on node 2 (Rebuild target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /IC:\dev\vn.ib\ibapi\windows\client /Zi /nologo /W3 /WX- /sdl /O2 /Oi /Oy- /GL /D _CRT_SECURE_NO_DEPRECATE /D _WINSOCK_DEPRECATED_NO_WARNINGS /D _WINDLL /D _MBCS /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt ..\..\ibapi\windows\client\ContractCondition.cpp ..\..\ibapi\windows\client\DefaultEWrapper.cpp ..\..\ibapi\windows\client\EClient.cpp ..\..\ibapi\windows\client\EClientSocket.cpp ..\..\ibapi\windows\client\EDecoder.cpp ..\..\ibapi\windows\client\EMessage.cpp ..\..\ibapi\windows\client\EMutex.cpp ..\..\ibapi\windows\client\EReader.cpp ..\..\ibapi\windows\client\EReaderOSSignal.cpp ..\..\ibapi\windows\client\EReaderWMSignal.cpp ..\..\ibapi\windows\client\ESocket.cpp ..\..\ibapi\windows\client\executioncondition.cpp ..\..\ibapi\windows\client\MarginCondition.cpp ..\..\ibapi\windows\client\OperatorCondition.cpp ..\..\ibapi\windows\client\OrderCondition.cpp ..\..\ibapi\windows\client\PercentChangeCondition.cpp ..\..\ibapi\windows\client\PriceCondition.cpp ..\..\ibapi\windows\client\SoftDollarTier.cpp ..\..\ibapi\windows\client\StdAfx.cpp ..\..\ibapi\windows\client\TimeCondition.cpp ..\..\ibapi\windows\client\VolumeCondition.cpp vnib.cpp
+         ContractCondition.cpp
+         DefaultEWrapper.cpp
+         EClient.cpp
+         EClientSocket.cpp
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReaderSignal.h(6): warning C4099: 'EReaderSignal' : type name first seen using 'class' now seen using 'struct'
+                 c:\dev\vn.ib.new\ibapi\windows\client\EClientSocket.h(13) : see declaration of 'EReaderSignal'
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReaderOSSignal.h(27): warning C4290: C++ exception specification ignored except to indicate a function is not __declspec(nothrow)
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReader.h(12): warning C4099: 'EReaderSignal' : type name first seen using 'struct' now seen using 'class'
+                 c:\dev\vn.ib.new\ibapi\windows\client\EReaderSignal.h(6) : see declaration of 'EReaderSignal'
+         EDecoder.cpp
+         EMessage.cpp
+         EMutex.cpp
+     1>..\..\ibapi\windows\client\EMutex.cpp(35): warning C4800: 'BOOL' : forcing value to bool 'true' or 'false' (performance warning)
+         EReader.cpp
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReaderOSSignal.h(27): warning C4290: C++ exception specification ignored except to indicate a function is not __declspec(nothrow)
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReader.h(12): warning C4099: 'EReaderSignal' : type name first seen using 'struct' now seen using 'class'
+                 c:\dev\vn.ib.new\ibapi\windows\client\EReaderSignal.h(6) : see declaration of 'EReaderSignal'
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EClientSocket.h(13): warning C4099: 'EReaderSignal' : type name first seen using 'struct' now seen using 'class'
+                 c:\dev\vn.ib.new\ibapi\windows\client\EReaderSignal.h(6) : see declaration of 'EReaderSignal'
+     1>..\..\ibapi\windows\client\EReader.cpp(182): warning C4018: '<' : signed/unsigned mismatch
+     1>..\..\ibapi\windows\client\EReader.cpp(225): warning C4018: '>=' : signed/unsigned mismatch
+         EReaderOSSignal.cpp
+     1>c:\dev\vn.ib.new\ibapi\windows\client\EReaderOSSignal.h(27): warning C4290: C++ exception specification ignored except to indicate a function is not __declspec(nothrow)
+     1>..\..\ibapi\windows\client\EReaderOSSignal.cpp(11): warning C4290: C++ exception specification ignored except to indicate a function is not __declspec(nothrow)
+         EReaderWMSignal.cpp
+         ESocket.cpp
+         executioncondition.cpp
+         MarginCondition.cpp
+         OperatorCondition.cpp
+         OrderCondition.cpp
+         PercentChangeCondition.cpp
+         PriceCondition.cpp
+         SoftDollarTier.cpp
+         StdAfx.cpp
+         TimeCondition.cpp
+         Compiling...
+         VolumeCondition.cpp
+         vnib.cpp
+     1>c:\dev\vn.ib.new\vnib\vnib\vnib.h : warning C4819: The file contains a character that cannot be represented in the current code page (936). Save the file in Unicode format to prevent data loss
+     1>c:\python27\include\pymath.h(22): warning C4273: 'round' : inconsistent dll linkage
+                 C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\math.h(516) : see previous definition of 'round'
+     1>c:\dev\vn.ib\ibapi\windows\client\StdAfx.h(12): warning C4005: 'assert' : macro redefinition
+                 C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\include\assert.h(41) : see previous definition of 'assert'
+     1>c:\dev\vn.ib\ibapi\windows\client\EReaderSignal.h(6): warning C4099: 'EReaderSignal' : type name first seen using 'class' now seen using 'struct'
+                 C:\dev\vn.ib\ibapi\windows\client\EClientSocket.h(13) : see declaration of 'EReaderSignal'
+     1>c:\dev\vn.ib\ibapi\windows\client\EReaderOSSignal.h(27): warning C4290: C++ exception specification ignored except to indicate a function is not __declspec(nothrow)
+     1>C:\dev\vn.ib\ibapi\windows\client\EReader.h(12): warning C4099: 'EReaderSignal' : type name first seen using 'struct' now seen using 'class'
+                 c:\dev\vn.ib\ibapi\windows\client\EReaderSignal.h(6) : see declaration of 'EReaderSignal'
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\dev\vn.ib.new\vnib\Release\vnib.pyd" /NOLOGO /LIBPATH:C:\dev\vn.ib\ibapi\windows\lib /LIBPATH:C:\boost_1_57_0\stage\lib /LIBPATH:C:\Python27\libs kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\dev\vn.ib.new\vnib\Release\vnib.pdb" /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\dev\vn.ib.new\vnib\Release\vnib.lib" /MACHINE:X86 /SAFESEH /DLL Release\ContractCondition.obj
+         Release\DefaultEWrapper.obj
+         Release\EClient.obj
+         Release\EClientSocket.obj
+         Release\EDecoder.obj
+         Release\EMessage.obj
+         Release\EMutex.obj
+         Release\EReader.obj
+         Release\EReaderOSSignal.obj
+         Release\EReaderWMSignal.obj
+         Release\ESocket.obj
+         Release\executioncondition.obj
+         Release\MarginCondition.obj
+         Release\OperatorCondition.obj
+         Release\OrderCondition.obj
+         Release\PercentChangeCondition.obj
+         Release\PriceCondition.obj
+         Release\SoftDollarTier.obj
+         Release\StdAfx.obj
+         Release\TimeCondition.obj
+         Release\VolumeCondition.obj
+         Release\vnib.obj
+            Creating library C:\dev\vn.ib.new\vnib\Release\vnib.lib and object C:\dev\vn.ib.new\vnib\Release\vnib.exp
+         Generating code
+         Finished generating code
+         vnib.vcxproj -> C:\dev\vn.ib.new\vnib\Release\vnib.pyd
+     1>Done Building Project "C:\dev\vn.ib.new\vnib\vnib\vnib.vcxproj" (Rebuild target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:01:42.88
