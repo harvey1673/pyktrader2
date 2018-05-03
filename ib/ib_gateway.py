@@ -110,9 +110,9 @@ class IbGateway(Gateway):
     """IB接口"""
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, gatewayName='IB'):
+    def __init__(self, agent, gatewayName='IB'):
         """Constructor"""
-        super(IbGateway, self).__init__(eventEngine, gatewayName)
+        super(IbGateway, self).__init__(agent, gatewayName)
         
         self.host = EMPTY_STRING        # 连接地址
         self.port = EMPTY_INT           # 连接端口
