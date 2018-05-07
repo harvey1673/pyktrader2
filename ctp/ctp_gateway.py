@@ -133,7 +133,7 @@ class CtpGateway(GrossGateway):
             tdAddress = str(setting['tdAddress'])
             mdAddress = str(setting['mdAddress'])
             self.intraday_close_ratio = setting.get('intraday_close_ratio', {})
-            self.product_info = setting.get('product_info', 'Zeno')
+            self.product_info = str(setting.get('product_info', 'Zeno'))
         except KeyError:
             logContent = u'连接配置缺少字段，请检查'
             self.onLog(logContent, level = logging.WARNING)
