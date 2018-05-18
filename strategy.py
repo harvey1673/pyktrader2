@@ -33,6 +33,7 @@ class Strategy(object):
         self.under2idx = {}
         self.num_entries = [0] * num_assets
         self.num_exits   = [0] * num_assets
+        self.curr_pos = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
         self.run_flag = [1] * num_assets
         self.conv_f = {}
@@ -163,6 +164,7 @@ class Strategy(object):
             xtrade.status = trade.TradeStatus.StratConfirm
             self.num_exits[idx] += 1
         self.positions[idx] = [ tradepos for tradepos in self.positions[idx] if not tradepos.is_closed]
+        self.curr_pos[idx] = sum([tradepos.pos for tradepos in self.positions[idx]])
         self.submitted_trades[idx] = [xtrade for xtrade in self.submitted_trades[idx] if xtrade.status!= trade.TradeStatus.StratConfirm]
         self.save_state()
 
@@ -358,6 +360,8 @@ class Strategy(object):
                 else:
                     self.load_local_variables(row)
         self.positions = positions
+        for idx, trade_positions in enumerate(self.positions):
+            self.curr_pos[idx] = sum([tp.pos for tp in trade_positions])
 
     def save_closed_pos(self, tradepos):
         logfile = self.folder + 'hist_tradepos.csv'
