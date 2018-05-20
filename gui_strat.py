@@ -133,14 +133,39 @@ class StratGui(object):
     def save_config(self):
         self.app.run_strat_func(self.name, 'save_config')
 
+class ManualTradeGui(StratGui):
+    def __init__(self, strat, app, master):
+        StratGui.__init__(self, strat, app, master)
+        self.entry_fields = ['PosScaler', 'AllocW', 'CloseTday', 'IsDisabled', 'MaxVol', 'TimePeriod', 'PriceType', \
+                             'LimitPrice', 'StopPrice', 'TickNum', 'OrderOffset' ]
+        self.status_fields = ['TradeUnit', 'CurrPos', 'CurrPrices']
+        self.shared_fields = ['PosScaler', 'IsDisabled']
+        self.field_types = {'RunFlag':'int',
+                            'TradeUnit':'int',
+                            'CurrPos': 'int',
+                            'MaxVol':'int',
+                            'TimePeriod': 'int',
+                            'PriceType': 'str',
+                            'LimitPrice': 'float',
+                            'StopPrice': 'float',
+                            'TickNum': 'int',
+                            'OrderOffset': 'int',
+                            'CloseTday': 'bool',
+                            'IsDisabled': 'bool',
+                            'CurrPrices': 'float',
+                            'AllocW': 'float',
+                            'PosScaler': 'float',
+                            }
+
 class DTSplitChanGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow', 'MaLevel', 'MaChan']
+        self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPos', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow', 'MaLevel', 'MaChan']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'Lookbacks':'int',
                             'Ratios': 'float',
                             'VolRatio': 'floatlist',
@@ -166,10 +191,11 @@ class DTSplitChanAddonStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['PosScaler', 'RunFlag', 'Freq', 'AllocW', 'Channels', 'Lookbacks', 'Ratios', 'PriceMode', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
+        self.status_fields = ['TdayOpen', 'OpenIdx', 'VolRatio', 'TradeUnit', 'CurrPos', 'CurrPrices', 'CurRng', 'ChanHigh', 'ChanLow']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',                                
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'Lookbacks':'int',
                             'Ratios': 'float',
                             'VolRatio': 'floatlist',
@@ -193,10 +219,11 @@ class BBandPChanStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW',  'Ratios', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'BandWin', 'UpperBand', 'MidBand', 'LowerBand', 'Channels', 'ChanHigh', 'ChanLow']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPos', 'CurrPrices', 'BandWin', 'UpperBand', 'MidBand', 'LowerBand', 'Channels', 'ChanHigh', 'ChanLow']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'IsDisabled': 'bool',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
@@ -218,10 +245,11 @@ class MASystemStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled']
-        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'MaWin', 'MaFast', 'MaMedm', 'MaSlow', 'Channels', 'ChanHigh', 'ChanLow']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPos', 'CurrPrices', 'MaWin', 'MaFast', 'MaMedm', 'MaSlow', 'Channels', 'ChanHigh', 'ChanLow']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'Ratios': 'float',
                             'CloseTday': 'bool',
                             'IsDisabled': 'bool', 
@@ -242,10 +270,11 @@ class RsiAtrStratGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
         self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled', 'Stoploss']
-        self.status_fields = ['TradeUnit', 'Freq', 'CurrPrices', 'RsiTh', 'Rsi', 'Atr', 'Atrma', 'AtrWin', 'AtrmaWin', 'RsiWin']
+        self.status_fields = ['TradeUnit', 'Freq', 'CurrPos', 'CurrPrices', 'RsiTh', 'Rsi', 'Atr', 'Atrma', 'AtrWin', 'AtrmaWin', 'RsiWin']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'CloseTday': 'bool',
                             'IsDisabled': 'bool',
                             'CurrPrices': 'float',
@@ -267,13 +296,14 @@ class RBStratGui(StratGui):
         StratGui.__init__(self, strat, app, master)
         self.root = master
         self.entry_fields = ['PosScaler', 'RunFlag', 'EntryLimit', 'DailyCloseBuffer', 'AllocW', 'MinRng', 'TrailLoss', 'Ratios', 'StartMinId', 'IsDisabled']
-        self.status_fields = ['TradeUnit', 'CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
+        self.status_fields = ['TradeUnit', 'CurrPos', 'CurrPrices', 'Sbreak', 'Bsetup', 'Benter', 'Senter', 'Ssetup', 'Bbreak']
         self.shared_fields = ['PosScaler', 'EntryLimit', 'DailyCloseBuffer', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
                             'AllocW': 'float',
                             'IsDisabled': 'bool',
                             'PosScaler': 'float',
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'MinRng':'float', 
                             'Ratios': 'floatlist', 
                             'StartMinId': 'int',
@@ -293,10 +323,11 @@ class TLStratGui(StratGui):
         StratGui.__init__(self, strat, app, master)
         self.root = master
         self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'Channels', 'MaxPos', 'TrailLoss', 'IsDisabled']
-        self.status_fields = ['TradingFreq', 'TradeUnit', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow']
+        self.status_fields = ['TradingFreq', 'TradeUnit', 'CurrPos', 'CurrPrices', 'CurrAtr', 'EntryHigh', 'EntryLow', 'ExitHigh', 'ExitLow']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',        
                             'TradeUnit':'int',
+                            'CurrPos': 'int',
                             'IsDisabled': 'bool',
                             'TradingFreq': 'str',
                             'TrailLoss': 'float',

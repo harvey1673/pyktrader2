@@ -8,9 +8,9 @@ class ManualTrade(Strategy):
     common_params =  dict({'daily_close_buffer': 3, 'price_limit_buffer': 5}, \
                           **Strategy.common_params)
     asset_params = Strategy.asset_params.copy()
-    asset_params.update({'run_flag': 0, 'limit_price': 0.0, 'stop_price': 0.0, \
+    asset_params.update({'limit_price': 0.0, 'stop_price': 0.0, \
                          'tick_num': 1, 'order_offset': True, \
-                         'max_pos': 1, 'max_vol': 10, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
+                         'max_vol': 10, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
                          'exec_args': {'max_vol': 10, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
                                   'tick_num': 1, 'order_type': '', 'order_offset': True, 'inst_order': None},})
     def __init__(self, config, agent = None):
