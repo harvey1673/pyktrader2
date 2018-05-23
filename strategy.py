@@ -16,7 +16,7 @@ class Strategy(object):
                      'daily_close_buffer': 3, 'pos_class': 'TradePos', 'pos_args': {},\
                      'exec_class': 'ExecAlgo1DFixT', 'is_disabled': False}
     asset_params = {'underliers': [], 'volumes': [], 'trade_unit': 1,  'alloc_w': 0.0, 'price_unit': None, \
-                    'close_tday': False, 'last_min_id': 2057, 'trail_loss': 0, \
+                    'close_tday': False, 'last_min_id': 2057, 'trail_loss': 0, 'run_flag': 1, \
                     'exec_args': {'max_vol': 20, 'time_period': 600, 'price_type': OPT_LIMIT_ORDER, \
                                   'tick_num': 1, 'order_type': '', 'inst_order': None} }
     def __init__(self, config, agent = None):
@@ -35,7 +35,6 @@ class Strategy(object):
         self.num_exits   = [0] * num_assets
         self.curr_pos = [0] * num_assets
         self.curr_prices = [0.0] * num_assets
-        self.run_flag = [1] * num_assets
         self.conv_f = {}
         self.unwind_key = (10000, 'unwind')        
         self.update_trade_unit()

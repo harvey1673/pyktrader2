@@ -136,8 +136,8 @@ class StratGui(object):
 class ManualTradeGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
-        self.entry_fields = ['PosScaler', 'AllocW', 'CloseTday', 'IsDisabled', 'MaxVol', 'TimePeriod', 'PriceType', \
-                             'LimitPrice', 'StopPrice', 'TickNum', 'OrderOffset' ]
+        self.entry_fields = ['PosScaler', 'RunFlag', 'AllocW', 'CloseTday', 'IsDisabled', 'MaxVol', 'TimePeriod', 'PriceType', \
+                             'LongPrice', 'LongStop', 'ShortPrice', 'ShortStop', 'TickNum', 'OrderOffset' ]
         self.status_fields = ['TradeUnit', 'CurrPos', 'CurrPrices']
         self.shared_fields = ['PosScaler', 'IsDisabled']
         self.field_types = {'RunFlag':'int',
@@ -146,8 +146,10 @@ class ManualTradeGui(StratGui):
                             'MaxVol':'int',
                             'TimePeriod': 'int',
                             'PriceType': 'str',
-                            'LimitPrice': 'float',
-                            'StopPrice': 'float',
+                            'LongPrice': 'float',
+                            'LongStop': 'float',
+                            'ShortPrice': 'float',
+                            'ShortStop': 'float',
                             'TickNum': 'int',
                             'OrderOffset': 'int',
                             'CloseTday': 'bool',
