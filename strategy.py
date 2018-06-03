@@ -152,10 +152,7 @@ class Strategy(object):
                                 (self.name, '_'.join(tradepos.insts), xtrade.id), level = logging.INFO)
             xtrade.status = trade.TradeStatus.StratConfirm    
         else:
-            if xtrade.filled_vol == xtrade.vol:
-                save_pos = tradepos.close( traded_price, datetime.datetime.now())
-            else:
-                save_pos = tradepos.partial_close( traded_price, xtrade.filled_vol, datetime.datetime.now())
+            save_pos = tradepos.close( traded_price, datetime.datetime.now(), xtrade.filled_vol)
             if save_pos != None:
                 self.save_closed_pos(save_pos)
                 self.on_log('strat %s closed a position on %s after tradeid=%s (filled = %s, full = %s) is done, the closed trade position is saved' %
@@ -192,6 +189,12 @@ class Strategy(object):
         return True
 
     def day_finalize(self):
+        for idx, pos_list in enumerate(self.positions):
+            for tradepos in pos_list:
+                if tradepos.exit_time == NO_ENTRY_TIME:
+                    tradepos.close(0, NO_ENTRY_TIME, 0)
+                if tradepos.entry_time == NO_ENTRY_TIME:
+                    tradepos.cancel_open()
         self.on_log('strat %s is finalizing the day - update trade unit, save state' % self.name, level = logging.INFO)
         self.update_trade_unit()
         self.num_entries = [0] * len(self.underliers)

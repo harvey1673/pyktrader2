@@ -18,6 +18,7 @@ class Position(object):
     def re_calc(self):
         tday_opened = [0, 0]
         tday_o_locked = [0, 0]
+        self.orders = [o for o in self.orders if o.volume != 0]
         for mo in self.orders:
             if mo.direction == ORDER_BUY:
                 tday_opened[0] += mo.filled_volume

@@ -18,21 +18,38 @@ class ManualTrade(Strategy):
         numAssets = len(self.underliers)
         self.tick_base = [0.0] * numAssets
 
-    def set_exec_args(self, idx):
+    def set_exec_args(self, idx, direction):
         for key in ['max_vol', 'time_period', 'price_type', 'tick_num', 'order_offset']:
             self.exec_args[idx][key] = getattr(self, key)[idx]
 
+    def open_long(self, idx):
+        if len(self.positions[idx]) < self.max_pos[idx]:
+            self.open_tradepos(idx, 1, self.long_price[idx], int(self.trade_unit[idx]))
+            return True
+        else:
+            return False
+
+    def open_short(self, idx):
+        if len(self.positions[idx]) < self.max_pos[idx]:
+            self.open_tradepos(idx, -1, self.short_price[idx], int(self.trade_unit[idx]))
+            return True
+        else:
+            return False
+
     def on_tick(self, idx, ctick):
         num_pos = len(self.positions[idx])
+        curr_pos = self.curr_pos[idx]
+        save_status = False
         if ((self.curr_pos[idx] <= 0) and (self.curr_prices[idx] >= self.long_price[idx])) or \
                 ((self.curr_pos[idx] >= 0) and (self.curr_prices[idx] <= self.short_price[idx])):
-            for tp in self.positions[idx]:
-                self.close_tradepos(idx, tp, self.curr_prices[idx])
+            save_status = self.liquidate_tradepos(idx) or save_status
             num_pos = 0
-        if ((num_pos <= self.max_pos[idx]) and (self.curr_prices[idx] >= self.long_price[idx])):
-            self.open_tradepos(idx, 1, self.curr_prices[idx], int(self.trade_unit[idx]))
-        elif ((num_pos <= self.max_pos[idx]) and (self.curr_prices[idx] >= self.long_price[idx])):
-            self.open_tradepos(idx, -1, self.curr_prices[idx], int(self.trade_unit[idx]))
+            curr_pos = 0
+        if (self.curr_prices[idx] >= self.long_price[idx]):
+            save_status = self.open_long(idx) or save_status
+        elif (self.curr_prices[idx] <= self.short_price[idx]):
+            save_status = self.open_short(idx) or save_status
+        return save_status
 
 
 

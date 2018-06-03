@@ -218,7 +218,7 @@ class Gateway(object):
         orders = self.id2order.keys()
         if len(self.id2order) > 1:
             orders.sort()
-        order_list = [self.id2order[key] for key in orders]
+        order_list = [self.id2order[key] for key in orders if self.id2order[key].volume != 0]
         filename = self.file_prefix + 'order_' + tday.strftime('%y%m%d') + '.csv'
         with open(filename, 'wb') as log_file:
             file_writer = csv.writer(log_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);

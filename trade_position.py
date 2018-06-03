@@ -67,23 +67,25 @@ class TradePos(object):
         self.entry_tradeid = 0
         self.is_closed = True
 
-    def close(self, price, end_time):
-        self.exit_time = end_time
-        self.exit_price = price
-        self.profit = (self.exit_price - self.entry_price) * self.pos * self.multiple
-        self.is_closed = True
-        return self
-
-    def partial_close(self, price, vol, end_time):
-        if vol != 0:
-            close_pos = copy.copy(self)
-            close_pos.pos = vol
-            close_pos.close(price, end_time)
-            self.pos -= vol
+    def close(self, price, end_time, vol = None):
+        if vol == None:
+            vol = self.pos
+        if vol == 0:
             self.exit_tradeid = 0
-            return close_pos
-        else:
             return None
+        self.pos -= vol
+        if self.pos != 0:
+            closed_pos = copy.copy(self)
+            closed_pos.pos = vol
+            self.exit_tradeid = 0
+        else:
+            self.pos = vol
+            closed_pos = self
+        closed_pos.exit_price = price
+        closed_pos.exit_time = end_time
+        closed_pos.profit = (closed_pos.exit_price - closed_pos.entry_price) * closed_pos.pos * closed_pos.multiple
+        closed_pos.is_closed = True
+        return closed_pos
 
 
 class ParSARTradePos(TradePos):
