@@ -1,30 +1,31 @@
 # -*- coding:utf-8 -*-
+import json
 import misc
 import workdays
 import datetime
 from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
-    'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', \
+    'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
                 'active_mths': range(1, 13), \
                 'parent_curve': '', 'spotID': 'plt_io62', 'vol_index': 'SGXIRO',\
                 '': '', },
-    'SGXIOLP': {'instID': 'iolp', 'exch': 'SGX', 'calendar': 'PLIO', \
+    'SGXIOLP': {'instID': 'iolp', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
                'active_mths': range(1, 13), \
                'parent_curve': '', 'spotID': 'plt_lp', 'vol_index': 'SGXIROLP', \
                '': '', },
-    'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN', \
+    'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN', 'ccy': 'CNY', \
                 'active_mths': [1, 5, 10], \
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
-    'SHFEHRC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', \
+    'SHFEHRC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', 'ccy': 'CNY', \
                 'active_mths': [1, 5, 10], \
                 'parent_curve': '', 'spotID': 'hc', 'vol_index': 'SHFEHRC',},
-    'DCEIOE': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN',\
+    'DCEIOE': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN','ccy': 'CNY', \
                 'active_mths': [1, 5, 9],
                 'parent_curve': '', 'spotID': 'i', 'vol_index': 'DCEIOE',},
-    'DCECOK': {'instID': 'j', 'exch': 'DCE', 'calendar': 'CHN',\
+    'DCECOK': {'instID': 'j', 'exch': 'DCE', 'calendar': 'CHN', 'ccy': 'CNY', \
                 'active_mths': [1, 5, 9],
                 'parent_curve': '', 'spotID': 'j', 'vol_index': 'DCECOK',},
-    'LMESCR': {'instID': 'sc', 'exch': 'LME', 'calendar': 'PLIO',\
+    'LMESCR': {'instID': 'sc', 'exch': 'LME', 'calendar': 'PLIO', 'ccy': 'USD', \
                 'active_mths': range(1,13),
                 'parent_curve': '', 'spotID': 'tsi_scrap', 'vol_index': 'LMESCR',},
 }
@@ -38,6 +39,9 @@ IR_Curve_Map = {
     'usd_disc': {'ccy': 'USD', 'src': 'BBA-LIBOR', 'calendar': 'USD',
                  'ir_index': 'USD3M',
                 'parent_curve': '', 'ir_spot': '', 'swn_curve': 'usd3m', },
+    'cny_disc': {'ccy': 'CNY', 'src': 'PBOC', 'calendar': 'CHN',
+                 'ir_index': 'SHIBOR3M',
+                'parent_curve': '', 'ir_spot': '', 'swn_curve': 'shibor3m', },
 }
 
 Market_Input_Struct = ['COMFwd', 'COMFix', 'COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90', \

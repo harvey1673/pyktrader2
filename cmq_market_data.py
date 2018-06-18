@@ -23,7 +23,8 @@ def comfwd_db_loader(market_data, fwd_index, dep_tenors = []):
     df = df[pd.to_datetime(df.date).dt.month.isin(curve_info['active_mths'])]
     return df[['date', 'expiry', 'close']].values.tolist()
 
-def tenor_to_expiry(tenor_label):
+def tenor_to_expiry(tenor_label, prod_code = 'fef'):
+    exch = misc.prod2exch(prod_code)
     if 'Cal' in tenor_label:
         ten_str = tenor_label.split(' ')
         year = 2000 + int(ten_str[1])
@@ -34,7 +35,8 @@ def tenor_to_expiry(tenor_label):
         mth = int(ten_str[0][-1])*3
         return datetime.date(year, mth, calendar.monthrange(year, mth)[1])
     else:
-        return datetime.datetime.strptime(tenor_label, "%Y-%m-%d").date()
+        cont_date = datetime.datetime.strptime(tenor_label, "%Y-%m-%d").date()
+        return misc.cont_date_expiry(cont_date, exch)
 
 def comvol_db_loader(market_data, fwd_index, dep_tenors = []):
     curve_info = cmq_crv_defn.COM_Curve_Map[fwd_index]
@@ -44,36 +46,38 @@ def comvol_db_loader(market_data, fwd_index, dep_tenors = []):
     vol_tbl = dbaccess.load_cmvol_curve(cnx, prod_code, mdate)
     if len(vol_tbl) == 0:
         print "COMVol data is not available for %s on %s" % (prod_code, mdate)
+        return {}
     vol_tbl = vol_tbl.reset_index()
-    vol_tbl['expiry'] = vol_tbl['tenor_label'].apply(tenor_to_expiry)
+    vol_tbl['expiry'] = vol_tbl['tenor_label'].apply(lambda tenor: tenor_to_expiry(tenor, prod_code))
     vol_tbl = vol_tbl.sort_values('expiry')
-    vol_tbl = vol_tbl[~vol_tbl['tenor_label'].str.startswith('Cal')]
-    vol_dict = dict([ (field, []) for field in ['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']])
-    cont_expiry = vol_tbl['expiry'][0]
-    cont_mth = datetime.date(cont_expiry.year, cont_expiry.month, 1)
-    idx = 0
-    expiries = vol_tbl['expiry'].values
-    while cont_expiry <= expiries[-1]:
-        atm = vol_tbl[('vol',50)].values[idx]
-        for vol, field in zip([50, 10, 25, 75, 90],['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']):
-            if vol == 50:
-                quote = vol_tbl[('vol',vol)].values[idx]
-                atm = quote
-            else:
-                quote = vol_tbl[('vol',vol)].values[idx] - atm
-            vol_dict[field].append([cont_mth, cont_expiry, quote])
-        cont_mth = cont_mth + relativedelta(months = 1)
+    if prod_code in ['fef']:
+        vol_tbl = vol_tbl[~vol_tbl['tenor_label'].str.startswith('Cal')]
+        vol_dict = dict([ (field, []) for field in ['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']])
+        cont_expiry = vol_tbl['expiry'][0]
+        cont_mth = datetime.date(cont_expiry.year, cont_expiry.month, 1)
         cont_expiry = cont_mth + relativedelta(months = 1) - datetime.timedelta(days = 1)
-        while (cont_expiry > expiries[idx]) and (idx < len(expiries) -1):
-            idx += 1
-    #    market_data['COMVol'+field][vol_index] = df[['expiry', field.lower(), 'instID']].values.tolist()
-    #expiries = [cmq_crv_defn.tenor_expiry(exch, prod_code, tenor, field = 'vol') for tenor in dep_tenors]
-    #output = {}
-    #for field in ['ATM', 'V90', 'V75', 'V25', 'V10']:
-    #    if field == 'ATM':
-    #        output['COMVol' + field] = [[tenor, expiry, 0.385] for tenor, expiry in zip(dep_tenors, expiries)]
-    #    else:
-    #        output['COMVol' + field] = [[tenor, expiry, 0.0] for tenor, expiry in zip(dep_tenors, expiries)]
+        idx = 0
+        expiries = vol_tbl['expiry'].values
+        while cont_expiry <= expiries[-1]:
+            for vol, field in zip([50, 10, 25, 75, 90],['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']):
+                quote = vol_tbl[('vol',vol)].values[idx]
+                vol_dict[field].append([cont_mth, cont_expiry, quote])
+            cont_mth = cont_mth + relativedelta(months = 1)
+            cont_expiry = cont_mth + relativedelta(months = 1) - datetime.timedelta(days = 1)
+            while (cont_expiry > expiries[idx]) and (idx < len(expiries) -1):
+                idx += 1
+        for i in range(18):
+            for vol, field in zip([50, 10, 25, 75, 90],['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90']):
+                cont_mth = vol_dict[field][-1][0] + relativedelta(months=1)
+                cont_expiry = cont_mth + relativedelta(months=1) - datetime.timedelta(days=1)
+                quote = vol_dict[field][-1][2]
+                vol_dict[field].append([cont_mth, cont_expiry, quote])
+    else:
+        vol_tbl['tenor_label'] = vol_tbl['tenor_label'].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+        vol_dict = {}
+        for field, delta in zip(['COMVolATM', 'COMVolV10', 'COMVolV25', 'COMVolV75', 'COMVolV90'], [50, 10, 25, 75, 90]):
+            vol_dict[field] = [[x, y, z] for x, y, z \
+                               in zip(vol_tbl['tenor_label'], vol_tbl['expiry'], vol_tbl[('vol', delta)])]
     return vol_dict
 
 def comdv_db_loader(market_data, fwd_index, dep_tenors = [], spd_key = 'DV1'):
@@ -123,6 +127,8 @@ def ircurve_db_loader(market_data, fwd_index, dep_tenors = []):
 
 def process_BOM(market_data, mkt_deps):
     mdate = market_data['market_date']
+    if 'COMFwd' not in market_data:
+        return
     for fwd_idx in market_data['COMFwd']:
         crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
         if crv_info['exch'] in ['SGX', 'LME', 'NYM']:
@@ -171,16 +177,32 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'AP'
             continue
         market_data[field] = {}
         for crv_idx in mkt_deps[field]:
+            if field == 'IRCurve':
+                if crv_idx == 'cny_disc':
+                    flat_rate = 0.045
+                    market_data[field][crv_idx] = flat_ir_curve(market_date, flat_rate)
+                    continue
             if field == 'COMVolATM':
                 output = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
                 for vol_field in cmq_crv_defn.COMVOL_fields:
-                    market_data[vol_field][crv_idx] = output[vol_field]
+                    if len(output) == 0:
+                        market_data[vol_field][crv_idx] = {}
+                    else:
+                        market_data[vol_field][crv_idx] = output[vol_field]
             elif field[:5] == 'COMDV':
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx], field[3:])
             else:
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
     process_BOM(market_data, mkt_deps)
     return market_data
+
+def flat_ir_curve(tday, rate):
+    tenors = ['1W', '2W', '1M', '3M', '6M', '9M', '1Y', '3Y']
+    output = []
+    for ten in tenors:
+        data = [ten, misc.day_shift(tday, ten.lower()), rate]
+        output.append(data)
+    return output
 
 if __name__ == '__main__':
     pass

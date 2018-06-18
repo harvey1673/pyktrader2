@@ -131,8 +131,9 @@ product_code = {'SHFE': ['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', '
                 'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF', 'CY', 'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG',
                          'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC', 'AP'],
                 'INE': ['sc',],
-                'SGX': ['fef', 'iolp'], \
-                'LME': ['lsc'], }
+                'SGX': ['fef', 'iolp', 'ckc'], \
+                'LME': ['lsc', 'lsr',], \
+                'NYMEX': ['nhr', ],}
 
 CHN_Stock_Exch = {
     'SSE': ["000300", "510180", "510050", "11000011", "11000016", "11000021", "11000026", "000002", "000003", "000004",
@@ -388,6 +389,20 @@ def get_mkt_fxpair(fx1, fx2):
         direction = 0
     return direction
 
+def conv_fx_rate(ccy, reporting_ccy, fx_market):
+    fx_pair = None
+    if ccy == reporting_ccy:
+        return 1.0
+    fx_direction = get_mkt_fxpair(reporting_ccy, ccy)
+    fx_rate = 1.0
+    if fx_direction > 0:
+        fx_pair = '/'.join([reporting_ccy, ccy])
+        fx_rate = 1 / fx_market[fx_pair][0][2]
+    elif fx_direction < 0:
+        fx_pair = '/'.join([ccy, reporting_ccy])
+        fx_rate = fx_market[fx_pair][0][2]
+    return fx_rate
+
 def filter_main_cont(sdate, filter=False):
     insts, prods = dbaccess.load_alive_cont(sdate)
     if not filter:
@@ -464,12 +479,14 @@ def inst2cont(instID):
 def inst2exch(inst):
     if inst.isdigit():
         return "SSE"
-    key = inst2product(inst)
+    prod = inst2product(inst)
+    return prod2exch(prod)
+
+def prod2exch(prod):
     for exch in product_code.keys():
-        if key in product_code[exch]:
+        if prod in product_code[exch]:
             return exch
     return "NA"
-
 
 def inst_to_exch(inst):
     key = inst2product(inst)
@@ -652,6 +669,11 @@ def day_shift(d, roll_rule):
     elif 'w' in roll_rule:
         weeks = int(roll_rule[:-1])
         shft_day = d + relativedelta(weeks=weeks)
+    elif 'MEND' in roll_rule:
+        mths = int(roll_rule[:-4]) + 1
+        shft_day = d + relativedelta(months=mths)
+        shft_day = shft_day.replace(day=1)
+        shft_day = shft_day - datetime.timedelta(days=1)
     return shft_day
 
 
@@ -664,24 +686,7 @@ def contract_expiry(cont, hols='db'):
         else:
             yr = 2010 + int(cont[-3:-2])
         cont_date = datetime.date(yr, mth, 1)
-        if exch == 'DCE' or exch == 'CZCE':
-            expiry = workdays.workday(cont_date - datetime.timedelta(days=1), 10, CHN_Holidays)
-        elif exch == 'CFFEX':
-            wkday = cont_date.weekday()
-            expiry = cont_date + datetime.timedelta(days=13 + (11 - wkday) % 7)
-            expiry = workdays.workday(expiry, 1, CHN_Holidays)
-        elif exch == 'SHFE':
-            expiry = datetime.date(yr, mth, 14)
-            expiry = workdays.workday(expiry, 1, CHN_Holidays)
-        elif exch == 'INE':
-            if mth != 10:
-                expiry = workdays.workday(cont_date, -1, CHN_Holidays)
-            else:
-                expiry = workdays.workday(cont_date, -6, CHN_Holidays)
-        elif exch in ['SGX', 'OTC']:
-            expiry = workdays.workday(cont_date + relativedelta(months = 1), -1, PLIO_Holidays)
-        else:
-            expiry = 0
+        expiry = cont_date_expiry(cont_date, exch)
     else:
         cnx = dbaccess.connect(**dbaccess.dbconfig)
         cursor = cnx.cursor()
@@ -697,6 +702,24 @@ def contract_expiry(cont, hols='db'):
         cnx.close()
     return expiry
 
+def cont_date_expiry(cont_date, exch):
+    hols = CHN_Holidays
+    yr = cont_date.year
+    mth = cont_date.month
+    if exch == 'DCE' or exch == 'CZCE':
+        expiry = workdays.workday(cont_date - datetime.timedelta(days=1), 10, hols)
+    elif exch == 'CFFEX':
+        wkday = cont_date.weekday()
+        expiry = cont_date + datetime.timedelta(days=13 + (11 - wkday) % 7)
+        expiry = workdays.workday(expiry, 1, CHN_Holidays)
+    elif exch == 'SHFE':
+        expiry = datetime.date(yr, mth, 14)
+        expiry = workdays.workday(expiry, 1, CHN_Holidays)
+    elif exch in ['SGX', 'LME', 'NYMEX', 'OTC']:
+        expiry = workdays.workday(cont_date + relativedelta(months=1), -1, PLIO_Holidays)
+    else:
+        expiry = 0
+    return expiry
 
 def contract_range(product, exch, cont_mth, start_date, end_date):
     st_year = start_date.year

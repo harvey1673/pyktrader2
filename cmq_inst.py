@@ -34,7 +34,7 @@ class CMQInstrument(object):
     _get_obj_cache = weakref.WeakValueDictionary()
     inst_key = [ 'start', 'end', 'ccy', 'volume']
     class_params = {'ccy': 'USD', 'start': datetime.date.today() + datetime.timedelta(days = 2), \
-                    'end': datetime.date.today() + datetime.timedelta(days = 3), 'volume': 1}
+                    'end': datetime.date.today() + datetime.timedelta(days = 3), 'volume': 1, 'inst_type': ''}
 
     @classmethod
     def create_instrument(cls, inst_data, market_data = {}, model_setting = {}):
@@ -64,6 +64,7 @@ class CMQInstrument(object):
         self.fxvega_type = CurveShiftType.Abs
         if isinstance(inst_data, (str, unicode)):
             inst_data = json.loads(inst_data)
+        self.inst_type = inst_data['inst_type']
         self.set_trade_data(inst_data)
         self.inst_data = inst_data
         self.set_market_data(market_data)

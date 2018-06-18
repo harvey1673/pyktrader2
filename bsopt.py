@@ -501,9 +501,6 @@ def IBAWVol( IsCall, Fwd, Strike, Price, Texp, rd, rf):
 
     return Vol
 
-def LogNormalPaths(mu, cov, fwd, numPaths):
-    ''' mu and fwd are 1d lists/arrays (1xn); cov is a 2d scipy.array (nxn); numPaths is int '''
-    return (fwd*scipy.exp(numpy.random.multivariate_normal(mu, cov, numPaths) - 0.5*cov.diagonal())).transpose()
 
 def AsianOptTW_Fwd(IsCall, Fwd, strike, RlzAvg, Vol, Texp, AvgPeriod, Rd):
     '''Calculate Asian option price using TurnbullWakeman model.

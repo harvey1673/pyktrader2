@@ -20,7 +20,7 @@ class CMQRiskEngine(object):
     def update_risk_store(self):
         self.scen_keys = []
         for inst in self.book.inst_dict:
-            self.risk_store[inst] = cmq_inst_risk.CMQInstRiskStore(inst, self.base_market, self.req_greeks)
+            self.risk_store[inst] = cmq_inst_risk.CMQInstRiskStore(inst, self.base_market, self.req_greeks, self.book.reporting_ccy)
             self.risk_store[inst].get_scen_keys()
             for scen in self.risk_store[inst].scen_keys:
                 if scen not in self.scen_keys:
@@ -51,36 +51,24 @@ class CMQRiskEngine(object):
                     if isinstance(self.inst_risks[inst.id][greek], dict):
                         if greek not in self.deal_risks[deal.id]:
                             self.deal_risks[deal.id][greek] = {}
-                        factor = self.ccy_converter(inst.ccy, greek)
-                        misc.merge_dict(self.inst_risks[inst.id][greek], self.deal_risks[deal.id][greek], pos * factor, 1)
+                        misc.merge_dict(self.inst_risks[inst.id][greek], self.deal_risks[deal.id][greek], pos, 1)
                     else:
                         if greek not in self.deal_risks[deal.id]:
                             self.deal_risks[deal.id][greek] = 0
-                        factor = self.ccy_converter(inst.ccy, greek)
-                        self.deal_risks[deal.id][greek] += self.inst_risks[inst.id][greek] * pos * factor
+                        self.deal_risks[deal.id][greek] += self.inst_risks[inst.id][greek] * pos
             misc.merge_dict(self.deal_risks[deal.id], self.book_risks, 1, 1)
 
-    def ccy_converter(self, pricing_ccy, greek):
-        factor = 1
-        if self.book.reporting_ccy != pricing_ccy:
-            fx_direction = misc.get_mkt_fxpair(self.book.reporting_ccy, pricing_ccy)
-            if fx_direction:
-                ccy_pair = self.book.reporting_ccy.upper() + '/' + pricing_ccy.upper()
-            else:
-                ccy_pair = pricing_ccy.upper() + '/' + self.book.reporting_ccy.upper()
-            fx_spot = self.base_market['FXFwd'][ccy_pair][0][2]
-            if fx_direction > 0:
-                multi = fx_spot
-            else:
-                multi = 1/fx_spot
-            if ('yc' in greek) or (greek in ['pv']) or ('vega' in greek) or ('theta' in greek):
-                factor = 1 / multi
-            elif greek in ['cmgamma', 'cmgammas']:
-                factor = multi
-            elif greek == 'fxdelta':
-                factor = 1
-            elif greek in ['fxgamma', 'fxgammas']:
-                factor = 1
+    def ccy_converter(self, fx, greek):
+        if ('cmdelta' in greek):
+            factor = 1.0
+        elif greek in ['cmgamma', 'cmgammas']:
+            factor = 1.0 / fx
+        elif greek == 'fxdelta':
+            factor = 1.0
+        elif greek in ['fxgamma', 'fxgammas']:
+            factor = 1.0
+        else:
+            factor = fx
         return factor
 
     def save_results(self, filename = None):

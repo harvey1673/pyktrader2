@@ -21,6 +21,29 @@ def colored_scatter(ts_a, ts_b, ts_c):
     cb.ax.set_yticklabels([str(x) for x in ts_c[::len(ts_c)//7]])
     plt.show()
 
+def apply_vat(df, field_list = None, index_col = None, direction = 1, with_ret = True):
+    if direction == 1:
+        vat_fac1 = 1.17
+        vat_fac2 = 1.16
+    else:
+        vat_fac1 = 1/1.17
+        vat_fac2 = 1/1.16
+    if field_list == None:
+        field_list = [col for col in df.columns if col != index_col]
+    if index_col == None:
+        idx = df.index
+    else:
+        idx = df[index_col]
+    cutoff_date = datetime.date(2018, 5, 1)
+    if type(idx[-1]).__name__ == 'Timestamp':
+        cutoff_date = pd.Timestamp(cutoff_date)
+    ind = idx < cutoff_date
+    for field in field_list:
+        df[field][ind] = df[field][ind]/vat_fac1
+        df[field][~ind] = df[field][~ind]/vat_fac2
+    if with_ret:
+        return df
+
 def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_col = 'date', fx_pair = None, field = 'spotID', args = None):
     cnx = dbaccess.connect(**dbaccess.dbconfig)
     if args:
@@ -50,12 +73,21 @@ def get_data(spotID, start, end, spot_table = 'spot_daily', name = None, index_c
     df = df[[data_field]]
     df.rename(columns = {data_field: col_name}, inplace = True)
     if fx_pair:
-        fx = dbaccess.load_daily_data_to_df(cnx, 'fx_daily', fx_pair, start, end, index_col = None, field = 'ccy')
+        fx = fx_pair.split('/')
+        direction = misc.get_mkt_fxpair(fx[0], fx[1])
+        if direction < 0:
+            mkt_pair = '/'.join([fx[1],fx[0]])
+        else:
+            mkt_pair = fx_pair
+        fx = dbaccess.load_daily_data_to_df(cnx, 'fx_daily', mkt_pair, start, end, index_col = None, field = 'ccy')
         fx = fx[fx['tenor']=='0W']
         if isinstance(fx[index_col][0], basestring):
             fx[index_col] = fx[index_col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
         fx = fx.set_index(index_col)
-        df[col_name] = df[col_name]/fx['rate']
+        if direction >= 0:
+            df[col_name] = df[col_name]/fx['rate']
+        else:
+            df[col_name] = df[col_name]*fx['rate']
     return df
 
 def merge_df(df_list):
@@ -221,7 +253,7 @@ class Regression(object):
             plt.title('residual plot ({} STD band)'.format(std_line))
         plt.show()
 
-    def residual_vs_fit(self, colorbar=False):
+    def residual_vs_fit(self, colorbar=True):
         if colorbar:
             df = self.df
             y_predict = self.result.predict(df[self.independent])

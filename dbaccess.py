@@ -30,7 +30,7 @@ price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': v
                  'cmdv': cmdv_columns, 'ccy': fx_columns, 'ir_index': ir_columns, }
 deal_columns = ['status', 'internal_id', 'external_id', 'cpty', 'positions', \
                 'strategy', 'book', 'external_src', 'last_updated', \
-                'trader', 'sales', 'desk', 'business', 'portfolio', 'premium', 'product', \
+                'trader', 'sales', 'desk', 'business', 'portfolio', 'premium', 'product', 'reporting_ccy', \
                 'enter_date', 'last_date', 'commission', 'day1_comments']
 
 def get_proxy_server():
@@ -335,9 +335,11 @@ def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'ins
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
 
-def load_deal_data(cnx, dbtable = 'deal', book = 'BOF', deal_status = [2]):
-    stmt = "select {variables} from {table} where book = '{book}' ".format(table=dbtable, \
-                                    variables=','.join(deal_columns), book = book)
+def load_deal_data(cnx, dbtable = 'deal', book = 'BOF', strategy = '', deal_status = [2]):
+    stmt = "select {variables} from {table} where book like '{book}' and strategy like '{strat}' ".format(\
+                        table=dbtable, variables=','.join(deal_columns), \
+                        book = book if len(book)> 0 else '%', \
+                        strat = strategy if len(strategy)>0 else '%')
     if len(deal_status) == 1:
         stmt = stmt + "and status = {deal_status} ".format(deal_status = deal_status[0])
     else:
@@ -353,8 +355,14 @@ def load_cmvol_curve(cnx, prod_code, ref_date, dbtable = 'cmvol_daily', field = 
     stmt = stmt + "and date like '{refdate}%' ".format( refdate = ref_date.strftime('%Y-%m-%d'))
     stmt = stmt + "order by expiry_date".format(field = field)
     df = pd.io.sql.read_sql(stmt, cnx)
-    df['delta'] = ((df['delta']+1)*100).astype(int) % 100
-    vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = numpy.mean)
+    if len(df) > 0:
+        df['delta'] = ((df['delta']+1)*100).astype(int) % 100
+        vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = numpy.mean)
+        atm_delta = 50
+        for delta in [10, 25, 75, 90]:
+            vol_tbl[('vol', delta)] = vol_tbl[('vol', delta)] - vol_tbl[('vol', atm_delta)]
+    else:
+        vol_tbl = []
     return vol_tbl
 
 def load_cmdv_curve(cnx, fwd_index, spd_key, ref_date, dbtable = 'cmspdvol_daily', field = 'cmdv'):
