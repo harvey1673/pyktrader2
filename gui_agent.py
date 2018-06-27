@@ -466,15 +466,15 @@ class MainApp(object):
             var = field2variable(field)
             value = params[field]
             setattr(strat, var, value)
-
+    
     def run_strat_func(self, strat_name, func_name, params = ()):
         strat = self.agent.strategies[strat_name]
         getattr(strat, func_name)(*params)
 
-    def run_agent_func(self, func_name, params = ()):
+    def run_agent_func(self, func_name, params):
         return getattr(self.agent, func_name)(*params)
 
-    def run_gateway_func(self, gway, func_name, params = ()):
+    def run_gateway_func(self, gway, func_name, params):
         gateway = self.agent.gateways[gway]
         return getattr(gateway, func_name)(*params)
 

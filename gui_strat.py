@@ -1,7 +1,6 @@
 #-*- coding:utf-8 -*-
 import Tkinter as tk
 import ttk
-from collections import OrderedDict
 from gui_misc import *
 
 class StratGui(object):
@@ -13,9 +12,9 @@ class StratGui(object):
         self.entries = {}
         self.stringvars = {}
         self.entry_fields = []
-        self.button_map = OrderedDict()
         self.status_fields = []
         self.shared_fields = []
+        self.button_fields = []
         self.field_types = {}
                 
     def get_params(self):
@@ -100,23 +99,21 @@ class StratGui(object):
         row_id += 2
         local_entry_fields = [ f for f in self.entry_fields if f not in self.shared_fields]
         local_status_fields = [ f for f in self.status_fields if f not in self.shared_fields]
-        local_cmd_fields = self.button_map.keys()
-        fields = ['assets'] + local_cmd_fields + local_entry_fields + local_status_fields
+        fields = ['assets'] + local_entry_fields + local_status_fields
         for idx, field in enumerate(fields):
             lbl = ttk.Label(scr_frame.frame, text = field, anchor='w', width = 8)
             lbl.grid(row=row_id, column=idx, sticky="ew")
         row_id += 1
-        for idy, underlier in enumerate(self.underliers):
+        for i, underlier in enumerate(self.underliers):
             under_key = ','.join(underlier)
             inst_lbl = ttk.Label(scr_frame.frame, text=under_key, anchor="w", width = 8)
             inst_lbl.grid(row=row_id, column=0, sticky="ew")
             col_id = 1
             entries[under_key] = {}
-            for idx, field in enumerate(local_cmd_fields):
-                button = ttk.Button(scr_frame.frame, text=field, command= lambda: \
-                    self.app.run_strat_func(self.name, self.button_map[field], (idy,)))
-                button.grid(row=row_id, column=col_id+idx, sticky="ew")
-            col_id += len(local_cmd_fields)
+            for txt, func in self.button_fields:
+                button = ttk.Button(scr_frame.frame, text = txt, width=6, command=lambda: self.run_func(func, idx))
+                button.grid(column=col_id, row=row_id, sticky="ew")
+                col_id += 1
             for idx, field in enumerate(local_entry_fields):
                 ent = ttk.Entry(scr_frame.frame, width=5)
                 ent.grid(row=row_id, column=col_id+idx, sticky="ew")
@@ -141,6 +138,9 @@ class StratGui(object):
     def save_config(self):
         self.app.run_strat_func(self.name, 'save_config')
 
+    def run_func(self, func, idx):
+        self.app.run_strat_func(self.name, func, (idx,))
+
 class ManualTradeGui(StratGui):
     def __init__(self, strat, app, master):
         StratGui.__init__(self, strat, app, master)
@@ -148,7 +148,7 @@ class ManualTradeGui(StratGui):
                              'LongPrice', 'LongStop', 'ShortPrice', 'ShortStop', 'TickNum', 'OrderOffset' ]
         self.status_fields = ['TradeUnit', 'CurrPos', 'CurrPrices']
         self.shared_fields = ['PosScaler', 'IsDisabled']
-        self.button_map = OrderedDict([('Long', 'open_long'), ('Short', 'open_short'), ('Liq', 'liquidate_tradepos'),])
+        self.button_fields = [('long', 'open_long'), ('short', 'open_short')]
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'CurrPos': 'int',
