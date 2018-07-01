@@ -24,6 +24,7 @@ class ManualTrade(Strategy):
 
     def open_long(self, idx):
         if len(self.positions[idx]) < self.max_pos[idx]:
+            self.set_exec_args(idx, ORDER_BUY)
             self.open_tradepos(idx, 1, self.long_price[idx], int(self.trade_unit[idx]))
             return True
         else:
@@ -31,6 +32,7 @@ class ManualTrade(Strategy):
 
     def open_short(self, idx):
         if len(self.positions[idx]) < self.max_pos[idx]:
+            self.set_exec_args(idx, ORDER_SELL)
             self.open_tradepos(idx, -1, self.short_price[idx], int(self.trade_unit[idx]))
             return True
         else:

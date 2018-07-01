@@ -148,7 +148,7 @@ class ManualTradeGui(StratGui):
                              'LongPrice', 'LongStop', 'ShortPrice', 'ShortStop', 'TickNum', 'OrderOffset' ]
         self.status_fields = ['TradeUnit', 'CurrPos', 'CurrPrices']
         self.shared_fields = ['PosScaler', 'IsDisabled']
-        self.button_fields = [('long', 'open_long'), ('short', 'open_short')]
+        self.button_fields = [('long', 'open_long'), ('short', 'open_short'), ('liq', 'liquidate_tradepos')]
         self.field_types = {'RunFlag':'int',
                             'TradeUnit':'int',
                             'CurrPos': 'int',
