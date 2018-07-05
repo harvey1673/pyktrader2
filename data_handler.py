@@ -238,7 +238,7 @@ def tr(df):
         df['TR'][-1] = max(df['high'][-1]-df['low'][-1], abs(df['high'][-1] - df['close'][-2]), abs(df['low'][-1] - df['close'][-2]))
 
 def CMI(df, n):
-    ts = pd.Series(abs(df['close'] - df['close'].shift(n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name='CMI'+str(n))
+    ts = pd.Series(abs(df['close'] - df['close'].shift(n))/(df['high'].rolling(n).max() - df['low'].rolling(n).min())*100, name='CMI'+str(n))
     return ts
 
 def cmi(df, n):
@@ -250,7 +250,7 @@ def cmi(df, n):
 
 def ATR(df, n = 20):
     tr = TR(df)
-    ts_atr = pd.ewma(tr, span=n,  min_periods = n-1, adjust = False)
+    ts_atr = tr.ewm(span=n,  min_periods = n-1, adjust = False).mean()
     ts_atr.name = 'ATR'+str(n)
     return ts_atr
 
@@ -269,21 +269,21 @@ def maext(df, n, field = 'close', ma_type = 0):
     df[key][-1] = float(ma_ts[-1])
     
 def MA(df, n, field = 'close'):
-    return pd.Series(pd.rolling_mean(df[field], n), name = 'MA_' + field.upper() + '_' + str(n), index = df.index)
+    return pd.Series(df[field].rolling(n).mean(), name = 'MA_' + field.upper() + '_' + str(n), index = df.index)
 
 def ma(df, n, field = 'close'):
     key = 'MA_' + field.upper() + '_' + str(n)
     df[key][-1] = (df[key][-2]*n + df[field][-1] - df[field][-1-n])/n
 
 def STDEV(df, n, field = 'close'):
-    return pd.Series(pd.rolling_std(df[field], n), name = 'STDEV_' + field.upper() + '_' + str(n))
+    return pd.Series(df[field].rolling(n).std(), name = 'STDEV_' + field.upper() + '_' + str(n))
 
 def stdev(df, n, field = 'close'):
     df['STDEV_' + field.upper() + '_' + str(n)][-1] = np.std(df[field][-n:])
 
 def SMAVAR(df, n, field = 'close'):
     ma_ts = MA(df, n, field)
-    var_ts = pd.Series(pd.rolling_mean(df[field]**2, n) - ma_ts**2, name = 'SVAR_' + field.upper() + '_' + str(n))
+    var_ts = pd.Series((df[field]**2).rolling(n).mean() - ma_ts**2, name = 'SVAR_' + field.upper() + '_' + str(n))
     return pd.concat([ma_ts, var_ts], join='outer', axis=1)
 
 def smavar(df, n, field = 'close'):
@@ -329,8 +329,8 @@ def ROC(df, n):
 
 #Bollinger Bands
 def BBANDS(df, n, k = 2):
-    MA = pd.Series(pd.rolling_mean(df['close'], n))
-    MSD = pd.Series(pd.rolling_std(df['close'], n))
+    MA = pd.Series(df['close'].rolling(n).mean())
+    MSD = pd.Series(df['close'].rolling(n).std())
     b1 = 2 * k * MSD / MA
     B1 = pd.Series(b1, name = 'BollingerB' + str(n))
     b2 = (df['close'] - MA + k * MSD) / (2 * k * MSD)
@@ -390,9 +390,9 @@ def STOCHRSI(df, n=14, fastk_period=5, fastd_period=3):
     
     #Trix
 def TRIX(df, n):
-    EX1 = pd.ewma(df['close'], span = n, min_periods = n - 1, adjust = False)
-    EX2 = pd.ewma(EX1, span = n, min_periods = n - 1, adjust = False)
-    EX3 = pd.ewma(EX2, span = n, min_periods = n - 1, adjust = False)
+    EX1 = df['close'].ewm(span = n, min_periods = n - 1, adjust = False).mean()
+    EX2 = EX1.ewm(span = n, min_periods = n - 1, adjust = False).mean()
+    EX3 = EX2.ewm(span = n, min_periods = n - 1, adjust = False).mean()
     return pd.Series(EX3/EX3.shift(1) - 1, name = 'Trix' + str(n))
 
 #Average Directional Movement Index
@@ -405,9 +405,9 @@ def ADX(df, n):
     # UpD[(UpMove<=DoMove)|(UpMove <= 0)] = 0
     # DoD[(DoMove<=UpMove)|(DoMove <= 0)] = 0
     # ATRs = ATR(df,span = n, min_periods = n)
-    # PosDI = pd.Series(pd.ewma(UpD, span = n, min_periods = n - 1) / ATRs)
-    # NegDI = pd.Series(pd.ewma(DoD, span = n, min_periods = n - 1) / ATRs)
-    # ADX = pd.Series(pd.ewma(abs(PosDI - NegDI) / (PosDI + NegDI), span = n_ADX, min_periods = n_ADX - 1), name = 'ADX' + str(n) + '_' + str(n_ADX))
+    # PosDI = pd.Series(UpD.ewm(span = n, min_periods = n - 1) / ATRs).mean()
+    # NegDI = pd.Series(DoD.ewm(span = n, min_periods = n - 1) / ATRs).mean()
+    # ADX = pd.Series((abs(PosDI - NegDI) / (PosDI + NegDI)).ewm(span = n_ADX, min_periods = n_ADX - 1), name = 'ADX' + str(n) + '_' + str(n_ADX)).mean()
     # return ADX 
 
 def ADXR(df, n):
@@ -415,10 +415,10 @@ def ADXR(df, n):
     
 #MACD, MACD Signal and MACD difference
 def MACD(df, n_fast, n_slow, n_signal):
-    EMAfast = pd.Series(pd.ewma(df['close'], span = n_fast, min_periods = n_slow - 1))
-    EMAslow = pd.Series(pd.ewma(df['close'], span = n_slow, min_periods = n_slow - 1))
+    EMAfast = pd.Series(df['close'].ewm(span = n_fast, min_periods = n_slow - 1).mean())
+    EMAslow = pd.Series(df['close'].ewm(span = n_slow, min_periods = n_slow - 1).mean())
     MACD = pd.Series(EMAfast - EMAslow, name = 'MACD' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
-    MACDsig = pd.Series(pd.ewma(MACD, span = n_signal, min_periods = n_signal - 1), name = 'MACDsig' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
+    MACDsig = pd.Series(MACD.ewm(span = n_signal, min_periods = n_signal - 1).mean(), name = 'MACDsig' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
     MACDhist = pd.Series(MACD - MACDsig, name = 'MACDhist' + str(n_fast) + '_' + str(n_slow) + '_' + str(n_signal))
     return pd.concat([MACD, MACDsig, MACDhist], join='outer', axis=1)
 
@@ -432,17 +432,17 @@ def MACDEXT(df, n_fast, n_slow, n_signal, matype = 0):
 #Mass Index
 def MassI(df):
     Range = df['high'] - df['low']
-    EX1 = pd.ewma(Range, span = 9, min_periods = 8)
-    EX2 = pd.ewma(EX1, span = 9, min_periods = 8)
+    EX1 = Range.ewm(span = 9, min_periods = 8).mean()
+    EX2 = EX1.ewm(span = 9, min_periods = 8).mean()
     Mass = EX1 / EX2
-    MassI = pd.Series(pd.rolling_sum(Mass, 25), name = 'MassIndex')
+    MassI = pd.Series(Mass.rolling(25).sum(), name = 'MassIndex')
     return MassI
 
 #Vortex Indicator
 def Vortex(df, n):
     tr = TR(df)
     vm = abs(df['high'] - df['low'].shift(1)) - abs(df['low']-df['high'].shift(1))
-    VI = pd.Series(pd.rolling_sum(vm, n) / pd.rolling_sum(tr, n), name = 'Vortex' + str(n))
+    VI = pd.Series(vm.rolling(n).sum() / tr.rolling(n).sum(), name = 'Vortex' + str(n))
     return VI
 
 #KST Oscillator
@@ -459,7 +459,7 @@ def KST(df, r1, r2, r3, r4, n1, n2, n3, n4):
     M = df['close'].diff(r4 - 1)
     N = df['close'].shift(r4 - 1)
     ROC4 = M / N
-    KST = pd.Series(pd.rolling_sum(ROC1, n1) + pd.rolling_sum(ROC2, n2) * 2 + pd.rolling_sum(ROC3, n3) * 3 + pd.rolling_sum(ROC4, n4) * 4, name = 'KST' + str(r1) + '_' + str(r2) + '_' + str(r3) + '_' + str(r4) + '_' + str(n1) + '_' + str(n2) + '_' + str(n3) + '_' + str(n4))
+    KST = pd.Series(ROC1.rolling(n1).sum() + ROC2.rolling(n2).sum() * 2 + ROC3.rolling(n3).sum() * 3 + ROC4.rolling(n4).sum() * 4, name = 'KST' + str(r1) + '_' + str(r2) + '_' + str(r3) + '_' + str(r4) + '_' + str(n1) + '_' + str(n2) + '_' + str(n3) + '_' + str(n4))
     return KST
 
 #Relative Strength Index
@@ -477,8 +477,8 @@ def RSI_F(df, n, field='close'):
     DoD = pd.Series(DoMove)
     UpD[(UpMove <= 0)] = 0
     DoD[(DoMove <= 0)] = 0
-    PosDI = pd.Series(pd.ewma(UpD, com = n-1), name = "RSI"+str(n)+'_UP')
-    NegDI = pd.Series(pd.ewma(DoD, com = n-1), name = "RSI"+str(n)+'_DN')
+    PosDI = pd.Series(UpD.ewm(com = n-1).mean(), name = "RSI"+str(n)+'_UP')
+    NegDI = pd.Series(DoD.ewm(com = n-1).mean(), name = "RSI"+str(n)+'_DN')
     RSI = pd.Series(PosDI / (PosDI + NegDI) * 100, name = 'RSI' + str(n))
     return pd.concat([RSI, PosDI, NegDI], join='outer', axis=1)
 
@@ -500,10 +500,10 @@ def rsi_f(df, n, field = 'close'):
 def TSI(df, r, s):
     M = pd.Series(df['close'].diff(1))
     aM = abs(M)
-    EMA1 = pd.Series(pd.ewma(M, span = r, min_periods = r - 1))
-    aEMA1 = pd.Series(pd.ewma(aM, span = r, min_periods = r - 1))
-    EMA2 = pd.Series(pd.ewma(EMA1, span = s, min_periods = s - 1))
-    aEMA2 = pd.Series(pd.ewma(aEMA1, span = s, min_periods = s - 1))
+    EMA1 = pd.Series(M.ewm(span = r, min_periods = r - 1).mean())
+    aEMA1 = pd.Series(aM.ewm(span = r, min_periods = r - 1).mean())
+    EMA2 = pd.Series(EMA1.ewm(span = s, min_periods = s - 1).mean())
+    aEMA2 = pd.Series(aEMA1.ewm(span = s, min_periods = s - 1).mean())
     TSI = pd.Series(EMA2 / aEMA2, name = 'TSI' + str(r) + '_' + str(s))
     return TSI
 
@@ -519,7 +519,7 @@ def ACCDIST(df, n):
 #Chaikin Oscillator
 def Chaikin(df):
     ad = (2 * df['close'] - df['high'] - df['low']) / (df['high'] - df['low']) * df['volume']
-    Chaikin = pd.Series(pd.ewma(ad, span = 3, min_periods = 2) - pd.ewma(ad, span = 10, min_periods = 9), name = 'Chaikin')
+    Chaikin = pd.Series(ad.ewm(span = 3, min_periods = 2).mean() - ad.ewm(span = 10, min_periods = 9).mean(), name = 'Chaikin')
     return Chaikin
 
 #Money Flow Index and Ratio
@@ -531,7 +531,7 @@ def MFI(df, n):
     PosMF = PosMF * df['volume']
     TotMF = PP * df['volume']
     MFR = pd.Series(PosMF / TotMF)
-    MFI = pd.Series(pd.rolling_mean(MFR, n), name = 'MFI' + str(n))
+    MFI = pd.Series(MFR.rolling(n).mean(), name = 'MFI' + str(n))
     return MFI
 
 #On-balance Volume
@@ -540,7 +540,7 @@ def OBV(df, n):
     NegVol = pd.Series(-df['volume'])
     PosVol[df['close'] <= df['close'].shift(1)] = 0
     NegVol[df['close'] >= df['close'].shift(1)] = 0
-    OBV = pd.Series(pd.rolling_mean(PosVol + NegVol, n), name = 'OBV' + str(n))
+    OBV = pd.Series((PosVol + NegVol).rolling(n).mean(), name = 'OBV' + str(n))
     return OBV
 
 #Force Index
@@ -551,13 +551,13 @@ def FORCE(df, n):
 #Ease of Movement
 def EOM(df, n):
     EoM = (df['high'].diff(1) + df['low'].diff(1)) * (df['high'] - df['low']) / (2 * df['volume'])
-    Eom_ma = pd.Series(pd.rolling_mean(EoM, n), name = 'EoM' + str(n))
+    Eom_ma = pd.Series(EoM.rolling(n).mean(), name = 'EoM' + str(n))
     return Eom_ma
 
 #Commodity Channel Index
 def CCI(df, n):
     PP = (df['high'] + df['low'] + df['close']) / 3
-    CCI = pd.Series((PP - pd.rolling_mean(PP, n)) / pd.rolling_std(PP, n) / 0.015, name = 'CCI' + str(n))
+    CCI = pd.Series((PP - PP.rolling(n).mean()) / PP.rolling(n).std() / 0.015, name = 'CCI' + str(n))
     return CCI
 
 def cci(df, n):
@@ -572,26 +572,26 @@ def COPP(df, n):
     M = df['close'].diff(int(n * 14 / 10) - 1)
     N = df['close'].shift(int(n * 14 / 10) - 1)
     ROC2 = M / N
-    Copp = pd.Series(pd.ewma(ROC1 + ROC2, span = n, min_periods = n), name = 'Copp' + str(n))
+    Copp = pd.Series((ROC1 + ROC2).ewm(span = n, min_periods = n).mean(), name = 'Copp' + str(n))
     return Copp
 
 #Keltner Channel
 def KELCH(df, n):
-    KelChM = pd.Series(pd.rolling_mean((df['high'] + df['low'] + df['close']) / 3, n), name = 'KelChM' + str(n))
-    KelChU = pd.Series(pd.rolling_mean((4 * df['high'] - 2 * df['low'] + df['close']) / 3, n), name = 'KelChU' + str(n))
-    KelChD = pd.Series(pd.rolling_mean((-2 * df['high'] + 4 * df['low'] + df['close']) / 3, n), name = 'KelChD' + str(n))
+    KelChM = pd.Series(((df['high'] + df['low'] + df['close']) / 3).rolling(n).mean(), name = 'KelChM' + str(n))
+    KelChU = pd.Series(((4 * df['high'] - 2 * df['low'] + df['close']) / 3).rolling(n).mean(), name = 'KelChU' + str(n))
+    KelChD = pd.Series(((-2 * df['high'] + 4 * df['low'] + df['close']) / 3).rolling(n).mean(), name = 'KelChD' + str(n))
     return pd.concat([KelChM, KelChU, KelChD], join='outer', axis=1)
 
 #Ultimate Oscillator
 def ULTOSC(df):
     TR_l = TR(df)
     BP_l = df['close'] - pd.concat([df['low'], df['close'].shift(1)], axis=1).min(axis=1)
-    UltO = pd.Series((4 * pd.rolling_sum(BP_l, 7) / pd.rolling_sum(TR_l, 7)) + (2 * pd.rolling_sum(BP_l, 14) / pd.rolling_sum(TR_l, 14)) + (pd.rolling_sum(BP_l, 28) / pd.rolling_sum(TR_l, 28)), name = 'UltOsc')
+    UltO = pd.Series((4 * BP_l.rolling(7).sum() / TR_l.rolling(7).sum()) + (2 * BP_l.rolling(14).sum() / TR_l.rolling(14).sum()) + (BP_l.rolling(28).sum() / TR_l.rolling(28).sum()), name = 'UltOsc')
     return UltO
 
 def DONCH_IDX(df, n):
-    high = pd.Series(pd.rolling_max(df['high'], n), name = 'DONCH_H'+ str(n))
-    low  = pd.Series(pd.rolling_min(df['low'], n), name = 'DONCH_L'+ str(n))
+    high = pd.Series(df['high'].rolling(n).max(), name = 'DONCH_H'+ str(n))
+    low  = pd.Series(df['low'].rolling(n).min(), name = 'DONCH_L'+ str(n))
     maxidx = pd.Series(index=df.index, name = 'DONIDX_H%s' % str(n))
     minidx = pd.Series(index=df.index, name = 'DONIDX_L%s' % str(n))
     for idx, dateidx in enumerate(high.index):
@@ -604,17 +604,17 @@ def DONCH_IDX(df, n):
 
 def CHENOW_PLUNGER(df, n, atr_n = 40):
     atr = ATR(df, atr_n)
-    high = pd.Series((pd.rolling_max(df['high'], n) - df['close'])/atr, name = 'CPLUNGER_H'+ str(n))
-    low  = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/atr, name = 'CPLUNGER_L'+ str(n))
+    high = pd.Series((df['high'].rolling(n).max() - df['close'])/atr, name = 'CPLUNGER_H'+ str(n))
+    low  = pd.Series((df['close'] - df['low'].rolling(n).min())/atr, name = 'CPLUNGER_L'+ str(n))
     return pd.concat([high,low], join='outer', axis=1)
 
 #Donchian Channel
 def DONCH_H(df, n, field = 'high'):
-    DC_H = pd.rolling_max(df[field],n)
+    DC_H = df[field].rolling(n).max()
     return pd.Series(DC_H, name = 'DONCH_H' + field[0].upper() + str(n))
 
 def DONCH_L(df, n, field = 'low'):
-    DC_L = pd.rolling_min(df[field], n)
+    DC_L = df[field].rolling(n).min()
     return pd.Series(DC_L, name = 'DONCH_L'+ field[0].upper() + str(n))
 
 def donch_h(df, n, field = 'high'):
@@ -627,10 +627,10 @@ def donch_l(df, n, field = 'low'):
     
 #Standard Deviation
 def HEIKEN_ASHI(df, period1):
-    SM_O = pd.rolling_mean(df['open'], period1)
-    SM_H = pd.rolling_mean(df['high'], period1)
-    SM_L = pd.rolling_mean(df['low'], period1)
-    SM_C = pd.rolling_mean(df['close'], period1)
+    SM_O = df['open'].rolling(period1).mean()
+    SM_H = df['high'].rolling(period1).mean()
+    SM_L = df['low'].rolling(period1).mean()
+    SM_C = df['close'].rolling(period1).mean()
     HA_C = pd.Series((SM_O + SM_H + SM_L + SM_C)/4.0, name = 'HAclose')
     HA_O = pd.Series(SM_O, name = 'HAopen')
     HA_H = pd.Series(SM_H, name = 'HAhigh')
@@ -653,8 +653,8 @@ def heiken_ashi(df, period):
     df['HAlow'][-1] = min(ma_l, df['HAopen'][-1], df['HAclose'][-1])
 
 def BBANDS_STOP(df, n, nstd):
-    MA = pd.Series(pd.rolling_mean(df['close'], n))
-    MSD = pd.Series(pd.rolling_std(df['close'], n))
+    MA = pd.Series(df['close'].rolling(n).mean())
+    MSD = pd.Series(df['close'].rolling(n).std())
     Upper = pd.Series(MA + MSD * nstd, name = 'BBSTOP_upper')
     Lower = pd.Series(MA - MSD * nstd, name = 'BBSTOP_lower')
     Trend = pd.Series(0, index = Lower.index, name = 'BBSTOP_trend')
@@ -687,12 +687,12 @@ def bbands_stop(df, n, nstd):
         df['BBSTOP_upper'][-1] = df['BBSTOP_upper'][-2]
 
 def FISHER(df, n, smooth_p = 0.7, smooth_i = 0.7):
-    roll_high = pd.rolling_max(df.high, n)
-    roll_low  = pd.rolling_min(df.low, n)
+    roll_high = df.high.rolling(n).max()
+    roll_low  = df.low.rolling(n).min()
     price_loc = (df.close - roll_low)/(roll_high - roll_low) * 2.0 - 1
-    sm_price = pd.Series(pd.ewma(price_loc, com = 1.0/smooth_p - 1, adjust = False), name = 'FISHER_P')
+    sm_price = pd.Series(price_loc.ewm(com = 1.0/smooth_p - 1, adjust = False).mean(), name = 'FISHER_P')
     fisher_ind = 0.5 * np.log((1 + sm_price)/(1 - sm_price))
-    sm_fisher = pd.Series(pd.ewma(fisher_ind, com = 1.0/smooth_i - 1, adjust = False), name = 'FISHER_I')
+    sm_fisher = pd.Series(fisher_ind.ewm(com = 1.0/smooth_i - 1, adjust = False).mean(), name = 'FISHER_I')
     return pd.concat([sm_price, sm_fisher], join='outer', axis=1)
 
 def fisher(df, n, smooth_p = 0.7, smooth_i = 0.7):
@@ -730,7 +730,7 @@ def COND_PCT_CHAN(df, n = 20, pct = 50, field = 'close', direction=1):
    
 def VCI(df, n, rng = 8):
     if n > 7:
-        varA = pd.rolling_max(df.high, rng) - pd.rolling_min(df.low, rng)
+        varA = df.high.rolling(rng).max() - df.low.rolling(rng).min()
         varB = varA.shift(rng)
         varC = varA.shift(rng*2)
         varD = varA.shift(rng*3)
@@ -738,8 +738,8 @@ def VCI(df, n, rng = 8):
         avg_tr = (varA+varB+varC+varD+varE)/25.0
     else:
         tr = pd.concat([df.high - df.low, abs(df.close - df.close.shift(1))], join='outer', axis=1).max(1)
-        avg_tr = pd.rolling_mean(tr, n) * 0.16
-    avg_pr = (pd.rolling_mean(df.high, n) + pd.rolling_mean(df.low, n))/2.0
+        avg_tr = tr.rolling(n).mean() * 0.16
+    avg_pr = (df.high.rolling(n).mean() + df.low.rolling(n).mean())/2.0
     VO = pd.Series((df.open - avg_pr)/avg_tr, name = 'VCIO')
     VH = pd.Series((df.high - avg_pr)/avg_tr, name = 'VCIH')
     VL = pd.Series((df.low - avg_pr)/avg_tr, name = 'VCIL')
@@ -748,9 +748,9 @@ def VCI(df, n, rng = 8):
 
 def TEMA(ts, n):
     n = int(n)
-    ts_ema1 = pd.Series( pd.ewma(ts, span = n, adjust = False), name = 'EMA' + str(n) )
-    ts_ema2 = pd.Series( pd.ewma(ts_ema1, span = n, adjust = False), name = 'EMA2' + str(n) )
-    ts_ema3 = pd.Series( pd.ewma(ts_ema2, span = n, adjust = False), name = 'EMA3' + str(n) )
+    ts_ema1 = pd.Series( ts.ewm(span = n, adjust = False).mean(), name = 'EMA' + str(n) )
+    ts_ema2 = pd.Series( ts_ema1.ewm(span = n, adjust = False).mean(), name = 'EMA2' + str(n) )
+    ts_ema3 = pd.Series( ts_ema2.ewm(span = n, adjust = False).mean(), name = 'EMA3' + str(n) )
     ts_tema = pd.Series( 3 * ts_ema1 - 3 * ts_ema2 + ts_ema3, name = 'TEMA' + str(n) )
     return ts_tema
     
@@ -765,9 +765,9 @@ def SVAPO(df, period = 8, cutoff = 1, stdev_h = 1.5, stdev_l = 1.3, stdev_period
     DoD = pd.Series(-vc)
     UpD[(haC<=haC.shift(1)*(1+cutoff/1000.0))|(vtrend < vtrend.shift(1))] = 0
     DoD[(haC>=haC.shift(1)*(1-cutoff/1000.0))|(vtrend > vtrend.shift(1))] = 0
-    delta_sum = pd.rolling_sum(UpD + DoD, period)/(vave+1)
+    delta_sum = (UpD + DoD).rolling(period).sum()/(vave+1)
     svapo = pd.Series(TEMA(delta_sum, period), name = 'SVAPO_%s' % period)
-    svapo_std = pd.rolling_std(svapo, stdev_period)
+    svapo_std = svapo.rolling(stdev_period).std()
     svapo_ub = pd.Series(svapo_std * stdev_h, name = 'SVAPO_UB%s' % period)
     svapo_lb = pd.Series(-svapo_std * stdev_l, name = 'SVAPO_LB%s' % period)
     return pd.concat([svapo, svapo_ub, svapo_lb], join='outer', axis=1)
@@ -864,7 +864,7 @@ def SPBFILTER(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     B = [a1-a2, a2-a1]
     A = [1, (1-a1)+(1-a2), -(1-a1)*(1-a2)]
     PB = pd.Series(signal.lfilter(B, A, df[field]), name = 'SPB_%s_%s' % (n1, n2))
-    RMS = pd.Series(pd.rolling_mean(PB*PB, n3)**0.5, name = 'SPBRMS__%s_%s' % (n1, n2))
+    RMS = pd.Series((PB*PB).rolling(n3).mean()**0.5, name = 'SPBRMS__%s_%s' % (n1, n2))
     return pd.concat([PB, RMS], join='outer', axis=1)
 
 def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
@@ -879,7 +879,7 @@ def spbfilter(df, n1 = 40, n2 = 60, n3 = 0, field = 'close'):
     df[RMS_key][-1] = np.sqrt((df[SPB_key][(-n3):]**2).mean())
 
 def WPR(df, n):
-    res = pd.Series((df['close'] - pd.rolling_min(df['low'], n))/(pd.rolling_max(df['high'], n) - pd.rolling_min(df['low'], n))*100, name = "WPR_%s" % str(n))    
+    res = pd.Series((df['close'] - df['low'].rolling(n).min())/(df['high'].rolling(n).max() - df['low'].rolling(n).min())*100, name = "WPR_%s" % str(n))
     return res
 
 def wpr(df, n):
@@ -888,8 +888,8 @@ def wpr(df, n):
     df['WPR_%s' % str(n)][-1] = (df['close'][-1] - ll)/(hh - ll) * 100
     
 def PRICE_CHANNEL(df, n, risk = 0.3):
-    hh = pd.rolling_max(df['high'], n)
-    ll = pd.rolling_min(df['low'], n)
+    hh = df['high'].rolling(n).max()
+    ll = df['low'].rolling(n).min()
     bsmax = pd.Series(hh-(hh - ll)*(33.0-risk)/100.0, name = "PCHUP_%s" % str(risk))
     bsmin = pd.Series(ll+(hh - ll)*(33.0-risk)/100.0, name = "PCHDN_%s" % str(risk))    
     return pd.concat([bsmax, bsmin], join='outer', axis=1)
@@ -911,7 +911,7 @@ def ASCTREND(df, n, risk = 3, stop_ratio = 0.5, atr_mode = 0):
     if atr_mode == 0:
         atr = ATR(df, n + 1)
     else:
-        atr = pd.rolling_mean(df['high'] - df['low'], n + 1)
+        atr = (df['high'] - df['low']).rolling(n + 1).mean()
     stop[trend > 0] = df['low'] - stop_ratio * atr
     stop[trend < 0] = df['high'] + stop_ratio * atr
     return pd.concat([signal, trend, stop], join='outer', axis=1)
@@ -964,14 +964,14 @@ def aroon(df, n):
 
 def DT_RNG(df, win = 2, ratio = 0.7):
     if win == 0:
-        tr_ts = pd.concat([(pd.rolling_max(df['high'], 2) - pd.rolling_min(df['close'], 2))*0.5,
-                        (pd.rolling_max(df['close'], 2) - pd.rolling_min(df['low'], 2))*0.5,
+        tr_ts = pd.concat([(df['high'].rolling(2).max() - df['close'].rolling(2).min())*0.5,
+                        (df['close'].rolling(2).max() - df['low'].rolling(2).min())*0.5,
                         df['high'] - df['close'],
                         df['close'] - df['low']],
                         join='outer', axis=1).max(axis=1)
     else:
-        tr_ts = pd.concat([pd.rolling_max(df['high'], win) - pd.rolling_min(df['close'], win),
-                       pd.rolling_max(df['close'], win) - pd.rolling_min(df['low'], win)],
+        tr_ts = pd.concat([df['high'].rolling(win).max() - df['close'].rolling(win).min(),
+                           df['close'].rolling(win).max() - df['low'].rolling(win).min()],
                        join='outer', axis=1).max(axis=1)
     return pd.Series(tr_ts, name = 'DTRNG%s_%s' % (win, ratio))
 
