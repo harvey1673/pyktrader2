@@ -160,7 +160,7 @@ class CMQInstRiskStore(object):
             pool_result = self.map_result.get()
             self.results = dict([(scen, val) for scen, val in zip(self.scen_keys, pool_result)])
         if self.instrument.ccy != self.reporting_ccy:
-            base_fx = self.fx_rate[("value_date", "value_date", "ALL", 0)]
+            base_fx = misc.conv_fx_rate(self.instrument.ccy, self.reporting_ccy, self.base_market['FXFwd'])
         else:
             base_fx = 1.0
         for greek_str in self.req_greeks:

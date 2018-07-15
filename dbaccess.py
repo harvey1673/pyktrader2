@@ -13,6 +13,7 @@ dbconfig = sec_bits.dbconfig
 hist_dbconfig = sec_bits.hist_dbconfig
 bktest_dbconfig = sec_bits.bktest_dbconfig
 trade_dbconfig = {'database': 'deal_data.db'}
+mktsnap_dbconfig = {'database': "C:\\dev\\pycmqlib\\data\\market_snapshot.db"}
 
 fut_tick_columns = ['instID', 'date', 'tick_id', 'hour', 'min', 'sec', 'msec', 'openInterest', 'volume', 'price',
                     'high', 'low', 'bidPrice1', 'bidVol1', 'askPrice1', 'askVol1']
@@ -24,7 +25,7 @@ fx_columns = ['date', 'tenor', 'rate']
 ir_columns = ['date', 'tenor', 'rate']
 spot_columns = ['date', 'close']
 vol_columns = ['date', 'expiry', 'atm', 'v90', 'v75', 'v25', 'v10']
-cmvol_columns = ['date', 'tenor_label', 'expiry_date', 'delta', 'vol', 'price', 'run_avg']
+cmvol_columns = ['date', 'tenor_label', 'expiry_date', 'delta', 'vol']
 cmdv_columns = ['date', 'expiry', 'vol']
 price_fields = { 'instID': daily_columns, 'spotID': spot_columns, 'vol_index': vol_columns, 'cmvol': cmvol_columns, \
                  'cmdv': cmdv_columns, 'ccy': fx_columns, 'ir_index': ir_columns, }
@@ -327,10 +328,14 @@ def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', 
     return df
 
 def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'instID'):
-    stmt = "select {variables} from {table} where {field} like '{prod}%' ".format( \
-                                    variables=','.join([field] + price_fields[field]),
+    if dbtable  == 'fut_daily':
+        qry_str = '____'
+    else:
+        qry_str = '%'
+    stmt = "select {variables} from {table} where {field} like '{prod}{qry}' ".format( \
+                                    variables=','.join([field] + price_fields[field]), qry = qry_str,
                                     table=dbtable, field = field, prod = prod_code)
-    stmt = stmt + "and date like '{refdate}%' ".format( refdate = ref_date.strftime('%Y-%m-%d'))
+    stmt = stmt + "and date like '{refdate}%' ".format(refdate = ref_date)
     stmt = stmt + "order by {field}".format(field = field)
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
@@ -352,24 +357,33 @@ def load_cmvol_curve(cnx, prod_code, ref_date, dbtable = 'cmvol_daily', field = 
     stmt = "select {variables} from {table} where product_code like '{prod}%' ".format( \
                                     variables=','.join(price_fields[field]),
                                     table = dbtable, prod = prod_code)
-    stmt = stmt + "and date like '{refdate}%' ".format( refdate = ref_date.strftime('%Y-%m-%d'))
+    stmt = stmt + "and date like '{refdate}%' ".format(refdate = ref_date)
     stmt = stmt + "order by expiry_date".format(field = field)
     df = pd.io.sql.read_sql(stmt, cnx)
+    for col in ['tenor_label','expiry_date']:
+        df[col] = df[col].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
     if len(df) > 0:
         df['delta'] = ((df['delta']+1)*100).astype(int) % 100
-        vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label'], values = ['vol'], aggfunc = numpy.mean)
+        vol_tbl = df.pivot_table(columns = ['delta'], index = ['tenor_label', 'expiry_date'], values = ['vol'], aggfunc = numpy.mean)
         atm_delta = 50
         for delta in [10, 25, 75, 90]:
             vol_tbl[('vol', delta)] = vol_tbl[('vol', delta)] - vol_tbl[('vol', atm_delta)]
     else:
-        vol_tbl = []
+        vol_tbl = pd.DataFrame()
+    vol_tbl = vol_tbl.reset_index()
+    vol_tbl.columns = [''.join([str(e) for e in col]).strip() for col in vol_tbl.columns.values]
+    vol_tbl.rename(columns={'vol10': 'COMVolV10', \
+                            'vol25': 'COMVolV25', \
+                            'vol50': 'COMVolATM', \
+                            'vol75': 'COMVolV75', \
+                            'vol90': 'COMVolV90', }, inplace=True)
     return vol_tbl
 
 def load_cmdv_curve(cnx, fwd_index, spd_key, ref_date, dbtable = 'cmspdvol_daily', field = 'cmdv'):
     stmt = "select {variables} from {table} where fwd_index like '{fwd_index}%' and spd_key='{spd_key}' ".format( \
                                     variables=','.join(price_fields[field]), spd_key = spd_key, \
                                     table = dbtable, fwd_index = fwd_index)
-    stmt = stmt + "and date like '{refdate}%' order by expiry".format( refdate = ref_date.strftime('%Y-%m-%d'))
+    stmt = stmt + "and date like '{refdate}%' order by expiry".format( refdate = ref_date)
     df = pd.io.sql.read_sql(stmt, cnx)
     return df
 

@@ -3,7 +3,7 @@ import dbaccess
 import workdays
 import datetime
 from dateutil.relativedelta import relativedelta
-
+import calendar
 import math
 import copy
 from base import *
@@ -87,7 +87,7 @@ PLIO_Holidays = [datetime.date(2014, 1, 1),
                 datetime.date(2015, 1, 1),
                 datetime.date(2016, 1, 1),
                 datetime.date(2017, 1, 2),
-                datetime.date(2018, 1, 1),]
+                datetime.date(2018, 1, 1), datetime.date(2019, 1, 1),]
 
 WASDE_Dates = [datetime.date(2010, 1, 12), datetime.date(2010, 2, 9), datetime.date(2010, 3, 10), \
                datetime.date(2010, 4, 9), datetime.date(2010, 5, 11), datetime.date(2010, 6, 10), \
@@ -676,6 +676,20 @@ def day_shift(d, roll_rule):
         shft_day = shft_day - datetime.timedelta(days=1)
     return shft_day
 
+def tenor_to_expiry(tenor_label, prod_code = 'fef'):
+    exch = prod2exch(prod_code)
+    if 'Cal' in tenor_label:
+        ten_str = tenor_label.split(' ')
+        year = 2000 + int(ten_str[1])
+        return datetime.date(year, 12, 31)
+    if 'Q' in tenor_label:
+        ten_str = tenor_label.replace("'", " ").split(" ")
+        year = 2000 + int(ten_str[1])
+        mth = int(ten_str[0][-1])*3
+        return datetime.date(year, mth, calendar.monthrange(year, mth)[1])
+    else:
+        cont_date = datetime.datetime.strptime(tenor_label, "%Y-%m-%d").date()
+        return cont_date_expiry(cont_date, exch)
 
 def contract_expiry(cont, hols='db'):
     if type(hols) == list:

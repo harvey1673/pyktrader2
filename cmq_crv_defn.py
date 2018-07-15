@@ -25,7 +25,7 @@ COM_Curve_Map = {
     'DCECOK': {'instID': 'j', 'exch': 'DCE', 'calendar': 'CHN', 'ccy': 'CNY', \
                 'active_mths': [1, 5, 9],
                 'parent_curve': '', 'spotID': 'j', 'vol_index': 'DCECOK',},
-    'LMESCR': {'instID': 'sc', 'exch': 'LME', 'calendar': 'PLIO', 'ccy': 'USD', \
+    'LMESCR': {'instID': 'lsc', 'exch': 'LME', 'calendar': 'PLIO', 'ccy': 'USD', \
                 'active_mths': range(1,13),
                 'parent_curve': '', 'spotID': 'tsi_scrap', 'vol_index': 'LMESCR',},
 }
