@@ -126,7 +126,7 @@ WASDE_Dates = [datetime.date(2010, 1, 12), datetime.date(2010, 2, 9), datetime.d
 Holiday_Map = { 'CHN': CHN_Holidays, 'PLIO': PLIO_Holidays}
 
 product_code = {'SHFE': ['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', 'hc', 'ag', 'au', 'sn', 'ni'],
-                'CFFEX': ['IF', 'TF', 'IO', 'T', 'IH', 'IC'],
+                'CFFEX': ['IF', 'TF', 'IO', 'T', 'TS', 'IH', 'IC'],
                 'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'm_Opt', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
                 'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF', 'CY', 'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG',
                          'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC', 'AP'],
@@ -246,6 +246,7 @@ product_lotsize = {'zn': 5,
                    'IC': 200,
                    'TF': 10000,
                    'T': 10000,
+                   'TS': 10000,
                    'IO': 100,
                    'sc': 1000,
                    }
@@ -303,6 +304,7 @@ product_ticksize = {'zn': 5,
                     'IH': 0.2,
                     'IC': 0.2,
                     'TF': 0.005,
+                    'TS': 0.005,
                     'T': 0.005,
                     'IO': 0.1,
                     'sc': 0.1,
@@ -427,7 +429,7 @@ def trading_hours(product, exch):
 
     if exch in ['SSE', 'SZE']:
         hrs = [(1530, 1730), (1900, 2100)]
-    elif product in ['TF', 'T']:
+    elif product in ['TF', 'T', 'TS']:
         hrs = [(1515, 1730), (1900, 2115)]
     elif product in ['IF', 'IH', 'IC']:
         hrs = [(1530, 1730), (1900, 2100)]
@@ -775,9 +777,9 @@ def get_asset_tradehrs(asset):
         hrs = [(1500, 1730), (1930, 2100)]
     else:
         hrs = [(1500, 1615), (1630, 1730), (1930, 2100)]
-    if exch in ['SSE', 'SZE']:
+    if (exch in ['SSE', 'SZE']) or (asset in ['IF', 'IC', 'IH']):
         hrs = [(1530, 1730), (1900, 2100)]
-    elif asset in ['TF', 'IF']:
+    elif asset in ['TF', 'T', 'TS']:
         hrs = [(1515, 1730), (1900, 2115)]
     else:
         if asset in night_session_markets:

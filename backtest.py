@@ -19,7 +19,7 @@ sim_margin_dict = { 'au': 0.06, 'ag': 0.08, 'cu': 0.07, 'al':0.05,
                 'jm': 0.05, 'pp': 0.05, 'l' : 0.05, 'SR': 0.06,
                 'TA': 0.06, 'TC': 0.05, 'ME': 0.06, 'IF': 0.1,
                 'jd': 0.06, 'ni': 0.07, 'IC': 0.1,  'ZC': 0.05,
-                'IH': 0.01, 'FG': 0.05, 'TF':0.015, 'OI': 0.05,
+                'IH': 0.01, 'FG': 0.05, 'TF':0.015, 'TS':0.015, 'OI': 0.05,
                 'T': 0.015, 'MA': 0.06, 'cs': 0.05, 'bu': 0.07, 
                 'sn': 0.05, 'v': 0.05, 'hc': 0.09, 'SM': 0.1,
                 'SF': 0.1, 'CY': 0.05, 'AP': 0.05, }
@@ -37,7 +37,8 @@ sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'IH':datetime.date(2015,5,1),  'IC':datetime.date(2015,5,1),  'cs':datetime.date(2015,2,1),
     'jd':datetime.date(2014,2,1),  'ni':datetime.date(2015,6,1),  'sn':datetime.date(2015,6,1),
     'ZC':datetime.date(2015,12,1), 'hc':datetime.date(2012, 1, 1), 'SM': datetime.date(2016,10,10),
-    'SF': datetime.date(2016,10,10), 'CY': datetime.date(2017, 8, 18), 'AP': datetime.date(2017, 12, 22),}
+    'SF': datetime.date(2016,10,10), 'CY': datetime.date(2017, 8, 18), 'AP': datetime.date(2017, 12, 22),
+    'TS': datetime.date(2018, 8, 17),}
 
 trade_offset_dict = {
                 'au': 0.05, 'ag': 1,    'cu': 10,   'al':5,
@@ -46,7 +47,7 @@ trade_offset_dict = {
                 'c':  1,    'CF': 5,    'i' : 0.5,  'j': 0.5,
                 'jm': 0.5,  'pp': 1,    'l' : 5,    'SR': 1,
                 'TA': 2,    'TC': 0.2,  'ME': 1,    'IF': 0.2,
-                'jd': 1,    'ni': 10,   'IC': 0.2,
+                'jd': 1,    'ni': 10,   'IC': 0.2,  'TS':0.005,
                 'IH': 0.2,  'FG': 1,    'TF':0.005, 'OI': 2,
                 'T': 0.005, 'MA': 1,    'cs': 1,    'bu': 1,
                 'sn': 10,   'v':  5,    'ZC': 0.2,  'hc': 1,
@@ -494,14 +495,14 @@ class BacktestManager(object):
         self.config['no_trade_set'] = range(300, 301) + range(1500, 1501) + range(2059, 2100) \
                                                 if 'no_trade_set' not in self.config else self.config['no_trade_set']
         if asset in ['cu', 'al', 'zn']:
-            self.config['nearby'] = 3
-            self.config['rollrule'] = '-1b'
+            self.config['nearby'] = 2
+            self.config['rollrule'] = '-1d'
         elif asset in ['IF', 'IH', 'IC']:
             self.config['rollrule'] = '-2b'
             self.config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
         elif asset in ['au', 'ag']:
             self.config['rollrule'] = '-25b'
-        elif asset in ['TF', 'T']:
+        elif asset in ['TF', 'T', 'TS']:
             self.config['rollrule'] = '-20b'
             self.config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
         self.config['no_trade_set'] = []
