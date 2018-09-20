@@ -160,7 +160,7 @@ def realized_termstruct(option_input, data):
 
 def breakeven_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1m', writeDB = False):
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
-    contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
+    contlist, _ = contract_range(prodcode, exch, cont_mth, start_d, end_d)
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
     data = {'is_dtime': True,
             'data_column': 'close',
@@ -204,7 +204,7 @@ def breakeven_vol_by_product(prodcode, start_d, end_d, periods = 12, tenor = '-1
 
 def hist_cso_by_product(prodcode, start_d, end_d, periods = 24, tenor = '-1w', max_spd = 2, writeDB = False, mode = 'n'):
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
-    contlist = contract_range(prodcode, exch, cont_mth, start_d, end_d)
+    contlist, _ = contract_range(prodcode, exch, cont_mth, start_d, end_d)
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
     if mode == 'n':
         xs_func = 'bachelier_delta_to_strike'
@@ -368,7 +368,7 @@ def breakeven_vol_by_spot(spotID, start_d, end_d, periods = 1, tenor = '-1m'):
 
 def spd_ratiovol_by_product(products, start_d, end_d, periods = 12, tenor = '-1m'):
     cont_mth, exch = dbaccess.prod_main_cont_exch(products)
-    contlist = contract_range(products, exch, cont_mth, start_d, end_d)
+    contlist, _ = contract_range(products, exch, cont_mth, start_d, end_d)
     exp_dates = [get_opt_expiry(cont, inst2contmth(cont)) for cont in contlist]
     data = {'is_dtime': True,
             'data_column': 'close',

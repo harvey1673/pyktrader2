@@ -26,20 +26,20 @@ def generate_scen(base_market, curve_type, curve_name, curve_tenor = 'ALL', shif
         if shift_size >= 1:
             market_scen[curve_type] = workdays.workday(market_scen[curve_type], shift_size)
             curr_date = market_scen['market_date']
-            prefix_dates = [workdays.workday(curr_date, shift) for shift in range(shift_size + 1)]
-            prefix_dates = prefix_dates[:-1]
+            prefix_dates = [workdays.workday(curr_date, shift) for shift in range(1, shift_size + 1)]
             for fwd_idx in market_scen['COMFwd']:
                 crv_info = cmq_crv_defn.COM_Curve_Map[fwd_idx]
                 if (crv_info['exch'] == 'SGX') and ('COMFix' in market_scen) and (crv_info['spotID'] in market_scen['COMFix']):
                     fixes = market_scen['COMFix'][crv_info['spotID']]
                     fwd_quotes = market_scen['COMFwd'][fwd_idx]
-                    if prefix_dates[0] == fixes[-1][0]:
-                        prefix_dates = prefix_dates[1:]
                     idy = 0
-                    for fix_date in prefix_dates:
-                        while fwd_quotes[idy][1] < fix_date:
-                            idy += 1
-                        fixes.append([fix_date, fwd_quotes[idy][2]])
+                    if len(fixes) > 0:
+                        for fix_date in prefix_dates:
+                            if fix_date <= fixes[-1][0]:
+                                continue
+                            while fwd_quotes[idy][1] < fix_date:
+                                idy += 1
+                            fixes.append([fix_date, fwd_quotes[idy][2]])
     elif (curve_type in market_scen) and (curve_name in market_scen[curve_type]):
             for idx, value in enumerate(market_scen[curve_type][curve_name]):
                 if curve_tenor == 'ALL' or value[0] == curve_tenor:

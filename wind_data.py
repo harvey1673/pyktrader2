@@ -3,82 +3,81 @@
 import pandas as pd
 from WindPy import w
 import misc
+from wind_data_config import *
+import dbaccess
 import csv
+from test_data import process_min_id
 from sqlalchemy import create_engine
 import datetime,time
 import os
 
 wind_exch_map = {'SHF': 'SHFE', 'CZC': 'CZCE', 'DCE': 'DCE', 'CFE': 'CFFEX'}
+w.start()
 
-def dump2csvfile(data, outfile):
-    output = [];
-    for key in data.keys():
-        x = [key] + data[key];
-        output.append(x);
-    item_len = len(output[0]);
-    with open(outfile, 'wb') as test_file:
-        file_writer = csv.writer(test_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL);
-        for i in range(item_len):
-            file_writer.writerow([x[i] for x in output])
-    return 0
+def load_symbol(symbol, field_list, start_date, end_date, freq = 'd',
+                  data_struct = {'oi': 'openInterest'}):
+    df = pd.DataFrame()
+    if freq == 'd':
+        func = w.wsd
+        data_struct['Times'] ='date'
+    elif freq == 'm':
+        func = w.wsi
+        data_struct['Times'] = 'datetime'
+    else:
+        print "unsupported freq, d or m"
+        return df
+    out = func(symbol, ','.join(field_list), start_date, end_date)
+    if out.ErrorCode < 0:
+        return df
+    df['Times'] = out.Times
+    for f, data in zip(field_list, out.Data):
+        df[f] = data
+    df.rename(columns = data_struct, inplace = True)
+    df = df.dropna()
+    return df
 
-def get_wind_data(inst_list, start_date, end_date, save_loc='C:\\dev\\data\\', freq='m'):
-    exch_map = {v: k for k, v in wind_exch_map.items()}
-    for instID in inst_list:
-        exch = misc.inst2exch(instID)
-        ex = exch_map[exch]
-        ticker = instID + '.' + ex
-        product = misc.inst2product(instID)
-        sdate = start_date
-        edate = end_date
-        stime = datetime.time(9, 0, 0)
-        etime = datetime.time(15, 0, 0)
-        if product in ['T', 'TF']:
-            stime = datetime.time(9, 15, 0)
-            etime = datetime.time(15, 15, 0)
-        elif product in misc.night_session_markets:
-            stime = datetime.time(21, 0, 0)
-            sdate = misc.day_shift(sdate, '-1b')
-        smin = datetime.datetime.combine(sdate, stime)
-        emin = datetime.datetime.combine(edate, etime)
-        fields = 'open,high,low,close,volume,oi'
-        try:
-            if freq == 'm':
-                outfile = save_loc + instID + '_min.csv'
-                if os.path.isfile(outfile):
-                    continue
-                raw_data = w.wsi(ticker, fields, smin, emin)
-                if len(raw_data.Data) > 1:
-                    output = {'datetime': raw_data.Times,
-                              'open': raw_data.Data[0],
-                              'high': raw_data.Data[1],
-                              'low': raw_data.Data[2],
-                              'close': raw_data.Data[3],
-                              'volume': raw_data.Data[4],
-                              'openInterest': raw_data.Data[5]}
-                    dump2csvfile(output, outfile)
-                else:
-                    print "no min data obtained for ticker=%s" % ticker
-            elif freq == 'd':
-                outfile = save_loc + instID + '_daily.csv'
-                if os.path.isfile(outfile):
-                    continue
-                raw_data = w.wsd(ticker, fields, start_date, end_date)
-                if len(raw_data.Data) > 1:
-                    output = {'datetime': raw_data.Times,
-                              'open': raw_data.Data[0],
-                              'high': raw_data.Data[1],
-                              'low': raw_data.Data[2],
-                              'close': raw_data.Data[3],
-                              'volume': raw_data.Data[4],
-                              'openInterest': raw_data.Data[5]}
-                    dump2csvfile(output, outfile)
-            else:
-                print "no daily data obtained for ticker=%s" % ticker
-        except ValueError:
-            pass
-    w.stop()
-    return True
+def save_hist_data(start_date, end_date,
+                   index_list = [],
+                   product_codes=[],
+                   spot_list = []):
+    conn = dbaccess.connect(**dbaccess.dbconfig)
+    tday = datetime.date.today()
+    for symbol, cmd_idx, desc in index_list:
+        df = load_symbol(symbol, ['open', 'high', 'low', 'close', 'volume'], start_date, end_date)
+        if len(df)> 0:
+            df['instID'] = cmd_idx
+            exch = symbol.split('.')[-1]
+            df['exch'] = exch
+            print "saving daily data for instID = %s with number of data pts = %s" % (cmd_idx, len(df))
+            df.to_sql('fut_daily', conn, 'sqlite', if_exists='append', index=False)
+    for prodcode in product_codes:
+        cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
+        cont_list, _ = misc.contract_range(prodcode, exch, cont_mth, start_date, end_date)
+        exp_dates = [misc.contract_expiry(cont) for cont in cont_list]
+        exch2wind_dict = dict([ (v, k) for k, v in wind_exch_map.iteritems( )])
+        for cont, exp in zip(cont_list, exp_dates):
+            if exp >= start_date:
+                ex = exch2wind_dict[exch]
+                symbol = cont + '.' + ex
+                ddf = load_symbol(symbol, ['open', 'high', 'low', 'close', 'volume', 'oi'], max(exp - datetime.timedelta(days = 400), start_date), min(exp, tday), freq = 'd')
+                if len(ddf) > 0:
+                    print "saving daily data for instID = %s with number of data pts = %s" % (cont, len(ddf))
+                    ddf['instID'] = cont
+                    ddf['exch'] = exch
+                    ddf.to_sql('fut_daily', conn, 'sqlite', if_exists='append', index=False)
+                mdf = load_symbol(symbol, ['open', 'high', 'low', 'close', 'volume', 'oi'], max(exp - datetime.timedelta(days = 400),start_date), min(exp, tday), freq='m')
+                if len(mdf) > 0:
+                    print "saving min data for instID = %s with number of data pts = %s" % (cont, len(mdf))
+                    mdf['instID'] = cont
+                    mdf['exch'] = exch
+                    mdf = process_min_id(mdf)
+                    mdf.to_sql('fut_min', conn, 'sqlite', if_exists='append', index=False)
+    for symbol, spotID, desc in spot_list:
+        df = load_symbol(symbol, ['close'], start_date, end_date)
+        if len(df)> 0:
+            df['spotID'] = spotID
+            print "saving daily data for spotID = %s with number of data pts = %s" % (spotID, len(df))
+            df.to_sql('spot_daily', conn, 'sqlite', if_exists='append', index=False)
 
 class WindStock():
 

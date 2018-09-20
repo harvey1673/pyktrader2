@@ -512,7 +512,6 @@ class BacktestManager(object):
         file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
         fname = file_prefix + '_stats.json'
         output = {}
-        output = {}
         if os.path.isfile(fname):
             with open(fname, 'r') as fp:
                 output = json.load(fp)
@@ -590,7 +589,7 @@ class ContBktestManager(BacktestManager):
         exp_dates = {}
         for i, prod in enumerate(assets):
             cont_mth, exch = dbaccess.prod_main_cont_exch(prod)
-            self.contlist[prod] = misc.contract_range(prod, exch, cont_mth, self.start_date, self.end_date)
+            self.contlist[prod], _ = misc.contract_range(prod, exch, cont_mth, self.start_date, self.end_date)
             self.exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
             edates = [ misc.day_shift(d, self.config['rollrule']) for d in exp_dates[prod] ]
             sdates = [ misc.day_shift(d, self.sim_period) for d in exp_dates[prod] ]

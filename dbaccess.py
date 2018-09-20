@@ -298,14 +298,21 @@ def load_inst_marginrate(instID, conn = None):
         cnx.close()
     return out
 
-def load_min_data_to_df(cnx, dbtable, inst, d_start, d_end, minid_start=1500, minid_end=2114, index_col='datetime'):
-    stmt = "select {variables} from {table} where instID='{instID}' ".format(variables=','.join(min_columns),
-                                                                             table=dbtable, instID=inst)
-    stmt = stmt + "and min_id >= %s " % minid_start
-    stmt = stmt + "and min_id <= %s " % minid_end
-    stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
-    stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
-    stmt = stmt + "order by date, min_id"
+def load_min_data_to_df(cnx, dbtable, inst, d_start = None, d_end = None, minid_start=None, minid_end=None, \
+                        index_col='datetime', fields = 'open,high,low,close,volume,openInterest'):
+    inst_list = inst.split(',')
+    field_list = ['instID', 'exch', 'datetime', 'date', 'min_id'] + fields.split(',')
+    stmt = "select {variables} from {table} where instID in ('{instID}') ".format(variables=','.join(field_list),
+                                                                             table=dbtable, instID="','".join(inst_list))
+    if minid_start:
+        stmt = stmt + "and min_id >= %s " % minid_start
+    if minid_end:
+        stmt = stmt + "and min_id <= %s " % minid_end
+    if d_start:
+        stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
+    if d_end:
+        stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
+    stmt = stmt + "order by instID, date, min_id"
     df = pd.io.sql.read_sql(stmt, cnx, index_col=index_col)
     return df
 
@@ -318,13 +325,17 @@ def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', 
     stmt = stmt + "order by date"
     df = pd.io.sql.read_sql(stmt, cnx)
     col_name = 'date'
-    if (isinstance(df[col_name][0], basestring)) and (date_as_str == False):
-        if len(df[col_name][0])> 12:
-            df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S").date())
-        else:
-            df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    if (len(df) > 0) and (isinstance(df[col_name][0], basestring)) and (date_as_str == False):
+        df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
     if index_col:
         df = df.set_index(index_col)
+    return df
+
+def query_data_to_df(cnx, dbtable, filter, fields):
+    stmt = "select {variables} from {table} where {filter} order by date".format(variables = fields,
+                                                                                 table = dbtable,
+                                                                                 filter = filter)
+    df = pd.io.sql.read_sql(stmt, cnx)
     return df
 
 def load_fut_curve(cnx, prod_code, ref_date, dbtable = 'fut_daily', field = 'instID'):

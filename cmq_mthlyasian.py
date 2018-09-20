@@ -29,11 +29,12 @@ class CMQMthlyAsian(CMQCalendarSwap):
         if len(market_data) == 0:
             self.volmark = None
             return
-        #vol_idx = cmq_crv_defn.COM_Curve_Map[self.fwd_index]['vol_index']
         self.volmark = cmq_crv_defn.lookup_vol_mark(self.fwd_index, market_data, self.end, \
                                                vol_fields = cmq_crv_defn.COMVOL_fields)
 
     def clean_price(self):
+        if self.value_date > self.end:
+            return 0.0
         ws = 1.0 if (self.otype[0].upper() == 'C') else -1.0
         n = len(self.fixing_dates)
         m = len(self.past_fix)

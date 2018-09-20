@@ -125,13 +125,13 @@ WASDE_Dates = [datetime.date(2010, 1, 12), datetime.date(2010, 2, 9), datetime.d
 
 Holiday_Map = { 'CHN': CHN_Holidays, 'PLIO': PLIO_Holidays}
 
-product_code = {'SHFE': ['cu', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', 'hc', 'ag', 'au', 'sn', 'ni'],
+product_code = {'SHFE': ['cu', 'cu_Opt', 'al', 'zn', 'pb', 'wr', 'rb', 'fu', 'ru', 'bu', 'hc', 'ag', 'au', 'sn', 'ni'],
                 'CFFEX': ['IF', 'TF', 'IO', 'T', 'TS', 'IH', 'IC'],
                 'DCE': ['c', 'cs', 'j', 'jd', 'a', 'b', 'm', 'm_Opt', 'y', 'p', 'l', 'v', 'jm', 'i', 'fb', 'bb', 'pp'],
                 'CZCE': ['ER', 'RO', 'WS', 'WT', 'WH', 'PM', 'CF', 'CY', 'SR', 'SR_Opt', 'TA', 'OI', 'RI', 'ME', 'FG',
                          'RS', 'RM', 'TC', 'JR', 'LR', 'MA', 'SM', 'SF', 'ZC', 'AP'],
                 'INE': ['sc',],
-                'SGX': ['fef', 'iolp', 'ckc'], \
+                'SGX': ['fef', 'iolp', 'iac'], \
                 'LME': ['lsc', 'lsr',], \
                 'NYMEX': ['nhr', ],}
 
@@ -140,9 +140,10 @@ CHN_Stock_Exch = {
             "000005", "000006", "11000031", "11000036", "10000036"],
     'SZE': ['399001', '399004', '399007']}
 
-option_market_products = ['Stock_Opt', 'ETF_Opt', 'IO', 'm_Opt', 'SR_Opt']
+option_market_products = ['Stock_Opt', 'ETF_Opt', 'IO', 'm_Opt', 'SR_Opt', 'cu_Opt']
 
 night_session_markets = {'cu': 1,
+                         'cu_Opt': 1,
                          'al': 1,
                          'zn': 1,
                          'pb': 1,
@@ -191,6 +192,7 @@ bar_shift_table1 = {1: [(1630, -15), (1800, -120)],
                     }
 product_lotsize = {'zn': 5,
                    'cu': 5,
+                   'cu_Opt': 5,
                    'ru': 10,
                    'rb': 10,
                    'fu': 50,
@@ -253,6 +255,7 @@ product_lotsize = {'zn': 5,
 
 product_ticksize = {'zn': 5,
                     'cu': 10,
+                    'cu_Opt': 1,
                     'ru': 5,
                     'rb': 1,
                     'fu': 1,
@@ -519,7 +522,7 @@ def get_opt_name(fut_inst, otype, strike):
     exch = inst2exch(instID)
     if instID[:2] == "IF":
         instID = instID.replace('IF', 'IO')
-    if exch == 'CZCE':
+    if exch in ['CZCE', 'SHFE']:
         instID = instID + otype + str(int(strike))
     else:
         instID = instID + '-' + otype + '-' + str(int(strike))
@@ -554,6 +557,8 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
         else:
             expiry_month = datetime.date(cont_yr - 1, 11, 30)
         expiry = workdays.workday(expiry_month, 5, CHN_Holidays)
+    elif fut_inst[:2] == 'cu' or exch == 'SHFE':
+        expiry = workdays.workday(expiry_month, -5, CHN_Holidays)
     elif fut_inst[:3] == 'fef' or exch == 'SGX':
         if cont_mth < 12:
             expiry_month = datetime.date(cont_yr, cont_mth + 1, 1)
@@ -562,13 +567,14 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
         expiry = workdays.workday(expiry_month, -1, PLIO_Holidays)
     return datetime.datetime.combine(expiry, datetime.time(15, 0))
 
-def nearby(prodcode, n = 1, start_date = None, end_date = None, roll_rule = '-20b', freq = 'd', need_shift=False, database = None):
-    if start_date > end_date:
-        return None
+def cont_expiry_list(prodcode, start_date, end_date, roll_rule = '-0d'):
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
-    contlist = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, roll_rule[1:]))
+    contlist, tenor_list = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, roll_rule[1:]))
     exp_dates = [day_shift(contract_expiry(cont), roll_rule) for cont in contlist]
-    # print contlist, exp_dates
+    return contlist, exp_dates, tenor_list
+
+def nearby(prodcode, n = 1, start_date = None, end_date = None, roll_rule = '-20b', freq = 'd', need_shift=False, database = None):
+    contlist, exp_dates, _ = cont_expiry_list(prodcode, start_date, end_date, roll_rule)
     sdate = start_date
     is_new = True
     dbconf = copy.deepcopy(dbaccess.dbconfig)
@@ -628,9 +634,8 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
     cont = str(out[0][1])
     cont_mth = [month_code_map[c] for c in cont]
     cnx.close()
-    contlist = contract_range(product, exch, cont_mth, start_date, end_date)
+    contlist, _ = contract_range(product, exch, cont_mth, start_date, end_date)
     exp_dates = [day_shift(contract_expiry(cont), cont_roll) for cont in contlist]
-    # print contlist, exp_dates
     sdate = start_date
     all_data = {}
     i = 0
@@ -740,6 +745,7 @@ def cont_date_expiry(cont_date, exch):
 def contract_range(product, exch, cont_mth, start_date, end_date):
     st_year = start_date.year
     cont_list = []
+    tenor_list = []
     for yr in range(st_year, end_date.year + 2):
         for mth in range(1, 13):
             if (mth in cont_mth):
@@ -748,24 +754,9 @@ def contract_range(product, exch, cont_mth, start_date, end_date):
                         contLabel = product + "%01d" % (yr % 10) + "%02d" % mth
                     else:
                         contLabel = product + "%02d" % (yr % 100) + "%02d" % mth
+                    tenor_list.append(datetime.date(yr, mth, 1))
                     cont_list.append(contLabel)
-    return cont_list
-
-
-def contract_range2(product, exch, cont_mth, start_date, end_date):
-    st_year = start_date.year
-    cont_list = []
-    for yr in range(st_year, end_date.year + 2):
-        for mth in range(1, 13):
-            if (mth in cont_mth):
-                if (datetime.date(yr, mth, 1) >= start_date) and (datetime.date(yr, mth, 1) <= end_date):
-                    if exch == 'CZCE' and datetime.date(yr, mth, 1) >= datetime.date(2010, 1, 1):
-                        contLabel = product + "%01d" % (yr % 10) + "%02d" % mth
-                    else:
-                        contLabel = product + "%02d" % (yr % 100) + "%02d" % mth
-                    cont_list.append(contLabel)
-    return cont_list
-
+    return cont_list, tenor_list
 
 def get_asset_tradehrs(asset):
     exch = 'SHFE'

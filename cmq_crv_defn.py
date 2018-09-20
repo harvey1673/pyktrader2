@@ -6,28 +6,36 @@ import datetime
 from dateutil.relativedelta import relativedelta
 COM_Curve_Map = {
     'SGXIRO': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
-                'active_mths': range(1, 13), \
+                'active_mths': range(1, 13), 'roll_rule': '-0d',\
+                'parent_curve': '', 'spotID': 'plt_io62', 'vol_index': 'SGXIRO',\
+                '': '', },
+    'PLATTS62': {'instID': 'fef', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
+                'active_mths': range(1, 13), 'roll_rule': '-0d',\
                 'parent_curve': '', 'spotID': 'plt_io62', 'vol_index': 'SGXIRO',\
                 '': '', },
     'SGXIOLP': {'instID': 'iolp', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
-               'active_mths': range(1, 13), \
+               'active_mths': range(1, 13), 'roll_rule': '-0d',\
                'parent_curve': '', 'spotID': 'plt_lp', 'vol_index': 'SGXIROLP', \
                '': '', },
     'SHFERB': {'instID': 'rb', 'exch': 'SHFE', 'calendar': 'CHN', 'ccy': 'CNY', \
-                'active_mths': [1, 5, 10], \
+                'active_mths': [1, 5, 10], 'roll_rule': '-35b',\
                 'parent_curve': '', 'spotID': 'rb', 'vol_index': 'SHFERB',},
     'SHFEHRC': {'instID': 'hc', 'exch': 'SHFE', 'calendar': 'CHN', 'ccy': 'CNY', \
-                'active_mths': [1, 5, 10], \
+                'active_mths': [1, 5, 10], 'roll_rule': '-35b',\
                 'parent_curve': '', 'spotID': 'hc', 'vol_index': 'SHFEHRC',},
     'DCEIOE': {'instID': 'i', 'exch': 'DCE', 'calendar': 'CHN','ccy': 'CNY', \
-                'active_mths': [1, 5, 9],
+                'active_mths': [1, 5, 9], 'roll_rule': '-35b',
                 'parent_curve': '', 'spotID': 'i', 'vol_index': 'DCEIOE',},
     'DCECOK': {'instID': 'j', 'exch': 'DCE', 'calendar': 'CHN', 'ccy': 'CNY', \
-                'active_mths': [1, 5, 9],
+                'active_mths': [1, 5, 9], 'roll_rule': '-35b',
                 'parent_curve': '', 'spotID': 'j', 'vol_index': 'DCECOK',},
     'LMESCR': {'instID': 'lsc', 'exch': 'LME', 'calendar': 'PLIO', 'ccy': 'USD', \
-                'active_mths': range(1,13),
+                'active_mths': range(1,13), 'roll_rule': '-0d',
                 'parent_curve': '', 'spotID': 'tsi_scrap', 'vol_index': 'LMESCR',},
+    'SGXIAC': {'instID': 'iac', 'exch': 'SGX', 'calendar': 'PLIO', 'ccy': 'USD', \
+                'active_mths': range(1, 13), 'roll_rule': '-0d',\
+                'parent_curve': '', 'spotID': 'PLSQ1032 Index', 'vol_index': 'SGXIRO',\
+                '': '', },
 }
 
 FX_Curve_Map = {
@@ -70,42 +78,14 @@ def lookup_vol_mark(vol_index, market_data, vol_tenor, vol_fields = COMVOL_field
             break
     return volmark
 
-def tenor_expiry(exch, product, tenor, rolldays = 0, field = 'fwd'):
-    expiry = tenor
-    if exch == 'DCE' or exch == 'CZCE':
-        while expiry.month not in [1, 5, 9]:
-            expiry = expiry + relativedelta(months=1)
-        expiry = workdays.workday(expiry - datetime.timedelta(days=1), 10 - rolldays, misc.CHN_Holidays)
-    elif exch == 'CFFEX':
-        while product in ['T', 'TF'] and expiry.month not in [3, 6, 9, 12]:
-            expiry = expiry + relativedelta(months=1)
-        wkday = expiry.weekday()
-        expiry = expiry + datetime.timedelta(days=13 + (11 - wkday) % 7)
-        expiry = workdays.workday(expiry, 1 - rolldays, misc.CHN_Holidays)
-    elif exch == 'SHFE':
-        if product in ['hc', 'rb']:
-            while expiry.month not in [1, 5, 10]:
-                expiry = expiry + relativedelta(months=1)
-        else:
-            while expiry.month not in [1, 5, 9]:
-                expiry = expiry + relativedelta(months=1)
-        expiry = expiry.replace(day=14)
-        expiry = workdays.workday(expiry, 1 - rolldays, misc.CHN_Holidays)
-    elif exch == 'SGX' or exch == 'OTC':
-        expiry = expiry + relativedelta(months=1)
-        expiry = workdays.workday(expiry, -1 - rolldays, misc.PLIO_Holidays)
-    return expiry
-
-def curve_expiry(exch, product, start_date, end_date, rolldays = 0, field = 'fwd'):
-    cont_date = start_date.replace(day = 1)
-    expiry = cont_date
-    cont_list = []
-    while expiry < end_date:
-        expiry = tenor_expiry(exch, product, cont_date, rolldays, field)
-        if expiry >= start_date:
-            cont_list.append((cont_date, expiry))
-        cont_date = cont_date + relativedelta(months = 1)
-    return cont_list
+def lookup_fix_mark(spot_id, market_data, fix_date):
+    fix_quotes = market_data['COMFix'][spot_id]
+    out = None
+    for q in fix_quotes:
+        out = q[1]
+        if q[0] == fix_date:
+            break
+    return out
 
 if __name__ == '__main__':
     pass

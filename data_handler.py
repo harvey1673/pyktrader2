@@ -161,9 +161,9 @@ def bar_conv_func2(min_ts):
         bar_id = int(min_ts/100) * 60 + min_ts % 100
         return bar_id
 
-def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = bar_conv_func2, extra_cols = []):
+def conv_ohlc_freq(mdf, freq, index_col = 'datetime', bar_func = bar_conv_func2, extra_cols = [], group_func = min2daily):
     df = mdf
-    min_func = lambda df: min2daily(df, extra_cols)
+    min_func = lambda df: group_func(df, extra_cols)
     if index_col == None:
         df = df.set_index('datetime')
     if freq in ['d', 'D']:
@@ -328,14 +328,16 @@ def ROC(df, n):
     return pd.Series(M / N, name = 'ROC' + str(n))
 
 #Bollinger Bands
-def BBANDS(df, n, k = 2):
-    MA = pd.Series(df['close'].rolling(n).mean())
-    MSD = pd.Series(df['close'].rolling(n).std())
+def BBANDS(df, n, k = 2, field = 'close'):
+    MA = pd.Series(df[field].rolling(n).mean(), name = 'MA_' + field.upper() + '_' + str(n))
+    MSD = pd.Series(df[field].rolling(n).std())
     b1 = 2 * k * MSD / MA
     B1 = pd.Series(b1, name = 'BollingerB' + str(n))
-    b2 = (df['close'] - MA + k * MSD) / (2 * k * MSD)
+    b2 = (df[field] - MA + k * MSD) / (2 * k * MSD)
     B2 = pd.Series(b2, name = 'Bollingerb' + str(n))
-    return pd.concat([B1,B2], join='outer', axis=1)
+    UB = pd.Series(MA + k * MSD, name = 'BollingerU_' + str(n))
+    LB = pd.Series(MA - k * MSD, name = 'BollingerL_' + str(n))
+    return pd.concat([B1, B2, MA, UB, LB], join='outer', axis=1)
 
 #Pivot Points, Supports and Resistances
 def PPSR(df):

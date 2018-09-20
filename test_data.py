@@ -416,5 +416,29 @@ def sina_fut_hist(ticker, daily=True, proxies={}):
     result = json.loads(raw)
     return result
 
+def process_min_id(df):
+    df['min_id'] = df['datetime'].apply(lambda x: ((x.hour + 6) % 24)*100 + x.minute)
+    flag = df['min_id'] >= 1000
+    df.loc[flag, 'date'] = df['datetime'][flag].apply(lambda x: x.date())
+    df['date'] = df['date'].fillna(method = 'bfill')
+    flag = pd.isnull(df['date'])
+    df.loc[flag,'date'] = df['datetime'][flag].apply(lambda x: misc.day_shift(x.date(),'1b'))
+    return df
+
+def process_trade_date(cnx, db_table = 'fut_min', col_name = 'instID'):
+    stmt = 'select distinct({colname}) from {dbtable}'.format(colname=col_name, dbtable=db_table)
+    cursor = cnx.cursor()
+    cursor.execute(stmt)
+    inst_list = []
+    for line in cursor:
+        inst_list.append(str(line[0]))
+    for inst in inst_list:
+        print "processing instID = %s" % inst
+        df = dbaccess.load_min_data_to_df(cnx, db_table, inst, index_col=None)
+        df['datetime'] = df['datetime'].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S"))
+        df = process_min_id(df)
+        df.to_sql('fut_min', cnx, 'sqlite', if_exists='append', index=False)
+
+
 if __name__ == '__main__':
     print

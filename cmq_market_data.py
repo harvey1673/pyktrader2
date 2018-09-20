@@ -54,7 +54,8 @@ def comdv_db_loader(market_data, fwd_index, dep_tenors = [], spd_key = 'DV1'):
 
 def comfix_db_loader(market_data, spotID, dep_tenors = []):
     cnx = dbaccess.connect(**dbaccess.dbconfig)
-    df = dbaccess.load_daily_data_to_df(cnx, 'spot_daily', spotID, min(dep_tenors), max(dep_tenors), index_col = None, field='spotID')
+    spot_id, tab_name = spotID.split('.')
+    df = dbaccess.load_daily_data_to_df(cnx, tab_name, spot_id, min(dep_tenors), max(dep_tenors), index_col = None, field='spotID')
     if len(df) > 0 and isinstance(df['date'][0], basestring):
         df['date'] = df['date'].apply(lambda x: datetime.datetime.strptime(x,"%Y-%m-%d %H:%M:%S").date())
     return df[['date', 'close']].values.tolist()
@@ -102,16 +103,17 @@ def process_BOM(market_data, mkt_deps):
             fwd_quotes = market_data['COMFwd'][fwd_idx]
             if (fwd_quotes[0][0] < mdate):
                 spotID = crv_info['spotID']
+                if spotID == crv_info['instID']:
+                    spotID = spotID + '.fut_daily'
+                else:
+                    spotID = spotID + '.spot_daily'
                 if spotID not in mkt_deps['COMFix']:
                     continue
                 hols = getattr(misc, crv_info['calendar'] + '_Holidays')
                 bzdays = workdays.networkdays(fwd_quotes[0][0], fwd_quotes[0][1], hols)
-                spotID = crv_info['spotID']
-                past_fix = [ quote[1] for quote in market_data['COMFix'][spotID] if quote[0] <= mdate]
+                past_fix = [ quote[1] for quote in market_data['COMFix'][spotID] if (quote[0] <= mdate) and (quote[0] >= fwd_quotes[0][0])]
                 if bzdays > len(past_fix):
                     fwd_quotes[0][2] = (fwd_quotes[0][2] * bzdays - sum(past_fix))/(bzdays - len(past_fix))
-                else:
-                    fwd_quotes[0][2] = 0
 
 def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'EOD', is_eod = True):
     if region == 'EOD':
@@ -125,6 +127,7 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'EOD
         mkt_db = dbaccess.mktsnap_dbconfig
         market_date = value_date
         market_key = market_date.strftime('%Y-%m-%d') + '_' + region
+    print market_key, market_date, region, is_eod
     market_data = {'value_date': value_date, 'market_date': market_date, 'market_key': market_key, 'market_db': mkt_db,}
     for field in mkt_deps:
         if field == 'COMFwd':
@@ -167,6 +170,7 @@ def load_market_data(mkt_deps, value_date = datetime.date.today(), region = 'EOD
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx], field[3:])
             else:
                 market_data[field][crv_idx] = mkt_loader(market_data, crv_idx, mkt_deps[field][crv_idx])
+
     process_BOM(market_data, mkt_deps)
     return market_data
 

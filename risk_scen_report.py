@@ -10,9 +10,9 @@ import cmq_risk_engine
 import multiprocessing as mp
 
 def run_book_report(value_date, book, req_greeks = ['cmdelta', 'cmgamma', 'cmvega_atm', 'theta'], \
-                    base_mkt = {}):
+                    base_mkt = {}, region = 'EOD'):
     if len(base_mkt) == 0:
-        mkt_data = cmq_market_data.load_market_data(book.mkt_deps, value_date = value_date)
+        mkt_data = cmq_market_data.load_market_data(book.mkt_deps, value_date = value_date, region = region)
     else:
         mkt_data = base_mkt
     re = cmq_risk_engine.CMQRiskEngine(book, mkt_data, req_greeks)
@@ -23,6 +23,7 @@ def run_book_report(value_date, book, req_greeks = ['cmdelta', 'cmgamma', 'cmveg
         if deal.positions[0][0].inst_type in ["ComEuroOption", 'ComMthAsian']:
             deal_id = deal.id
             deal_results[deal_id] = {}
+            deal_results[deal_id]['internal_id'] = deal.internal_id
             deal_results[deal_id]['strike'] = deal.positions[0][0].strike
             deal_results[deal_id]['otype'] = deal.positions[0][0].otype
             deal_results[deal_id]['end'] = deal.positions[0][0].end
@@ -36,18 +37,23 @@ def run_book_report(value_date, book, req_greeks = ['cmdelta', 'cmgamma', 'cmveg
                     deal_results[deal_id][greek] = re.deal_risks[deal_id][greek]
 
     df = pd.DataFrame.from_dict(deal_results, orient='index')
-    volume = pd.pivot_table(df, values='volume', index=['fwd_idx', 'end'], columns=['otype', 'strike']).fillna(0)
-    delta = pd.pivot_table(df, values = 'cmdelta', index=['fwd_idx', 'end'], columns=['otype', 'strike']).fillna(0)
-    gamma = pd.pivot_table(df, values='cmgamma', index=['fwd_idx', 'end'], columns=['otype', 'strike']).fillna(0)
-    vega = pd.pivot_table(df, values='cmvega_atm', index=['fwd_idx', 'end'], columns=['otype', 'strike']).fillna(0)
-    theta = pd.pivot_table(df, values='theta', index=['end'], columns=['otype', 'strike']).fillna(0)
+    volume = pd.pivot_table(df, values='volume', index=['fwd_idx', 'end'], \
+                            columns=['otype', 'strike'], aggfunc=np.sum, margins=True).fillna(0)
+    delta = pd.pivot_table(df, values = 'cmdelta', index=['fwd_idx', 'end'], \
+                           columns=['otype', 'strike'], aggfunc=np.sum, margins=True).fillna(0)
+    gamma = pd.pivot_table(df, values='cmgamma', index=['fwd_idx', 'end'], \
+                           columns=['otype', 'strike'], aggfunc=np.sum, margins=True).fillna(0)
+    vega = pd.pivot_table(df, values='cmvega_atm', index=['fwd_idx', 'end'], \
+                          columns=['otype', 'strike'], aggfunc=np.sum, margins=True).fillna(0)
+    theta = pd.pivot_table(df, values='theta', index=['end'], \
+                           columns=['otype', 'strike'], aggfunc=np.sum, margins=True).fillna(0)
     return volume, delta, gamma, vega, theta, df
 
 def run_book(value_date, book, req_greeks = ['cmdelta', 'cmgamma', 'cmvega_atm', 'theta'], \
-                    base_mkt = {}):
+                    base_mkt = {}, region = 'EOD'):
     book_obj = get_book(book)
     if len(base_mkt) == 0:
-        mkt_data = cmq_market_data.load_market_data(book_obj.mkt_deps, value_date = value_date)
+        mkt_data = cmq_market_data.load_market_data(book_obj.mkt_deps, value_date = value_date, region = region)
     else:
         mkt_data = base_mkt
     re = cmq_risk_engine.CMQRiskEngine(book_obj, mkt_data, req_greeks)
@@ -57,9 +63,9 @@ def run_book(value_date, book, req_greeks = ['cmdelta', 'cmgamma', 'cmvega_atm',
 def book_greek_scen_report(value_date, book, \
                     req_greeks = ['pv', 'theta', 'cmdelta', 'cmgamma', 'cmvega_atm'], \
                     scens = ['COMFwd', [- 5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0], 0], \
-                    base_mkt = {}, use_pool = False):
+                    base_mkt = {}, region = 'EOD', use_pool = False):
     if len(base_mkt) == 0:
-        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date)
+        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date, region = region)
     output = {}
     if use_pool:
         num_cpus = mp.cpu_count() - 1
@@ -91,9 +97,9 @@ def book_greek_scen_report(value_date, book, \
 def greek_ladder_report(value_date, book, \
                         req_greeks = ['cmdeltas', 'cmgammas', 'cmvegas_atm'], \
                         scens = ['COMFwd', [-0.05, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.05], 1],\
-                        base_mkt = {}, use_pool = False):
+                        base_mkt = {}, region = 'EOD', use_pool = False):
     if len(base_mkt) == 0:
-        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date)
+        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date, region = region)
     output = dict([(greek, {}) for greek in req_greeks])
     if use_pool:
         num_cpus = mp.cpu_count() - 1
@@ -133,9 +139,9 @@ def greek_ladder_report(value_date, book, \
 def scenario_2d_report(value_date, book, greeks, \
         scens = [['COMFwd', 'SGXIRO', [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0], 0], \
                 ['COMVolATM', 'SGXIRO', [-0.02, -0.01, 0.0, 0.01, 0.02], 0]],\
-                base_mkt = {}):
+                base_mkt = {}, region = 'EOD'):
     if len(base_mkt) == 0:
-        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date)
+        base_mkt = cmq_market_data.load_market_data(book.mkt_deps, value_date=value_date, region = region)
     res = {}
     for greek in greeks:
         output = {}
@@ -160,8 +166,8 @@ def scenario_2d_report(value_date, book, greeks, \
 def get_book(book_name, strategy = '', trade_dbtable = 'trade_data'):
     return cmq_book.get_book_from_db(book_name, strategy, [2,], trade_dbtable)
 
-def get_market(book, today):
-    return cmq_market_data.load_market_data(book.mkt_deps, value_date = today, is_eod = True)
+def get_market(book, today, region = 'EOD'):
+    return cmq_market_data.load_market_data(book.mkt_deps, value_date = today, is_eod = True, region = region)
 
 def get_engine(book, mkt, greeks):
     return cmq_risk_engine.CMQRiskEngine(book, mkt, greeks)

@@ -48,7 +48,7 @@ class CMQInstrument(object):
     def __init__(self, inst_data, market_data = {}, model_settings={}):
         self.id = '_'.join([self.__class__.__name__] + [ str(inst_data.get(key, self.class_params[key])) for key in self.inst_key])
         self.eod_flag = False
-        self.cmdelta_shift = 0.0001
+        self.cmdelta_shift = 0.01
         self.cmdelta_type = CurveShiftType.Abs
         self.cmvega_shift = 0.005
         self.cmvega_type = CurveShiftType.Abs

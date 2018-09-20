@@ -104,6 +104,8 @@ def BSFwd( IsCall, Fwd, Strike, Vol, Texp, ir):
         else:
             return 0.
     df = exp(-ir * Texp)
+    if (Texp <= 0) or ( Vol <= 0):
+        return df * max((Fwd-Strike)*(1 if IsCall else -1), 0)
     if IsCall:
         return df * (Fwd  * cnorm( fd1( Fwd, Strike, Vol, Texp ) ) \
              - Strike * cnorm( fd2( Fwd, Strike, Vol, Texp ) ))
