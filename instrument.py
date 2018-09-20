@@ -291,7 +291,7 @@ class StockOptionInst(OptionInst):
 class FutOptionInst(OptionInst):
     def __init__(self,name):    
         OptionInst.__init__(self, name)
-        if self.exchange != 'CFFEX':
+        if self.exchange not in ['CFFEX', 'SHFE']:
             self.pricer_func = pyktlib.AmericanFutPricer
             self.pricer_param = [AMERICAN_OPTION_STEPS]
             self.margin_param = [0.15, 0.1]
@@ -304,11 +304,24 @@ class FutOptionInst(OptionInst):
     def initialize(self):
         self.ptype = ProductType.Option
         self.product = inst2product(self.name)
-        if (self.product[-3:] == 'Opt') and (self.product[:-4] in product_code['CZCE']):
-            self.underlying = str(self.name[:5])
-            self.otype = str(self.name[5])
-            self.cont_mth = int(self.underlying[-3:]) + 201000
-            self.strike = float(self.name[6:])
+        if (self.product[-3:] == 'Opt') and ((self.product in product_code['CZCE']) \
+                                             or (self.product in product_code['SHFE'])):
+            if (self.product in product_code['CZCE']):
+                idx = 5
+            else:
+                idx = 6
+            self.underlying = str(self.name[:idx])
+            self.otype = str(self.name[idx])
+            if idx == 5:
+                cmth = int(self.underlying[-3:])
+                if cmth < 800:
+                    cmth = cmth + 202000
+                else:
+                    cmth = cmth + 201000
+            else:
+                cmth = int(self.underlying[-4:]) + 200000
+            self.cont_mth = cmth
+            self.strike = float(self.name[(idx+1):])
             self.product = str(self.name[:2])
             self.expiry = get_opt_expiry(self.underlying, self.cont_mth)
         else:
