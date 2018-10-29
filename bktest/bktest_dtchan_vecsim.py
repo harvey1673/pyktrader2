@@ -55,20 +55,20 @@ class DTChanSim(StratSim):
             tr= pd.concat([xdf.high - xdf.low, abs(xdf.close - xdf.close.shift(1))], 
                           join='outer', axis=1).max(axis=1)
         elif self.win == 0:
-            tr = pd.concat([(pd.rolling_max(xdf.high, 2) - pd.rolling_min(xdf.close, 2)) * self.multiplier, 
-                            (pd.rolling_max(xdf.close, 2) - pd.rolling_min(xdf.low, 2)) * self.multiplier,
+            tr = pd.concat([(xdf.high.rolling(2).max() - xdf.close.rolling(2).min()) * self.multiplier,
+                            (xdf.close.rolling(2).max() - xdf.low.rolling(2).min()) * self.multiplier,
                             xdf.high - xdf.close, 
                             xdf.close - xdf.low], 
                             join='outer', axis=1).max(axis=1)
         else:
-            tr= pd.concat([pd.rolling_max(xdf.high, self.win) - pd.rolling_min(xdf.close, self.win), 
-                            pd.rolling_max(xdf.close, self.win) - pd.rolling_min(xdf.low, self.win)], 
+            tr= pd.concat([xdf.high.rolling(self.win).max() - xdf.close.rolling(self.win).min(),
+                            xdf.close.rolling(self.win).max() - xdf.low.rolling(self.win).min()],
                             join='outer', axis=1).max(axis=1)
         xdf['tr'] = tr
         xdf['chan_h'] = self.chan_high(xdf, self.chan, **self.chan_func['high']['args'])
         xdf['chan_l'] = self.chan_low(xdf, self.chan, **self.chan_func['low']['args'])
         #xdf['atr'] = dh.ATR(xdf, self.machan)
-        xdf['ma'] = pd.rolling_mean(xdf.close, max(self.machan, 1))
+        xdf['ma'] = xdf.close.rolling(max(self.machan, 1)).mean()
         xdf['rng'] = pd.DataFrame([self.min_rng * xdf['open'], self.k * xdf['tr'].shift(1)]).max()
         xdf['upper'] = xdf['open'] + xdf['rng'] * (1 + ((xdf['open'] < xdf['ma'].shift(1)) & self.use_chan) *self.f)
         xdf['lower'] = xdf['open'] - xdf['rng'] * (1 + ((xdf['open'] > xdf['ma'].shift(1)) & self.use_chan) *self.f)
@@ -134,8 +134,8 @@ def gen_config_file(filename):
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
-    chan_func = {'high': {'func': 'pd.rolling_max', 'args':{}},
-                 'low':  {'func': 'pd.rolling_min', 'args':{}},
+    chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
+                 'low':  {'func': 'dh.DONCH_L', 'args':{}},
                  }
     config = {'capital': 10000,              
               'use_chan': True,

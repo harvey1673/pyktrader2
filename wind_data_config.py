@@ -28,4 +28,9 @@ commod_index_list = [
 spot_daily_list = [
     ('S0033507', 'coke_ts', 'Coke Tangshan'),
     ('S5705055', 'coke_changzhi', 'Coke Changzhi'),
+    ('S5700017', 'scrap_ts', 'Scrap Tangshan'),
+    ('S5705443', 'scrap_sh', 'Scrap Shanghai'),
+    ('S5700021', 'scrap_bj', 'Scrap Beijing'),
+    ('S5700022', 'scrap_jinan', 'Scrap Jinan'),
+    ('S5705445', 'scrap_Taian', 'Scrap Taian'),
 ]

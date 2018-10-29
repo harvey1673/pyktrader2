@@ -39,7 +39,8 @@ def load_symbol(symbol, field_list, start_date, end_date, freq = 'd',
 def save_hist_data(start_date, end_date,
                    index_list = [],
                    product_codes=[],
-                   spot_list = []):
+                   spot_list = [],
+                   min_bar = False):
     conn = dbaccess.connect(**dbaccess.dbconfig)
     tday = datetime.date.today()
     for symbol, cmd_idx, desc in index_list:
@@ -65,13 +66,14 @@ def save_hist_data(start_date, end_date,
                     ddf['instID'] = cont
                     ddf['exch'] = exch
                     ddf.to_sql('fut_daily', conn, 'sqlite', if_exists='append', index=False)
-                mdf = load_symbol(symbol, ['open', 'high', 'low', 'close', 'volume', 'oi'], max(exp - datetime.timedelta(days = 400),start_date), min(exp, tday), freq='m')
-                if len(mdf) > 0:
-                    print "saving min data for instID = %s with number of data pts = %s" % (cont, len(mdf))
-                    mdf['instID'] = cont
-                    mdf['exch'] = exch
-                    mdf = process_min_id(mdf)
-                    mdf.to_sql('fut_min', conn, 'sqlite', if_exists='append', index=False)
+                if min_bar:
+                    mdf = load_symbol(symbol, ['open', 'high', 'low', 'close', 'volume', 'oi'], max(exp - datetime.timedelta(days = 400),start_date), min(exp, tday), freq='m')
+                    if len(mdf) > 0:
+                        print "saving min data for instID = %s with number of data pts = %s" % (cont, len(mdf))
+                        mdf['instID'] = cont
+                        mdf['exch'] = exch
+                        mdf = process_min_id(mdf)
+                        mdf.to_sql('fut_min', conn, 'sqlite', if_exists='append', index=False)
     for symbol, spotID, desc in spot_list:
         df = load_symbol(symbol, ['close'], start_date, end_date)
         if len(df)> 0:
@@ -82,14 +84,14 @@ def save_hist_data(start_date, end_date,
 class WindStock():
 
     def getCurrentTime(self):
-        # è·å–å½“å‰æ—¶é—´
+        # »ñÈ¡µ±Ç°Ê±¼ä
         return time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
 
     def AStockHisData(self,symbols,start_date,end_date,step=0):
         '''
-        é€ä¸ªè‚¡ç¥¨ä»£ç æŸ¥è¯¢è¡Œæƒ…æ•°æ®
-        wsdä»£ç å¯ä»¥å€ŸåŠ© WindNavigatorè‡ªåŠ¨ç”Ÿæˆcopyå³å¯ä½¿ç”¨;æ—¶é—´å‚æ•°ä¸è®¾ï¼Œé»˜è®¤å–å½“å‰æ—¥æœŸï¼Œå¯èƒ½æ˜¯éäº¤æ˜“æ—¥æ²¡æ•°æ®;
-        åªæœ‰ä¸€ä¸ªæ—¶é—´å‚æ•°æ—¶ï¼Œé»˜è®¤ä½œä¸ºä¸ºèµ·å§‹æ—¶é—´ï¼Œç»“æŸæ—¶é—´é»˜è®¤ä¸ºå½“å‰æ—¥æœŸï¼›å¦‚è®¾ç½®ä¸¤ä¸ªæ—¶é—´å‚æ•°åˆ™ä¾æ¬¡ä¸ºèµ·æ­¢æ—¶é—´
+        Öğ¸ö¹ÉÆ±´úÂë²éÑ¯ĞĞÇéÊı¾İ
+        wsd´úÂë¿ÉÒÔ½èÖú WindNavigator×Ô¶¯Éú³Écopy¼´¿ÉÊ¹ÓÃ;Ê±¼ä²ÎÊı²»Éè£¬Ä¬ÈÏÈ¡µ±Ç°ÈÕÆÚ£¬¿ÉÄÜÊÇ·Ç½»Ò×ÈÕÃ»Êı¾İ;
+        Ö»ÓĞÒ»¸öÊ±¼ä²ÎÊıÊ±£¬Ä¬ÈÏ×÷ÎªÎªÆğÊ¼Ê±¼ä£¬½áÊøÊ±¼äÄ¬ÈÏÎªµ±Ç°ÈÕÆÚ£»ÈçÉèÖÃÁ½¸öÊ±¼ä²ÎÊıÔòÒÀ´ÎÎªÆğÖ¹Ê±¼ä
         '''
         print(self.getCurrentTime(),": Download A Stock Starting:")
         for symbol in symbols:
@@ -97,9 +99,9 @@ class WindStock():
              try:
                  #stock=w.wsd(symbol,'trade_code,open,high,low,close,volume,amt',start_date,end_date)
                  '''
-                 wsdä»£ç å¯ä»¥å€ŸåŠ© WindNavigatorè‡ªåŠ¨ç”Ÿæˆcopyå³å¯ä½¿ç”¨;
-                 æ—¶é—´å‚æ•°ä¸è®¾ï¼Œé»˜è®¤å–å½“å‰æ—¥æœŸï¼Œå¯èƒ½æ˜¯éäº¤æ˜“æ—¥æ²¡æ•°æ®;
-                 åªæœ‰ä¸€ä¸ªæ—¶é—´å‚æ•°ï¼Œé»˜è®¤ä¸ºèµ·å§‹æ—¶é—´åˆ°æœ€æ–°ï¼›å¦‚è®¾ç½®ä¸¤ä¸ªæ—¶é—´å‚æ•°åˆ™ä¾æ¬¡ä¸ºèµ·æ­¢æ—¶é—´
+                 wsd´úÂë¿ÉÒÔ½èÖú WindNavigator×Ô¶¯Éú³Écopy¼´¿ÉÊ¹ÓÃ;
+                 Ê±¼ä²ÎÊı²»Éè£¬Ä¬ÈÏÈ¡µ±Ç°ÈÕÆÚ£¬¿ÉÄÜÊÇ·Ç½»Ò×ÈÕÃ»Êı¾İ;
+                 Ö»ÓĞÒ»¸öÊ±¼ä²ÎÊı£¬Ä¬ÈÏÎªÆğÊ¼Ê±¼äµ½×îĞÂ£»ÈçÉèÖÃÁ½¸öÊ±¼ä²ÎÊıÔòÒÀ´ÎÎªÆğÖ¹Ê±¼ä
                 '''
                  stock=w.wsd(symbol, "trade_code,open,high,low,close,pre_close,volume,amt,dealnum,chg,pct_chg,vwap, adjfactor,close2,turn,free_turn,oi,oi_chg,pre_settle,settle,chg_settlement,pct_chg_settlement, lastradeday_s,last_trade_day,rel_ipo_chg,rel_ipo_pct_chg,susp_reason,close3, pe_ttm,val_pe_deducted_ttm,pe_lyr,pb_lf,ps_ttm,ps_lyr,dividendyield2,ev,mkt_cap_ard,pb_mrq,pcf_ocf_ttm,pcf_ncf_ttm,pcf_ocflyr,pcf_nflyr,trade_status", start_date,end_date)
                  index_data = pd.DataFrame()
@@ -158,7 +160,7 @@ class WindStock():
                  try:
                     index_data.to_sql('stock_daily_data',engine,if_exists='append');
                  except Exception as e:
-                     #å¦‚æœå†™å…¥æ•°æ®åº“å¤±è´¥ï¼Œå†™å…¥æ—¥å¿—è¡¨ï¼Œä¾¿äºåç»­åˆ†æå¤„ç†
+                     #Èç¹ûĞ´ÈëÊı¾İ¿âÊ§°Ü£¬Ğ´ÈëÈÕÖ¾±í£¬±ãÓÚºóĞø·ÖÎö´¦Àí
                      error_log=pd.DataFrame()
                      error_log['trade_date']=stock.Times
                      error_log['stock_code']=stock.Data[0]
@@ -174,7 +176,7 @@ class WindStock():
                      continue
                  w.start()
              except Exception as e:
-                     #å¦‚æœè¯»å–å¤„ç†å¤±è´¥ï¼Œå¯èƒ½æ˜¯ç½‘ç»œä¸­æ–­ã€é¢‘ç¹è®¿é—®è¢«é™ã€å†å²æ•°æ®ç¼ºå¤±ç­‰åŸå› ã€‚å†™å…¥ç›¸å…³ä¿¡æ¯åˆ°æ—¥å¿—è¡¨ï¼Œä¾¿äºåç»­è¡¥å……å¤„ç†
+                     #Èç¹û¶ÁÈ¡´¦ÀíÊ§°Ü£¬¿ÉÄÜÊÇÍøÂçÖĞ¶Ï¡¢Æµ·±·ÃÎÊ±»ÏŞ¡¢ÀúÊ·Êı¾İÈ±Ê§µÈÔ­Òò¡£Ğ´ÈëÏà¹ØĞÅÏ¢µ½ÈÕÖ¾±í£¬±ãÓÚºóĞø²¹³ä´¦Àí
                      error_log=pd.DataFrame()
                      error_log['trade_date']=stock.Times
                      error_log['stock_code']=stock.Data[0]
@@ -195,7 +197,7 @@ class WindStock():
 
     def getAStockCodesFromCsv(self):
         '''
-        è·å–è‚¡ç¥¨ä»£ç æ¸…å•ï¼Œé“¾æ¥æ•°æ®åº“
+        »ñÈ¡¹ÉÆ±´úÂëÇåµ¥£¬Á´½ÓÊı¾İ¿â
         '''
         file_path=os.path.join(os.getcwd(),'Stock.csv')
         stock_code = pd.read_csv(filepath_or_buffer=file_path, encoding='gbk')
@@ -204,21 +206,21 @@ class WindStock():
 
     def getAStockCodesWind(end_date=time.strftime('%Y%m%d',time.localtime(time.time()))):
         '''
-        é€šè¿‡wsetæ•°æ®é›†è·å–æ‰€æœ‰Aè‚¡è‚¡ç¥¨ä»£ç ï¼Œæ·±å¸‚ä»£ç ä¸ºè‚¡ç¥¨ä»£ç +SZåç¼€ï¼Œæ²ªå¸‚ä»£ç ä¸ºè‚¡ç¥¨ä»£ç +SHåç¼€ã€‚
-        å¦‚è®¾å®šæ—¥æœŸå‚æ•°ï¼Œåˆ™è·å–å‚æ•°æŒ‡å®šæ—¥æœŸæ‰€æœ‰Aè‚¡ä»£ç ï¼Œä¸æŒ‡å®šæ—¥æœŸå‚æ•°åˆ™é»˜è®¤ä¸ºå½“å‰æ—¥æœŸ
-        :return: æŒ‡å®šæ—¥æœŸæ‰€æœ‰Aè‚¡ä»£ç ï¼Œä¸æŒ‡å®šæ—¥æœŸé»˜è®¤ä¸ºæœ€æ–°æ—¥æœŸ
+        Í¨¹ıwsetÊı¾İ¼¯»ñÈ¡ËùÓĞA¹É¹ÉÆ±´úÂë£¬ÉîÊĞ´úÂëÎª¹ÉÆ±´úÂë+SZºó×º£¬»¦ÊĞ´úÂëÎª¹ÉÆ±´úÂë+SHºó×º¡£
+        ÈçÉè¶¨ÈÕÆÚ²ÎÊı£¬Ôò»ñÈ¡²ÎÊıÖ¸¶¨ÈÕÆÚËùÓĞA¹É´úÂë£¬²»Ö¸¶¨ÈÕÆÚ²ÎÊıÔòÄ¬ÈÏÎªµ±Ç°ÈÕÆÚ
+        :return: Ö¸¶¨ÈÕÆÚËùÓĞA¹É´úÂë£¬²»Ö¸¶¨ÈÕÆÚÄ¬ÈÏÎª×îĞÂÈÕÆÚ
         '''
         w.start()
-        #åŠ æ—¥æœŸå‚æ•°å–æœ€æŒ‡å®šæ—¥æœŸè‚¡ç¥¨ä»£ç 
+        #¼ÓÈÕÆÚ²ÎÊıÈ¡×îÖ¸¶¨ÈÕÆÚ¹ÉÆ±´úÂë
         #stockCodes=w.wset("sectorconstituent","date="+end_date+";sectorid=a001010100000000;field=wind_code")
-        #ä¸åŠ æ—¥æœŸå‚æ•°å–æœ€æ–°è‚¡ç¥¨ä»£ç 
+        #²»¼ÓÈÕÆÚ²ÎÊıÈ¡×îĞÂ¹ÉÆ±´úÂë
         stockCodes=w.wset("sectorconstituent","sectorid=a001010100000000;field=wind_code")
         return stockCodes.Data[0]
         #return stockCodes
 
 def main():
     '''
-    ä¸»è°ƒå‡½æ•°ï¼Œå¯ä»¥é€šè¿‡å‚æ•°è°ƒæ•´å®ç°åˆ†æ‰¹ä¸‹è½½
+    Ö÷µ÷º¯Êı£¬¿ÉÒÔÍ¨¹ı²ÎÊıµ÷ÕûÊµÏÖ·ÖÅúÏÂÔØ
     '''
     global engine,sleep_time,symbols
     sleep_time=5
@@ -226,10 +228,10 @@ def main():
     engine = create_engine('mysql://root:root@localhost/invest?charset=utf8')
     #start_date='20100101'
     #end_date='20131231'
-    #symbols=windStock.getAStockCodesFromCsv()#é€šè¿‡æ–‡ä»¶è·å–è‚¡ç¥¨ä»£ç 
+    #symbols=windStock.getAStockCodesFromCsv()#Í¨¹ıÎÄ¼ş»ñÈ¡¹ÉÆ±´úÂë
     #symbols=windStock.getAStockCodesWind()
-    #é€šè¿‡Wind APIè·å–è‚¡ç¥¨ä»£ç ,é»˜è®¤å–æœ€æ–°çš„ï¼Œå¯ä»¥æŒ‡å®šå–å†å²æŸä¸€æ—¥æ‰€æœ‰Aè‚¡ä»£ç 
-    #symbols=['000001.SZ', '000002.SZ', '000004.SZ']#é€šè¿‡ç›´æ¥èµ‹å€¼è·å–è‚¡ç¥¨ä»£ç ç”¨äºæµ‹è¯•
+    #Í¨¹ıWind API»ñÈ¡¹ÉÆ±´úÂë,Ä¬ÈÏÈ¡×îĞÂµÄ£¬¿ÉÒÔÖ¸¶¨È¡ÀúÊ·Ä³Ò»ÈÕËùÓĞA¹É´úÂë
+    #symbols=['000001.SZ', '000002.SZ', '000004.SZ']#Í¨¹ıÖ±½Ó¸³Öµ»ñÈ¡¹ÉÆ±´úÂëÓÃÓÚ²âÊÔ
     #print (symbols)
     #windStock.AStockHisData(symbols,start_date,end_date)
     for i in range(2013,1990,-1):
@@ -244,7 +246,7 @@ def main():
 
 def test():
     '''
-    æµ‹è¯•è„šæœ¬ï¼Œæ–°å¢å’Œä¼˜åŒ–åŠŸèƒ½æ—¶ä½¿ç”¨
+    ²âÊÔ½Å±¾£¬ĞÂÔöºÍÓÅ»¯¹¦ÄÜÊ±Ê¹ÓÃ
     '''
     symbol='000001.SZ'
     start_date='20170101'

@@ -569,7 +569,7 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
 
 def cont_expiry_list(prodcode, start_date, end_date, roll_rule = '-0d'):
     cont_mth, exch = dbaccess.prod_main_cont_exch(prodcode)
-    contlist, tenor_list = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, roll_rule[1:]))
+    contlist, tenor_list = contract_range(prodcode, exch, cont_mth, start_date, day_shift(end_date, '12m'))
     exp_dates = [day_shift(contract_expiry(cont), roll_rule) for cont in contlist]
     return contlist, exp_dates, tenor_list
 
@@ -587,7 +587,6 @@ def nearby(prodcode, n = 1, start_date = None, end_date = None, roll_rule = '-20
         elif sdate > end_date:
             break
         nb_cont = contlist[idx + n - 1]
-
         if freq == 'd':
             new_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, sdate, min(exp, end_date))
         else:
@@ -608,17 +607,22 @@ def nearby(prodcode, n = 1, start_date = None, end_date = None, roll_rule = '-20
             df = new_df
             is_new = False
         else:
-            if need_shift:
+            if need_shift > 0:
                 if isinstance(df.index[-1], datetime.datetime):
                     last_date = df.index[-1].date()
                 else:
                     last_date = df.index[-1]
                 tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_daily', nb_cont, last_date, last_date)
-                shift = tmp_df['close'][-1] - df['close'][-1]
-                for ticker in ['open', 'high', 'low', 'close']:
-                    df[ticker] = df[ticker] + shift
+                if need_shift == 1:
+                    shift = tmp_df['close'][-1] - df['close'][-1]
+                    for ticker in ['open', 'high', 'low', 'close']:
+                        df[ticker] = df[ticker] + shift
+                else:
+                    shift = float(tmp_df['close'][-1])/float(df['close'][-1])
+                    for ticker in ['open', 'high', 'low', 'close']:
+                        df[ticker] = df[ticker] * shift
             df = df.append(new_df)
-        sdate = min(exp, end_date) + datetime.timedelta(days=1)
+        sdate = exp + datetime.timedelta(days=1)
     return df
 
 

@@ -127,11 +127,17 @@ def insert_daily_data(cnx, inst, daily_data, is_replace=False, dbtable='fut_dail
 
 def insert_row_by_dict(cnx, dbtable, rowdict, is_replace=False):
     cursor = cnx.cursor()
-    cursor.execute("describe %s" % dbtable)
-    allowed_keys = set(row[0] for row in cursor.fetchall())
+    if USE_DB_TYPE in ['sqlite3']:
+        cmd = "PRAGMA table_info(%s)"
+        idx = 1
+    else:
+        cmd = "describe %s"
+        idx = 1
+    cursor.execute(cmd % dbtable)
+    allowed_keys = set(row[idx] for row in cursor.fetchall())
     keys = allowed_keys.intersection(rowdict)
     columns = ", ".join(keys)
-    values_template = ", ".join(["%s"] * len(keys))
+    values_template = ", ".join(["?"] * len(keys))
     if is_replace:
         cmd = "REPLACE"
     else:
@@ -313,13 +319,29 @@ def load_min_data_to_df(cnx, dbtable, inst, d_start = None, d_end = None, minid_
     if d_end:
         stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by instID, date, min_id"
-    df = pd.io.sql.read_sql(stmt, cnx, index_col=index_col)
+    df = pd.io.sql.read_sql(stmt, cnx)
+    col_name = 'datetime'
+    if (len(df) > 0) and (isinstance(df[col_name][0], basestring)):
+        df[col_name] = df[col_name].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S"))
+        df['date'] = df['date'].apply(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    if index_col:
+        df = df.set_index(index_col)
     return df
 
 def load_daily_data_to_df(cnx, dbtable, inst, d_start, d_end, index_col='date', field = 'instID', date_as_str = False):
+    if dbtable == 'fut_daily':
+        inst_field = 'instID'
+    elif dbtable == 'spot_daily':
+        inst_field = 'spotID'
+    elif dbtable == 'fx_daily':
+        inst_field = 'ccy'
+    elif dbtable == 'ir_daily':
+        inst_field = 'ir_index'
+    else:
+        print "unknown ="
     stmt = "select {variables} from {table} where {field} like '{instID}' ".format( \
                                     variables=','.join(price_fields[field]),
-                                    table=dbtable, field = field, instID=inst)
+                                    table=dbtable, field = inst_field, instID=inst)
     stmt = stmt + "and date >= '%s' " % d_start.strftime('%Y-%m-%d')
     stmt = stmt + "and date <= '%s' " % d_end.strftime('%Y-%m-%d')
     stmt = stmt + "order by date"

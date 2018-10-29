@@ -83,22 +83,20 @@ def gen_config_file(filename):
     sim_config['sim_class']  = 'bktest.bktest_ma_ribbon.MARibbonSim'
     sim_config['sim_func'] = 'run_vec_sim'
     sim_config['scen_keys'] = ['freq', 'param']
-    sim_config['sim_name']   = 'ribbon_customMA_'
-    sim_config['products']   = ['rb', 'hc', 'i', 'j', 'jm', 'ZC', 'ru', 'ni', 'y', 'p', 'OI', 'm', 'RM', \
-                                'SR', 'CF', 'c', 'cs', 'jd', 'a', 'l', 'pp', 'v', 'TA', 'MA', 'bu', 'cu', 'al', 'zn', \
-                                'ag', 'au', 'IF', 'IH', 'TF', 'T']
-    sim_config['start_date'] = '20160102'
-    sim_config['end_date']   = '20170721'
-    sim_config['freq'] = [1, 3, 5]
-    sim_config['param'] =[[0, 0, 0.02, 0.2], [0, 0, 0.05, 0.2], [0, 0, 0.08, 0.2], [0, 0, 0.1, 0.2],\
-                          [0, 0, 0.02, 0.3], [0, 0, 0.05, 0.3], [0, 0, 0.08, 0.3], [0, 0, 0.1, 0.3],\
-                          [0, 0, 0.02, 0.4], [0, 0, 0.05, 0.4], [0, 0, 0.08, 0.4], [0, 0, 0.1, 0.4],]
+    sim_config['sim_name']   = 'ma_ribbon'
+    sim_config['products']   = ['rb', 'hc']
+    sim_config['start_date'] = '20150901'
+    sim_config['end_date']   = '20180928'
+    sim_config['freq'] = [1, 3, 5, 15]
+    sim_config['param'] =[[0, 0, 0.5, 0.5], [0, 0, 0.05, 0.2], [0, 0, 0.08, 0.2], [0, 0, 0.1, 0.2],\
+                          [0, 0, 0.5, 0.5], [0, 0, 0.05, 0.3], [0, 0, 0.08, 0.3], [0, 0, 0.1, 0.3],\
+                          [0, 0, 0.5, 0.5], [0, 0, 0.05, 0.4], [0, 0, 0.08, 0.4], [0, 0, 0.1, 0.4],]
     sim_config['pos_class'] = 'strat.TradePos'
     sim_config['offset']    = 1
     config = {'capital': 10000,              
               'trans_cost': 0.0,
               'unit': 1,
-              'ma_list': [5] + range(10, 70, 10),
+              'ma_list': [5, 10, 20, 30, 40, 60, 80, 120, 160],
               'stoploss': 0.0,
               'close_daily': False,
               'pos_update': False,

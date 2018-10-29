@@ -35,8 +35,8 @@ def fd2(Fwd,K,Vol,T):
     return log(float(Fwd)/K)/Vol/sqrt(T) - Vol*sqrt(T)/2.
     
 def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rd, Rf):
-    x1 = d1(S, K, Vol, Texp, Rd, Rf )
-    x2 = d2(S, K, Vol, Texp, Rd, Rf )
+    x1 = cnorm(d1(S, K, Vol, Texp, Rd, Rf ))
+    x2 = cnorm(d2(S, K, Vol, Texp, Rd, Rf ))
     y = pnorm(x1)
     res = {}
 
@@ -49,6 +49,36 @@ def BlackSholesFormula(IsCall, S, K, Vol, Texp, Rd, Rf):
     res['Vega'] = S * sqrt(Texp) * y * exp(-Rf*Texp)
     res['Gamma'] = y * exp(-Rf*Texp)/(S*Vol* sqrt(Texp))
     return res
+
+def LookbackFltStrike(IsCall, S, strike, Vol, Texp, Rd, Rf, mflag = 'd'):
+    if IsCall and (strike > S):
+        raise ValueError('Lookback call need strike is less than S')
+    elif (not IsCall) and (strike < S):
+        raise ValueError('Lookback put need strike is less than S')
+    if IsCall:
+        call_flag = 1.0
+    else:
+        call_flag = -1.0
+    if Texp <= 0:
+        return (S - strike) * call_flag
+    if mflag in ['d', 'D']:
+        discreteAdj = exp(0.5826 * Vol/sqrt(252.0) * call_flag)
+    else:
+        discreteAdj = 1.0
+    strike = strike/discreteAdj
+    df = exp(-Rd * Texp)
+    dd = exp(-Rf * Texp)
+    fd1 = d1(S, strike, Vol, Texp, Rd, Rf)
+    fd2 = d2(S, strike, Vol, Texp, Rd, Rf)
+    fd3 = fd1 - 2 * (Rd - Rf) * sqrt(Texp)/Vol
+    beta = 2 * (Rd - Rf) / (Vol * Vol)
+    val = call_flag * (S * dd * cnorm(fd1*call_flag) - strike * df * cnorm(fd2*call_flag))
+    if abs(Rd - Rf) >= 1e-4:
+        val -= call_flag * S/beta * ( dd * cnorm(-fd1*call_flag) - df * ((strike/S)**beta) * cnorm(-fd3*call_flag))
+    else:
+        val += S * df * Vol * sqrt(Texp) * (pnorm(-fd1*call_flag) - call_flag * fd1 * cnorm(-fd1*call_flag))
+    val = val * discreteAdj - call_flag * (discreteAdj - 1) * S
+    return val
 
 def KirkApprox(IsCall, F1, F2, Sigma1, Sigma2, Corr, K, Texp, r):
     FA = F1/(F2+K)

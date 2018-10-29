@@ -294,7 +294,7 @@ def smavar(df, n, field = 'close'):
 
 #Exponential Moving Average
 def EMA(df, n, field = 'close'):
-    return pd.Series(talib.EMA(df[field].values, n), name = 'EMA_' + field.upper() + '_' + str(n), index = df.index)
+    return pd.Series(talib.EMA(df[field].astype('f8').values, n), name = 'EMA_' + field.upper() + '_' + str(n), index = df.index)
 
 def ema(df, n, field =  'close'):    
     key = 'EMA_' + field.upper() + '_' + str(n)

@@ -59,16 +59,16 @@ def test_run():
     fwds = df['fwd'].values
     vols = df['vol'].values
     exp_dates = df['expiry'].values
-    start_date = 43228
-    end_date = exp_dates[-1]
+    start_date = 43362.0
+    end_date = float(exp_dates[-1])
     accr = 365.0
-    opt_strikes = [63.5, 45.25]
-    opt_weights = [-1.0, 2.5]
+    opt_strikes = [66, 51.5]
+    opt_weights = [-1.0, 2.0]
     pt_list = [1, 5, 10, 25, 50, 75, 90, 95, 99]
     fwd_path = generate_1f_path(fwds, vols, exp_dates, num_steps, num_paths, \
                                 start_date, end_date, a = 1, b = 0, accr = accr)
     opt_vals = calc_port_values(fwd_path, fwds, vols, exp_dates, start_date, end_date, \
-                     opt_strikes = opt_strikes, a=1, b=0, ir=0.02, accr=accr)
+                     opt_strikes = opt_strikes, a=1, b=0, ir=0.025, accr=accr)
     num_steps += 1
     port_vals = np.zeros((num_steps, num_paths))
 
@@ -86,7 +86,7 @@ def test_run():
     fwd_pct = np.reshape(fwd_pct, (-1, len(pt_list)))
     port_pct = np.reshape(port_pct, (-1, len(pt_list)))
     df = pd.DataFrame(fwd_pct, columns = ['fwd_' + str(p) for p in pt_list])
-    writer = pd.ExcelWriter('C:\\dev\\data\\Tacora_port.xlsx')
+    writer = pd.ExcelWriter('C:\\dev\\data\\Tacora_port_180919.xlsx')
     df.to_excel(writer, 'fwd')
     df = pd.DataFrame(port_pct, columns = ['port_' + str(p) for p in pt_list])
     df.to_excel(writer, 'port')

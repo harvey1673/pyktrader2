@@ -2,20 +2,13 @@ import os,sys,inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
-
-import misc
-import json
 import data_handler as dh
-import pandas as pd
-import numpy as np
-import trade_position
-import datetime
 from backtest import *
-import sys
+import trade_position
 
-class MASystemSim(StratSim):
+class MACrossSim(StratSim):
     def __init__(self, config):
-        super(MASystemSim, self).__init__(config)
+        super(MACrossSim, self).__init__(config)
 
     def process_data(self, mdf):
         self.df = mdf
@@ -47,10 +40,7 @@ class MASystemSim(StratSim):
         self.low_args = config['channel_args'][1]
 
     def run_vec_sim(self):
-        if int(self.freq[:-3]) == 1:
-            xdf = self.df
-        else:
-            xdf = dh.conv_ohlc_freq(self.df, self.freq, extra_cols=['contract'])
+        xdf = dh.conv_ohlc_freq(self.df, self.freq, extra_cols=['contract'])
         for idx, win in enumerate(self.win_list):
             xdf['MA'+str(idx+1)] = self.ma_func(xdf, win).shift(1)
         if self.use_chan:
@@ -80,6 +70,7 @@ class MASystemSim(StratSim):
         short_flag = (xdf['MA1'] <= xdf['MA2']) & (xdf['MA1'] <= xdf['MA'+str(last)])
         if self.use_chan:
             short_flag = short_flag & (xdf['open'] <= xdf['chan_low'])
+        short_signal[short_flag] = -1
         cover_flag = (xdf['MA1'] > xdf['MA'+str(last)])
         if self.use_chan:
             cover_flag = cover_flag | (xdf['open'] > xdf['chan_low'])
@@ -98,14 +89,14 @@ class MASystemSim(StratSim):
 
 def gen_config_file(filename):
     sim_config = {}
-    sim_config['sim_func']  = 'bktest_MA_system.MA_sim'
+    sim_config['sim_func']  = 'run_vec_sim'
+    sim_config['sim_class'] = 'bktest.bktest_ma_cross.MACrossSim'
     sim_config['scen_keys'] = ['freq', 'win_list']
     sim_config['sim_name']   = 'EMA3_025'
     sim_config['products']   = ['rb', 'i', 'j']
-    sim_config['start_date'] = '20150102'
-    sim_config['end_date']   = '20160708'
-    sim_config['need_daily'] = False
-    sim_config['freq'] = ['30min', '60min']
+    sim_config['start_date'] = '20150901'
+    sim_config['end_date']   = '20180928'
+    sim_config['freq'] = ['15min', '30min', '60min', '120min']
     sim_config['win_list'] = [ [5,  10, 20], [5, 10, 40], [5, 20, 40], [5, 20, 80], \
                              [10, 20, 40], [10, 20, 80],[10, 30, 60],[10, 30, 120],\
                              [10, 40, 80], [10, 40, 120],\
@@ -119,11 +110,11 @@ def gen_config_file(filename):
               'stoploss': 0.0,
               'close_daily': False,
               'pos_update': False,
-              'MA_func': 'dh.EMA',
+              'ma_func': 'dh.EMA',
               'channel_func': ['dh.DONCH_H', 'dh.DONCH_L'],
               'channel_args': [{}, {}],
               'channel_ratio': 0.25,
-              'exit_min': 2055,
+              'exit_min': 2058,
               'pos_args': {},
               }
     sim_config['config'] = config

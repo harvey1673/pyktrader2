@@ -10,7 +10,7 @@ import trade_position
 import dbaccess
 import misc
 import platform
-import mysql_helper
+#import mysql_helper
 
 sim_margin_dict = { 'au': 0.06, 'ag': 0.08, 'cu': 0.07, 'al':0.05,
                 'zn': 0.06, 'rb': 0.06, 'ru': 0.12, 'a': 0.05,
@@ -64,7 +64,7 @@ class StratSim(object):
         self.offset = 0
         self.config = config
         self.process_config(config)
-        self.process_data(config['mdf'])
+        self.process_data(config['df'])
         self.positions = []
         self.closed_trades = []
         self.tradeid = 0
@@ -78,7 +78,7 @@ class StratSim(object):
     def process_config(self, config):
         pass
 
-    def process_data(self, mdf):
+    def process_data(self, df):
         pass
 
     def on_bar(self, sim_data, n):
@@ -183,7 +183,7 @@ def simdf_to_trades1(df, slippage = 0):
     tradeid = 0
     pos_list = []
     closed_trades = []
-    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'],
+    for pos, tprice, cont, dtime in zip(xdf['pos'], xdf['traded_price'],
                                               xdf['contract'], xdf.index):
         if (prev_pos * pos >= 0) and (abs(prev_pos) < abs(pos)):
             if len(pos_list) > 0 and (pos_list[-1].pos * (pos - prev_pos) < 0):
@@ -236,7 +236,7 @@ def simdf_to_trades2(df, slippage=0.0):
     tradeid = 0
     pos_list = []
     closed_trades = []
-    for o, c, pos, tprice, cont, dtime in zip(xdf['open'], xdf['close'], xdf['pos'], xdf['traded_price'],
+    for pos, tprice, cont, dtime in zip(xdf['pos'], xdf['traded_price'],
                                               xdf['contract'], xdf.index):
         if (prev_pos * pos >= 0) and (abs(prev_pos) < abs(pos)):
             if len(pos_list) > 0 and (pos_list[-1].pos * (pos - prev_pos) < 0):
@@ -354,7 +354,10 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
         else:
             sum_margin = sum_margin.add(margin, fill_value=0)
         if len(sum_cost) == 0:
-            sum_cost = xdf['cost']
+            if 'cost' in xdf.columns:
+                sum_cost = xdf['cost']
+            else:
+                sum_cost = xdf['close'] * 0.0
         else:
             sum_cost = sum_cost.add(xdf['cost'], fill_value=0)
     if freq == 'm':
@@ -430,6 +433,7 @@ class BacktestManager(object):
         self.sim_class = sim_class
         self.sim_func = sim_config['sim_func']
         self.need_shift = sim_config.get('need_shift', True)
+        self.sim_freq = sim_config.get('sim_freq', 'm')
         self.sim_name = sim_config['sim_name']
         self.set_bktest_env()
         self.dbtable = sim_config.get('dbtable', 'bktest_output')
@@ -437,6 +441,7 @@ class BacktestManager(object):
             self.sim_assets = [[str(asset)] for asset in sim_config['products']]
         else:
             self.sim_assets = sim_config['products']
+        self.sim_by_product = sim_config.get('sim_by_product', [{} for asset in self.sim_assets])
         self.sim_offset = sim_config.get('offset', 0)
         self.sim_mode = sim_config.get('sim_mode', 'OR')
         self.calc_coeffs = sim_config.get('calc_coeffs', [1, -1])
@@ -445,30 +450,32 @@ class BacktestManager(object):
         else:
             self.cont_maplist = [[0]] * len(self.sim_assets)
         self.sim_period = sim_config.get('sim_period', '-12m')
-        self.config = {}
         self.start_date = datetime.datetime.strptime(sim_config['start_date'], '%Y%m%d').date()
         self.end_date = datetime.datetime.strptime(sim_config['end_date'], '%Y%m%d').date()
         scen_dim = [len(sim_config[s]) for s in sim_config['scen_keys']]
         self.scenarios = [list(s) for s in np.ndindex(tuple(scen_dim))]
         self.scen_keys = sim_config['scen_keys']
         self.scen_param = dict([(key, sim_config[key]) for key in self.scen_keys])
+        self.config = {}
         self.config.update(sim_config['config'])
         if 'pos_class' in sim_config:
             self.config['pos_class'] = eval(sim_config['pos_class'])
         if 'proc_func' in sim_config:
             self.config['proc_func'] = eval(sim_config['proc_func'])
+        self.trade_offset_dict = sim_config.get('trade_offset_dict', trade_offset_dict)
+        self.sim_margin_dict = sim_config.get('sim_margin_dict', sim_margin_dict)
         self.start_capital = self.config['capital']
-        self.min_data = {}
+        self.data_store = {}
         self.contlist = {}
         self.exp_dates = {}
-        self.pnl_tenors = ['3m', '6m', '1y', '2y', '3y']
+        self.pnl_tenors = sim_config.get('pnl_tenors', ['3m', '6m', '1y', '2y', '3y'])
 
     def set_bktest_env(self):
         system = platform.system()
         if system == 'Linux':
             folder = '/home/harvey/dev/data/'
         elif system == 'Windows':
-            folder = 'E:\\data\\'
+            folder = 'C:\\dev\\data\\'
         else:
             folder = ''
         file_prefix = folder + self.sim_name + os.path.sep
@@ -479,33 +486,39 @@ class BacktestManager(object):
 
     def set_config(self, idx):
         assets = self.sim_assets[idx]
-        asset = assets[0]
-        if asset in sim_start_dict:
-            self.config['start_date'] = max(sim_start_dict[asset], self.start_date)
-        else:
-            self.config['start_date'] = self.start_date
+        self.config.update(self.sim_by_product[idx])
+        self.config['start_date'] = max([sim_start_dict.get(asset, self.start_date) for asset in assets] + [self.start_date])
         self.config['end_date'] = self.end_date
-        self.config['tick_base'] = sum([trade_offset_dict[prod] for prod in assets])
-        self.config['offset'] = self.sim_offset * self.config['tick_base']
-        max_margin = max([sim_margin_dict[prod] for prod in assets])
-        self.config['marginrate'] = (max_margin, max_margin)
-        self.config['nearby'] = 1
-        self.config['rollrule'] = '-50b'
-        self.config['exit_min'] = 2057
-        self.config['no_trade_set'] = range(300, 301) + range(1500, 1501) + range(2059, 2100) \
-                                                if 'no_trade_set' not in self.config else self.config['no_trade_set']
-        if asset in ['cu', 'al', 'zn']:
-            self.config['nearby'] = 2
-            self.config['rollrule'] = '-1d'
-        elif asset in ['IF', 'IH', 'IC']:
-            self.config['rollrule'] = '-2b'
-            self.config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
-        elif asset in ['au', 'ag']:
-            self.config['rollrule'] = '-25b'
-        elif asset in ['TF', 'T', 'TS']:
-            self.config['rollrule'] = '-20b'
-            self.config['no_trade_set'] = range(1515, 1520) + range(2110, 2115)
-        self.config['no_trade_set'] = []
+        self.config['tick_base'] = [self.trade_offset_dict.get(prod, 0.0) for prod in assets]
+        self.config['offset'] = [self.sim_offset * tbase for tbase in self.config['tick_base']]
+        self.config['marginrate'] = [self.sim_margin_dict.get(prod, 0.0) for prod in assets]
+        self.config['nearby'] = []
+        self.config['rollrule'] = []
+        if self.sim_freq == 'm':
+            self.config['exit_min'] = 2057
+            self.config['no_trade_set'] = []
+        for asset in assets:
+            nb = 1
+            rr = '-40b'
+            if asset in ['cu', 'al', 'zn']:
+                nb = 3
+                rr = '-1b'
+            elif asset in ['IF', 'IH', 'IC']:
+                rr = '-2b'
+            elif asset in ['au', 'ag']:
+                rr = '-25b'
+            elif asset in ['TF', 'T']:
+                rr = '-20b'
+            elif asset in ['ni']:
+                rr = '-40b'
+            self.config['nearby'].append(nb)
+            self.config['rollrule'].append(rr)
+        if len(assets) == 1:
+            self.config['tick_base'] = self.config['tick_base'][0]
+            self.config['offset'] = self.config['offset'][0]
+            self.config['marginrate'] = (self.config['marginrate'][0], self.config['marginrate'][0])
+            self.config['nearby'] = self.config['nearby'][0]
+            self.config['rollrule'] = self.config['rollrule'][0]
 
     def load_curr_results(self, idx):
         asset = self.sim_assets[idx]
@@ -520,10 +533,11 @@ class BacktestManager(object):
     def load_data(self, idx):
         asset = self.sim_assets[idx]
         for prod in asset:
-            mdf = misc.nearby(prod, self.config['nearby'], self.config['start_date'], self.config['end_date'],
-                          self.config['rollrule'], 'm', need_shift = self.need_shift, database=self.config.get('database', 'hist_data'))
-            mdf = misc.cleanup_mindata(mdf, prod)
-            self.min_data[prod] = mdf
+            df = misc.nearby(prod, self.config['nearby'], self.config['start_date'], self.config['end_date'],
+                          self.config['rollrule'], self.sim_freq, need_shift = self.need_shift)
+            if self.sim_freq == 'm':
+                df = misc.cleanup_mindata(df, prod)
+            self.data_store[prod] = df
         #if self.config['need_daily']:
         #    self.config['ddf'] = misc.nearby(asset, self.config['nearby'], self.config['start_date'], self.config['end_date'],
         #                                 self.config['rollrule'], 'd', need_shift=True, database='hist_data')
@@ -532,8 +546,8 @@ class BacktestManager(object):
 
     def prepare_data(self, asset_idx, cont_idx = 0):
         asset = self.sim_assets[asset_idx]
-        self.config['mdf'] = self.min_data[asset[0]]
-
+        self.config['df'] = self.data_store[asset[0]]
+        self.config['assets'] = asset
 
     def run_all_assets(self):
         for idx, asset in enumerate(self.sim_assets):
@@ -558,7 +572,7 @@ class BacktestManager(object):
                 self.prepare_data(idx, cont_idx = 0)
                 sim_strat = self.sim_class(self.config)
                 sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
-                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm', self.pnl_tenors)
+                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], self.sim_freq, self.pnl_tenors)
                 res_trade = get_trade_stats(closed_trades)
                 res.update(dict( res_pnl.items() + res_trade.items()))
                 file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
@@ -575,10 +589,72 @@ class BacktestManager(object):
                 with open(fname, 'w') as ofile:
                     json.dump(output, ofile)
                 cnx = dbaccess.connect(**self.dbconfig)
-                cnx.set_converter_class(mysql_helper.NumpyMySQLConverter)
+                #cnx.set_converter_class(mysql_helper.NumpyMySQLConverter)
                 dbaccess.insert_row_by_dict(cnx, self.dbtable, res, is_replace=True)
                 cnx.close()
                 print 'The results for asset = %s, scen = %s are saved' % (asset, str(ix))
+
+class SpdBktestManager(BacktestManager):
+    def __init__(self, config_file):
+        super(SpdBktestManager, self).__init__(config_file)
+
+    def load_data(self, idx):
+        asset = self.sim_assets[idx]
+        for prod in asset:
+            if prod in self.data_store:
+                continue
+            ticker = prod
+            if '$' not in ticker:
+                ticker_sp = [ticker, 'spot']
+            else:
+                ticker_sp = ticker.split('$')
+            ticker = ticker_sp[0]
+            postfix = '_daily'
+            if self.sim_freq == 'm':
+                postfix = '_min'
+            dbtable = ticker_sp[-1] + postfix
+            if ticker_sp[-1] in ['spot']:
+                field_id = 'spotID'
+            elif ticker_sp[-1] in ['ccy']:
+                field_id = 'instID'
+            if len(ticker_sp) > 2:
+                nb = int(ticker_sp[1])
+                if len(ticker_sp) > 3:
+                    rollrule = ticker_sp[2]
+                else:
+                    rollrule = '-1b'
+                df = misc.nearby(ticker, nb, self.config['start_date'], self.config['end_date'], rollrule,
+                            self.sim_freq, need_shift = self.need_shift,
+                            database = self.config.get('dbconfig', dbaccess.dbconfig)['database'])
+            else:
+                cnx = dbaccess.connect(**self.config.get('dbconfig', dbaccess.dbconfig))
+                if self.sim_freq == 'd':
+                    df = dbaccess.load_daily_data_to_df(cnx, dbtable, ticker,
+                            self.config['start_date'], self.config['end_date'], index_col='date',
+                            field = field_id)
+                else:
+                    minid_start = 1500
+                    minid_end = 2114
+                    if ticker in misc.night_session_markets:
+                        minid_start = 300
+                    df = dbaccess.load_min_data_to_df(cnx, dbtable, ticker, self.config['start_date'],
+                                                      self.config['end_date'], minid_start, minid_end)
+                df['contract'] = ticker
+            if self.sim_freq == 'm':
+                df = misc.cleanup_mindata(df, ticker)
+            df.columns = [(prod, col) for col in df.columns]
+            self.data_store[prod] = df
+
+    def prepare_data(self, asset_idx, cont_idx = 0):
+        assets = self.sim_assets[asset_idx]
+        df = pd.concat([self.data_store[prod] for prod in assets], axis = 1).fillna(method = 'ffill').dropna()
+        df['contract'] = df[(assets[0], 'contract')]
+        df.index.names = ['date']
+        for asset in assets[1:]:
+            df['contract'] = df['contract'] + '_' + df[(asset, 'contract')]
+        self.config['df'] = df
+        self.config['assets'] = assets
+
 
 class ContBktestManager(BacktestManager):
     def __init__(self, config_file):
@@ -587,22 +663,27 @@ class ContBktestManager(BacktestManager):
     def load_data(self, assets):
         contlist = {}
         exp_dates = {}
+        dbconfig = self.config.get('dbconfig', dbaccess.hist_dbconfig)
+        cnx = dbaccess.connect(**dbconfig)
         for i, prod in enumerate(assets):
             cont_mth, exch = dbaccess.prod_main_cont_exch(prod)
             self.contlist[prod], _ = misc.contract_range(prod, exch, cont_mth, self.start_date, self.end_date)
             self.exp_dates[prod] = [misc.contract_expiry(cont) for cont in contlist[prod]]
             edates = [ misc.day_shift(d, self.config['rollrule']) for d in exp_dates[prod] ]
             sdates = [ misc.day_shift(d, self.sim_period) for d in exp_dates[prod] ]
-            self.min_data[prod] = {}
+            self.data_store[prod] = {}
             for cont, sd, ed in zip(contlist[prod], sdates, edates):
-                minid_start = 1500
-                minid_end = 2114
-                if prod in misc.night_session_markets:
-                    minid_start = 300
-                cnx = dbaccess.connect(**dbaccess.hist_dbconfig)
-                tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end, database = self.config.get('database','hist_data'))
+                if self.sim_freq == 'd':
+                    tmp_df = dbaccess.load_daily_data_to_df(cnx, 'fut_min', cont, sd, ed)
+                else:
+                    minid_start = 1500
+                    minid_end = 2114
+                    if prod in misc.night_session_markets:
+                        minid_start = 300
+                    tmp_df = dbaccess.load_min_data_to_df(cnx, 'fut_min', cont, sd, ed, minid_start, minid_end)
+                    misc.cleanup_mindata(tmp_df, prod)
                 tmp_df['contract'] = cont
-                self.min_data[prod][cont] = misc.cleanup_mindata( tmp_df, prod)
+                self.data_store[prod][cont] = tmp_df
                 cnx.close()
 
     def prepare_data(self, asset_idx, cont_idx = 0):
@@ -611,21 +692,21 @@ class ContBktestManager(BacktestManager):
         cont = self.contlist[assets[0]][cont_idx]
         edate = misc.day_shift(self.exp_dates[assets[0]][cont_idx], self.config['rollrule'])
         if self.sim_mode == 'OR':
-            mdf = self.min_data[assets[0]][cont]
-            mdf = mdf[mdf.date <= edate]
+            df = self.data_store[assets[0]][cont]
+            df = df[df.date <= edate]
         else:
             mode_keylist = self.sim_mode.split('-')
             smode = mode_keylist[0]
             cmode = mode_keylist[1]
             all_data = []
             if smode == 'TS':
-                all_data = [self.min_data[assets[0]][self.contlist[assets[0]][cont_idx+i]] for i in cont_map]
+                all_data = [self.data_store[assets[0]][self.contlist[assets[0]][cont_idx+i]] for i in cont_map]
             else:
-                all_data = [self.min_data[asset][self.contlist[asset][cont_idx+i]] for asset, i in zip(assets, cont_map)]
+                all_data = [self.data_store[asset][self.contlist[asset][cont_idx+i]] for asset, i in zip(assets, cont_map)]
             if cmode == 'Full':
-                mdf = pd.concat(all_data, axis = 1, join = 'inner')
-                mdf.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
-                mdf = mdf[ mdf.date0 < edate]
+                df = pd.concat(all_data, axis = 1, join = 'inner')
+                df.columns = [iter + str(i) for i, x in enumerate(all_data) for iter in x.columns]
+                df = df[ df.date0 < edate]
             else:
                 for i, (coeff, tmpdf) in enumerate(zip(self.calc_coeffs, all_data)):
                     if i == 0:
@@ -639,10 +720,10 @@ class ContBktestManager(BacktestManager):
                 xhigh = pd.concat([xopen, xclose], axis = 1).max(axis = 1)
                 xlow = pd.concat([xopen, xclose], axis = 1).min(axis = 1)
                 col_list = ['date', 'min_id', 'volume', 'openInterest']
-                mdf = pd.concat([ xopen, xhigh, xlow, xclose] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
-                mdf.columns = ['open', 'high', 'low', 'close'] + col_list
-                mdf['contract'] = cont
-        self.config['mdf'] = mdf
+                df = pd.concat([ xopen, xhigh, xlow, xclose] + [all_data[0][col] for col in col_list], axis = 1, join = 'inner')
+                df.columns = ['open', 'high', 'low', 'close'] + col_list
+                df['contract'] = cont
+        self.config['df'] = df
 
     def run_all_assets(self):
         for idx, asset in enumerate(self.sim_assets):
@@ -729,5 +810,8 @@ if __name__=="__main__":
             bktest_sim.run_all_assets()
         elif mode == 1:
             bktest_sim = ContBktestManager(args[1])
+            bktest_sim.run_all_assets()
+        elif mode == 2:
+            bktest_sim = SpdBktestManager(args[1])
             bktest_sim.run_all_assets()
 

@@ -175,19 +175,19 @@ def load_db_to_xlmkt(tag, xlfile = MKT_LATEST_XLFILE):
             if prod_code in req_data:
                 req_data[prod_code] = df
     #do the SGX-DCE spread calc
-    try:
-        tday =  datetime.date.today()
-        if tday >= req_data['i']['tenor_label'][0]:
-            dce_prompt =  req_data['i']['instID'][1]
-        else:
-            dce_prompt = req_data['i']['instID'][0]
-        sgx_prompt = 'fef' + dce_prompt[-4:]
-        sgx_price = float(req_data['fef'].loc[req_data['fef']['instID'] == sgx_prompt, 'COMFwd'])
-        dce_price = float(req_data['i'].loc[req_data['i']['instID'] == dce_prompt, 'COMFwd'])
-        fx = float(req_data['USD/CNY']['rate'][0])
-        sgx_dce_spd =  sgx_price - (dce_price - 30.0/0.92)/1.16/fx
-        wb = writer.book
-        wb['COMM']['F1'] = sgx_dce_spd
-    except:
-        print "failed to update SGX-DCE spread"
+    #try:
+    tday =  datetime.date.today()
+    if tday >= req_data['i']['tenor_label'][0]:
+        dce_prompt =  req_data['i']['instID'][1]
+    else:
+        dce_prompt = req_data['i']['instID'][0]
+    sgx_prompt = 'fef' + dce_prompt[-4:]
+    sgx_price = float(req_data['fef'].loc[req_data['fef']['instID'] == sgx_prompt, 'COMFwd'])
+    dce_price = float(req_data['i'].loc[req_data['i']['instID'] == dce_prompt, 'COMFwd'])
+    fx = float(req_data['USD/CNY']['rate'][0])
+    sgx_dce_spd =  sgx_price - (dce_price - 30.0/0.92)/1.16/fx
+    wb = writer.book
+    wb['COMM']['F1'] = sgx_dce_spd
+    #except:
+    #    print "failed to update SGX-DCE spread"
     writer.save()
