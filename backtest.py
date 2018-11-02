@@ -324,7 +324,7 @@ def pnl_stats(pnl_df):
         res['profit_dd_ratio'] = 0
     return res
 
-def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '3y'], start_capital = 10000.0):
+def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '3y'], start_capital = 10000.0, cost_ratio = 0.0):
     sum_pnl = pd.Series(name='pnl')
     sum_margin = pd.Series(name='margin')
     sum_cost = pd.Series(name='cost')
@@ -338,7 +338,7 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
             field = 'traded_price'
         else:
             field  = 'close'
-        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
+        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0) - xdf['cost'] * cost_ratio
         if 'closeout' in xdf.columns:
             pnl = pnl + xdf['closeout']
         # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
@@ -371,7 +371,7 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
     daily_pnl.name = 'daily_pnl'
     daily_margin.name = 'daily_margin'
     daily_cost.name = 'daily_cost'
-    cum_pnl = pd.Series(daily_pnl.cumsum() + daily_cost.cumsum() + start_capital, name='cum_pnl')
+    cum_pnl = pd.Series(daily_pnl.cumsum() + start_capital, name='cum_pnl')
     df = pd.concat([cum_pnl, daily_pnl, daily_margin, daily_cost], join='outer', axis=1)
     res = {}
     for tenor in tenors:
@@ -435,6 +435,7 @@ class BacktestManager(object):
         self.need_shift = sim_config.get('need_shift', True)
         self.sim_freq = sim_config.get('sim_freq', 'm')
         self.sim_name = sim_config['sim_name']
+        self.cost_ratio = sim_config.get('cost_ratio', 1.0)
         self.set_bktest_env()
         self.dbtable = sim_config.get('dbtable', 'bktest_output')
         if type(sim_config['products'][0]).__name__ != 'list':
@@ -465,6 +466,7 @@ class BacktestManager(object):
         self.trade_offset_dict = sim_config.get('trade_offset_dict', trade_offset_dict)
         self.sim_margin_dict = sim_config.get('sim_margin_dict', sim_margin_dict)
         self.start_capital = self.config['capital']
+        self.config['data_freq'] = self.sim_freq
         self.data_store = {}
         self.contlist = {}
         self.exp_dates = {}
@@ -571,8 +573,8 @@ class BacktestManager(object):
                     res['par_value' + str(i)] = str(self.scen_param[key][seq])
                 self.prepare_data(idx, cont_idx = 0)
                 sim_strat = self.sim_class(self.config)
-                sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
-                (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], self.sim_freq, self.pnl_tenors)
+                sim_dfs, closed_trades = getattr(sim_strat, self.sim_func)()
+                (res_pnl, ts) = get_pnl_stats( sim_dfs, self.config['marginrate'], self.sim_freq, self.pnl_tenors, cost_ratio = self.cost_ratio)
                 res_trade = get_trade_stats(closed_trades)
                 res.update(dict( res_pnl.items() + res_trade.items()))
                 file_prefix = self.file_prefix + '_' + '_'.join([self.sim_mode] + asset)
@@ -752,7 +754,7 @@ class ContBktestManager(BacktestManager):
                     sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                     df_list.append(sim_df)
                     trade_list = trade_list + closed_trades
-                    (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm')
+                    (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm', cost_ratio = self.cost_ratio)
                     res_trade = get_trade_stats(closed_trades)
                     res =  dict( res_pnl.items() + res_trade.items())
                     res.update(dict(zip(self.scen_keys, s)))
@@ -760,7 +762,7 @@ class ContBktestManager(BacktestManager):
                     if cont not in output['cont']:
                         output['cont'][cont] = {}
                     output['cont'][cont][ix] = res
-                (res_pnl, ts) = get_pnl_stats(df_list, self.config['marginrate'], 'm')
+                (res_pnl, ts) = get_pnl_stats(df_list, self.config['marginrate'], 'm', cost_ratio = self.cost_ratio)
                 output[ix] = res
                 res_trade = get_trade_stats(trade_list)
                 res = dict(res_pnl.items() + res_trade.items())

@@ -68,7 +68,6 @@ def strat_cov_matrix(df, columns = None, start_date = None, end_date = None, ten
     combo_pnl = pd.Series(0.0, index = df.index)
     for w, col in zip(weights, columns):
         combo_pnl = combo_pnl + w * df[col]
-
     return weights, combo_pnl
 
 def load_sim_config(sim_names, config_folder = sim_config_folder):
@@ -135,9 +134,9 @@ def create_strat_json(df, inst_list, asset_keys, common_keys, capital = 4000.0, 
     return output
 
 def process_DTsim():
-    sim_names = ['DTvec_180928', 'DT2sp_180928', 'DT3sp_180928', 'DT4sp_180928', \
-                'DTvec_dchan_180928', 'DT2sp_dchan_180928', 'DT3sp_dchan_180928', 'DT4sp_dchan_180928'\
-                'DTvec_pct25_180928', 'DTvec_pct45_180928']
+    sim_names = ['DTvec_181028', 'DT2sp_181028', 'DT3sp_181028', 'DT4sp_181028', \
+                'DTvec_dchan_181028', 'DT2sp_dchan_181028', 'DT3sp_dchan_181028', 'DT4sp_dchan_181028'\
+                'DTvec_pct25_181028', 'DTvec_pct45_181028', 'DTvec_pct10_181028']
     df = load_btest_res(sim_names)
     filter = df['sharp_ratio_3y'].isnull()
     df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
@@ -151,10 +150,10 @@ def process_DTsim():
     df['volumes'] = '[1]'
     df['vol_ratio'] = '[1.0, 0.0]'
     df['open_period'] = '[300, 2115]'
-    df.ix[(df.sim_name == 'DT2sp_180928') | (df.sim_name == 'DT2sp_dchan_180928'), 'open_period'] = '[300, 1500, 2115]'
-    df.ix[(df.sim_name == 'DT3sp_180928') | (df.sim_name == 'DT3sp_dchan_180928'), 'open_period'] = '[300, 1500, 1900, 2115]'
-    df.ix[(df.sim_name == 'DT4sp_180928') | (df.sim_name == 'DT4sp_dchan_180928'), 'open_period'] = '[300, 1500, 1630, 1900, 2115]'
-    filter = (df.sim_name == 'DTvec_180928') | (df.sim_name == 'DT2sp_180928') | (df.sim_name == 'DT3sp_180928') | (df.sim_name == 'DT4sp_180928')
+    df.ix[(df.sim_name == 'DT2sp_181028') | (df.sim_name == 'DT2sp_dchan_181028'), 'open_period'] = '[300, 1500, 2115]'
+    df.ix[(df.sim_name == 'DT3sp_181028') | (df.sim_name == 'DT3sp_dchan_181028'), 'open_period'] = '[300, 1500, 1900, 2115]'
+    df.ix[(df.sim_name == 'DT4sp_181028') | (df.sim_name == 'DT4sp_dchan_181028'), 'open_period'] = '[300, 1500, 1630, 1900, 2115]'
+    filter = (df.sim_name == 'DTvec_181028') | (df.sim_name == 'DT2sp_181028') | (df.sim_name == 'DT3sp_181028') | (df.sim_name == 'DT4sp_181028')
     df.ix[filter, 'ma_chan'] = df.ix[filter, 'par_value1']
     df.ix[~filter, 'channels'] = df.ix[~filter, 'par_value1']
     df.ix[~filter, 'vol_ratio'] = '[0.0, 1.0]'
@@ -167,23 +166,23 @@ def process_DTsim():
     res = pd.DataFrame()
     for asset in assets:
         xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
-        xdf1 = xdf[((xdf.sim_name == 'DTvec_180928'))].sort_values('w_sharp', ascending=False)
+        xdf1 = xdf[((xdf.sim_name == 'DTvec_181028'))].sort_values('w_sharp', ascending=False)
         if len(xdf1) > 20:
             xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-        xdf1 = xdf[((xdf.sim_name == 'DT2sp_180928') | (xdf.sim_name == 'DT3sp_180928') | (xdf.sim_name == 'DT4sp_180928'))].sort_values('w_sharp', ascending=False)
+        xdf1 = xdf[((xdf.sim_name == 'DT2sp_181028') | (xdf.sim_name == 'DT3sp_181028') | (xdf.sim_name == 'DT4sp_181028'))].sort_values('w_sharp', ascending=False)
         if len(xdf1) > 30:
             xdf1 = xdf1[:30]
         res = res.append(xdf1, ignore_index=True)
-        xdf1 = xdf[(xdf.sim_name != 'DTvec_180928') & (xdf.sim_name != 'DT2sp_180928')\
-            & (xdf.sim_name != 'DT3sp_180928') & (xdf.sim_name != 'DT4sp_180928')].sort_values('w_sharp', ascending=False)
+        xdf1 = xdf[(xdf.sim_name != 'DTvec_181028') & (xdf.sim_name != 'DT2sp_181028')\
+            & (xdf.sim_name != 'DT3sp_181028') & (xdf.sim_name != 'DT4sp_181028')].sort_values('w_sharp', ascending=False)
         if len(xdf1) > 30:
             xdf1 = xdf1[:30]
         res = res.append(xdf1, ignore_index=True)
     out_cols = output_columns + ['freq', 'channels', 'ma_chan', 'price_mode', 'lookbacks', 'ratios', \
                                  'trend_factor', 'lot_size', 'min_rng', 'vol_ratio', 'volumes', 'open_period']
     out = res[out_cols]
-    out.to_csv('DT_summary_180928.csv')
+    out.to_csv('DT_summary_181028.csv')
     return out
 
 def process_RSIATRsim():
@@ -224,23 +223,64 @@ def process_RSIATRsim():
         res = res.append(xdf2, ignore_index=True)
 
     out_cols = output_columns + ['freq', 'rsi_th', 'rsi_win', 'stoploss', 'atr_win', 'atrma_win', 'close_tday', \
-                                 'std_unit', 'w_sharp', 'lot_size', 'volumes']
+                                 'std_unit', 'lot_size', 'volumes']
     out = res[out_cols]
-    out.to_csv('RSI_ATR_180928.csv')
+    out.to_csv('RSI_ATR_181028.csv')
     return out
 
-def process_MAChanSim():
-    sim_names = ['EMA_cross']
+def process_ChanbreakSim():
+    sim_names = ['chanbreak_daily_181028', 'chanbreak_2sp_181028', 'chanbreak_3sp_181028', 'chanbreak_4sp_181028']
     df = load_btest_res(sim_names)
     filter = df['sharp_ratio_3y'].isnull()
     df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
     weight = {'6m': 0.5/2.5, '1y': 1.0/3.5, '2y': 1.0/3.5, '3y': 1.0/3.5}
     df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
-    df['max_win'] = extract_element(df, 'par_value1', -1)
-    df['freq'] = df['par_value0']
-    df['win_list'] = df['par_value1']
-    df['channel_ratio'] = df['par_value2']
-    df['channels'] = df['channel_ratio'] * df['max_win']
+    df['stoploss_win'] = df['par_value0']
+    df['stoploss'] = df['par_value1']
+    df['channel'] = df['par_value2']
+    df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
+    df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
+    df['volumes'] = '[1]'
+    assets = asset_list
+    res = pd.DataFrame()
+    for asset in assets:
+        xdf = df[(df.asset==asset) & (df.w_sharp > 0.8)]
+        filter = (xdf['sim_name']=='chanbreak_daily_181028')
+        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1, ignore_index=True)
+        filter = (xdf['sim_name'] == 'chanbreak_2sp_181028')
+        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1, ignore_index=True)
+        filter = (xdf['sim_name'] == 'chanbreak_3sp_181028')
+        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1, ignore_index=True)
+        filter = (xdf['sim_name'] == 'chanbreak_4sp_181028')
+        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        if len(xdf1) > 10:
+            xdf1 = xdf1[:10]
+        res = res.append(xdf1, ignore_index=True)
+
+    out_cols = output_columns + ['stoploss_win', 'stoploss', 'channel','std_unit', 'lot_size', 'volumes']
+    out = res[out_cols]
+    out.to_csv('Chanbreak_181028.csv')
+    return out
+
+def process_MAChanSim():
+    sim_names = ['MA2cross_daily_181028']
+    df = load_btest_res(sim_names)
+    filter = df['sharp_ratio_3y'].isnull()
+    df.ix[filter, 'sharp_ratio_3y'] = df.ix[filter, 'sharp_ratio_2y']
+    weight = {'6m': 0.5/2.5, '1y': 1.0/3.5, '2y': 1.0/3.5, '3y': 1.0/3.5}
+    df['w_sharp'] = calc_w_col(df, key = 'sharp_ratio', weight = weight)
+    df['win_s'] = extract_element(df, 'par_value0', 0)
+    df['win_l'] = extract_element(df, 'par_value0', 1)
+    df['win_list'] = df['par_value0']
     df['lot_size'] = df['asset'].apply(lambda x: misc.product_lotsize[x])
     df['std_unit'] = df['std_pnl_1y'] * df['lot_size']
     df['volumes'] = '[1]'
@@ -248,19 +288,13 @@ def process_MAChanSim():
     res = pd.DataFrame()
     for asset in assets:
         xdf = df[(df.asset==asset) & (df.w_sharp > 0.5)]
-        filter = (xdf['freq']=='1min') | (xdf['freq']=='3min') | (xdf['freq']=='5min')
-        xdf1 = xdf[filter].sort_values('w_sharp', ascending=False)
+        xdf1 = xdf.sort_values('w_sharp', ascending=False)
         if len(xdf1) > 20:
             xdf1 = xdf1[:20]
         res = res.append(xdf1, ignore_index=True)
-        xdf2 = xdf[~filter].sort_values('w_sharp', ascending=False)
-        if len(xdf2) > 20:
-            xdf2 = xdf2[:20]
-        res = res.append(xdf2, ignore_index=True)
-
-    out_cols = output_columns + ['win_list', 'channels','std_unit', 'w_sharp', 'lot_size', 'volumes', 'freq']
+    out_cols = output_columns + ['win_l', 'win_s', 'std_unit', 'lot_size', 'volumes']
     out = res[out_cols]
-    out.to_csv('EMA3_cross_180928.csv')
+    out.to_csv('MA2cross_daily_181028.csv')
     return out
 
 def process_MARibbonSim():
@@ -289,9 +323,9 @@ def process_MARibbonSim():
             xdf2 = xdf2[:20]
         res = res.append(xdf2, ignore_index=True)
 
-    out_cols = output_columns + ['param', 'std_unit', 'w_sharp', 'lot_size', 'volumes', 'freq']
+    out_cols = output_columns + ['param', 'std_unit', 'lot_size', 'volumes', 'freq']
     out = res[out_cols]
-    out.to_csv('ma_ribbon_180928.csv')
+    out.to_csv('ma_ribbon_181028.csv')
     return out
 
 
@@ -303,7 +337,7 @@ def create_DT_strat():
     asset_keys = ['alloc_w', 'vol_ratio', 'lookbacks', 'ratios', 'trend_factor', \
                   'close_tday', 'channels', 'volumes', 'freq', 'price_mode', 'close_daily']
     common_keys = ['open_period']
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\DTsim_180928.xlsx', 'rb'), sheetname = 'DTvec')
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\DTsim_181028.xlsx', 'rb'), sheetname = 'DTvec')
     output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_dtsp_chan.DTSplitChan")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
@@ -313,7 +347,7 @@ def create_RSIATR_strat():
     asset_keys = ['alloc_w', 'rsi_th', 'rsi_win', 'atr_win', 'atrma_win', 'stoploss',\
                   'close_tday', 'volumes', 'freq']
     common_keys = []
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\RSI_ATR_180928.xlsx', 'rb'), sheetname = 'RSI_ATR_180928')
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\RSI_ATR_181028.xlsx', 'rb'), sheetname = 'RSI_ATR_181028')
     output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_rsiatr.RsiAtrStrat")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:
@@ -322,7 +356,7 @@ def create_RSIATR_strat():
 def create_MAChan_strat():
     asset_keys = ['alloc_w', 'ma_win', 'channels', 'close_tday', 'volumes', 'freq']
     common_keys = []
-    df = pd.read_excel(open('C:\\dev\\pyktlib\\EMAChansim_180928.xlsx', 'rb'), sheetname = 'EMA3Chan_180928')
+    df = pd.read_excel(open('C:\\dev\\pyktlib\\EMAChansim_181028.xlsx', 'rb'), sheetname = 'EMA3Chan_181028')
     output = create_strat_json(df, inst_list, asset_keys, common_keys, capital = 1500.0, strat_class = "strat_ma_system.MASystemTrader")
     for key in output:
         with open("C:\\dev\\data\\" + key + ".json", 'w') as outfile:

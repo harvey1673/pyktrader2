@@ -109,7 +109,7 @@ class DTChanSim(StratSim):
         mdf['cost'] = mdf['cost'].fillna(0.0)
         mdf['traded_price'] = mdf['open']
         self.closed_trades = simdf_to_trades1(mdf, slippage = self.offset )
-        return (mdf, self.closed_trades)
+        return ([mdf], self.closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}
@@ -131,7 +131,7 @@ def gen_config_file(filename):
             (0.4, 4, 0.5, 0.0), (0.45, 4, 0.5, 0.0),(0.5, 4, 0.5, 0.0),\
             ]
     sim_config['chan'] = [3, 5, 10, 15, 20]
-    sim_config['pos_class'] = 'strat.TradePos'
+    sim_config['pos_class'] = 'trade_position.TradePos'
     sim_config['proc_func'] = 'dh.day_split'
     sim_config['offset']    = 1
     chan_func = {'high': {'func': 'dh.DONCH_H', 'args':{}},
