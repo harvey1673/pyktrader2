@@ -38,7 +38,7 @@ sim_start_dict = { 'c': datetime.date(2008,10,1), 'm': datetime.date(2010,10,1),
     'jd':datetime.date(2014,2,1),  'ni':datetime.date(2015,6,1),  'sn':datetime.date(2015,6,1),
     'ZC':datetime.date(2015,12,1), 'hc':datetime.date(2012, 1, 1), 'SM': datetime.date(2016,10,10),
     'SF': datetime.date(2016,10,10), 'CY': datetime.date(2017, 8, 18), 'AP': datetime.date(2017, 12, 22),
-    'TS': datetime.date(2018, 8, 17),}
+    'TS': datetime.date(2018, 8, 17), 'sp':datetime.date(2018,11,27)}
 
 trade_offset_dict = {
                 'au': 0.05, 'ag': 1,    'cu': 10,   'al':5,
@@ -52,7 +52,7 @@ trade_offset_dict = {
                 'T': 0.005, 'MA': 1,    'cs': 1,    'bu': 1,
                 'sn': 10,   'v':  5,    'ZC': 0.2,  'hc': 1,
                 'SM': 4,    'SF': 4,    'CY': 5,    'AP': 1,
-                }
+                'sp':1,}
 
 
 class StratSim(object):
@@ -477,7 +477,7 @@ class BacktestManager(object):
         if system == 'Linux':
             folder = '/home/harvey/dev/data/'
         elif system == 'Windows':
-            folder = 'C:\\dev\\data\\'
+            folder = 'E:\\data\\'
         else:
             folder = ''
         file_prefix = folder + self.sim_name + os.path.sep
