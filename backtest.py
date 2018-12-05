@@ -306,10 +306,15 @@ def pnl_stats(pnl_df):
     res['avg_pnl'] = float(pnl_df['daily_pnl'].mean())
     res['std_pnl'] = float(pnl_df['daily_pnl'].std())
     res['tot_pnl'] = float(pnl_df['daily_pnl'].sum())
-    res['tot_cost'] = float(pnl_df['daily_cost'].sum())
+    if 'daily_cost' in pnl_df.columns:
+        res['tot_cost'] = float(pnl_df['daily_cost'].sum())
+    else:
+        res['tot_cost'] = 0.0
     res['num_days'] = len(pnl_df['daily_pnl'])
     if res['std_pnl'] > 0:
         res['sharp_ratio'] = float(res['avg_pnl'] / res['std_pnl'] * np.sqrt(252.0))
+        if 'cum_pnl' not in pnl_df.columns:
+            pnl_df['cum_pnl'] = pnl_df['daily_pnl'].cumsum()
         max_dd, max_dur = max_drawdown(pnl_df['cum_pnl'])
         res['max_drawdown'] = float(max_dd)
         res['max_dd_period'] = int(max_dur)
@@ -322,6 +327,19 @@ def pnl_stats(pnl_df):
         res['max_drawdown'] = 0
         res['max_dd_period'] = 0
         res['profit_dd_ratio'] = 0
+    return res
+
+def pnl_stats_by_tenor(df, tenors):
+    res = {}
+    for tenor in tenors:
+        edate = df.index[-1]
+        sdate = misc.day_shift(edate, '-' + tenor)
+        pnl_df = df[df.index >= sdate]
+        res_by_tenor = pnl_stats(pnl_df)
+        for field in res_by_tenor:
+            res[field + '_' + tenor] = 0 if np.isnan(res_by_tenor[field]) else res_by_tenor[field]
+        if sdate < df.index[0]:
+            break
     return res
 
 def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '3y'], start_capital = 10000.0, cost_ratio = 0.0):
@@ -338,7 +356,9 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
             field = 'traded_price'
         else:
             field  = 'close'
-        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0) - xdf['cost'] * cost_ratio
+        pnl = xdf['pos'].shift(1).fillna(0.0) * (xdf[field] - xdf[field].shift(1)).fillna(0.0)
+        if 'cost' in xdf.columns:
+            pnl = pnl - xdf['cost'] * cost_ratio
         if 'closeout' in xdf.columns:
             pnl = pnl + xdf['closeout']
         # pnl = pnl + (xdf['pos'] - xdf['pos'].shift(1).fillna(0.0)) * (xdf['close'] - xdf['traded_price'])
@@ -373,16 +393,7 @@ def get_pnl_stats(df_list, marginrate, freq, tenors = ['3m', '6m', '1y', '2y', '
     daily_cost.name = 'daily_cost'
     cum_pnl = pd.Series(daily_pnl.cumsum() + start_capital, name='cum_pnl')
     df = pd.concat([cum_pnl, daily_pnl, daily_margin, daily_cost], join='outer', axis=1)
-    res = {}
-    for tenor in tenors:
-        edate = df.index[-1]
-        sdate = misc.day_shift(edate, '-' + tenor)
-        pnl_df = df[df.index >= sdate]
-        res_by_tenor = pnl_stats(pnl_df)
-        for field in res_by_tenor:
-            res[field + '_' + tenor] = 0 if np.isnan(res_by_tenor[field]) else res_by_tenor[field]
-        if sdate < df.index[0]:
-            break
+    res = pnl_stats_by_tenor(df, tenors)
     return res, df
 
 def get_trade_stats(trade_list):
@@ -501,7 +512,7 @@ class BacktestManager(object):
             self.config['no_trade_set'] = []
         for asset in assets:
             nb = 1
-            rr = '-40b'
+            rr = '-35b'
             if asset in ['cu', 'al', 'zn']:
                 nb = 3
                 rr = '-1b'
@@ -540,11 +551,6 @@ class BacktestManager(object):
             if self.sim_freq == 'm':
                 df = misc.cleanup_mindata(df, prod)
             self.data_store[prod] = df
-        #if self.config['need_daily']:
-        #    self.config['ddf'] = misc.nearby(asset, self.config['nearby'], self.config['start_date'], self.config['end_date'],
-        #                                 self.config['rollrule'], 'd', need_shift=True, database='hist_data')
-        #else:
-        #    self.config['ddf'] = None
 
     def prepare_data(self, asset_idx, cont_idx = 0):
         asset = self.sim_assets[asset_idx]
@@ -754,7 +760,7 @@ class ContBktestManager(BacktestManager):
                     sim_df, closed_trades = getattr(sim_strat, self.sim_func)()
                     df_list.append(sim_df)
                     trade_list = trade_list + closed_trades
-                    (res_pnl, ts) = get_pnl_stats( [sim_df], self.config['marginrate'], 'm', cost_ratio = self.cost_ratio)
+                    (res_pnl, ts) = get_pnl_stats( sim_df, self.config['marginrate'], 'm', cost_ratio = self.cost_ratio)
                     res_trade = get_trade_stats(closed_trades)
                     res =  dict( res_pnl.items() + res_trade.items())
                     res.update(dict(zip(self.scen_keys, s)))

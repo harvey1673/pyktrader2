@@ -86,7 +86,6 @@ class ChanBreakSim(StratSim):
             long_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'open']
         long_df.ix[-1, 'pos'] = 0
         long_df['cost'] = abs(long_df['pos'] - long_df['pos'].shift(1)) * (self.offset + long_df['close'] * self.tcost)
-        long_df['cost'] = abs(long_df['pos'] - long_df['pos'].shift(1)) * (self.offset + long_df['close'] * self.tcost)
         long_df['cost'].fillna(0.0, inplace = True)
         long_trades = simdf_to_trades1(long_df, slippage=self.offset)
 

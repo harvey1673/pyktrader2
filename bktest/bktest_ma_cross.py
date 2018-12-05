@@ -51,14 +51,14 @@ class MACrossSim(StratSim):
         self.df = xdf.dropna()
 
     def run_vec_sim(self):
-        xdf = self.df
+        xdf = self.df.copy()
         long_signal = pd.Series(np.nan, index = xdf.index)
         last = len(self.win_list)
         long_flag = (xdf['MA1'] > xdf['MA2']) & (xdf['MA1'] > xdf['MA'+str(last)])
         if self.use_chan:
             long_flag = long_flag & (xdf['open'] >= xdf['chan_h'])
         long_signal[long_flag] = 1
-        cover_flag = (xdf['MA1'] < xdf['MA'+str(last)])
+        cover_flag = (xdf['MA1'] <= xdf['MA'+str(last)])
         if self.use_chan:
             cover_flag = cover_flag | (xdf['open'] < xdf['chan_l'])
         long_signal[cover_flag] = 0

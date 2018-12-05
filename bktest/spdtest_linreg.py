@@ -71,7 +71,7 @@ class SpdLinRegSim(StratSim):
         self.df['close'] = self.df['traded_price']
         self.df['cost'] = abs(self.df['pos'] - self.df['pos'].shift(1)) * (self.offset[0] + self.df[(self.assets[0], 'close')] * self.tcost)
         self.closed_trades = simdf_to_trades1(self.df, slippage=0.0)
-        return (self.df, self.closed_trades)
+        return ([self.df], self.closed_trades)
 
 def gen_config_file(filename):
     sim_config = {}

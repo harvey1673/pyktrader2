@@ -667,10 +667,10 @@ def rolling_hist_data(product, n, start_date, end_date, cont_roll, freq, win_rol
     return all_data
 
 
-def day_shift(d, roll_rule):
+def day_shift(d, roll_rule, hols = []):
     if 'b' in roll_rule:
         days = int(roll_rule[:-1])
-        shft_day = workdays.workday(d, days)
+        shft_day = workdays.workday(d, days, hols)
     elif 'm' in roll_rule:
         mths = int(roll_rule[:-1])
         shft_day = d + relativedelta(months=mths)
@@ -800,16 +800,16 @@ def cleanup_mindata(df, asset, index_col='datetime', skip_hl=True):
             cond = cond | (xdf.min_id >= tradehrs[idx][0]) & (xdf.min_id < tradehrs[idx][1])
     if asset in ['a', 'b', 'p', 'y', 'm', 'i', 'j', 'jm']:
         cond = cond | (
-        (xdf.index < datetime.datetime(2015, 5, 12, 15, 0, 0)) & (xdf.min_id >= 300) & (xdf.min_id < 830))
+        (xdf.date < datetime.date(2015, 5, 12)) & (xdf.min_id >= 300) & (xdf.min_id < 830))
     if asset in ['rb', 'hc', 'bu']:
-        cond = cond | ((xdf.index < datetime.datetime(2016, 5, 1, 15, 0, 0)) & (xdf.min_id >= 300) & (xdf.min_id < 700))
+        cond = cond | ((xdf.date < datetime.date(2016, 5, 1)) & (xdf.min_id >= 300) & (xdf.min_id < 700))
     if asset in ['IF', 'IH', 'IC']:
         cond = cond | (
-        (xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id >= 1515) & (xdf.min_id < 1530))
+        (xdf.index < datetime.date(2016, 1, 1, 15, 0, 0)) & (xdf.min_id >= 1515) & (xdf.min_id < 1530))
         cond = cond | (
-        (xdf.index < datetime.datetime(2016, 1, 1, 15, 0, 0)) & (xdf.min_id >= 2100) & (xdf.min_id < 2115))
+        (xdf.index < datetime.date(2016, 1, 1, 15, 0, 0)) & (xdf.min_id >= 2100) & (xdf.min_id < 2115))
     xdf = xdf.ix[cond]
-    xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
+    #xdf = xdf[(xdf.close > 0) & (xdf.high > 0) & (xdf.open > 0) & (xdf.low > 0)]
     if skip_hl:
         xdf = xdf[xdf.high > xdf.low]
     if index_col == None:

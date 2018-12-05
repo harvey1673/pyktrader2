@@ -19,51 +19,42 @@ class BBTrailStop(StratSim):
         self.offset = config['offset']
         self.tick_base = config['tick_base']
         self.freq = config['freq']
+        self.data_freq = config['data_freq']
         self.band_ratio = config['band_ratio']
         self.ma_func = eval(config.get('ma_func', 'dh.MA'))
         self.band_func = eval(config.get('band_func', 'dh.ATR'))
         self.boll_len = config['boll_len']
-        self.chan_len = config['chan_ratio'] * self.boll_len
         self.filter_func = eval(config.get('filter_func', 'dh.CCI'))
-        self.filter_args = config.get('filter_args', 10)
+        self.filter_len = config.get('filter_len', 10)
         self.filter_thres = config.get('filter_args', [0, 0])
-        self.pos_update = config['pos_update']
+        self.channel = config.get('channel', 30)
         self.pos_class = config['pos_class']
         self.pos_args  = config['pos_args']        
         self.tcost = config['trans_cost']
         self.unit = config['unit']
         self.weights = config.get('weights', [1])
         self.SL = config['stoploss']
-        self.no_trade_set = config['no_trade_set']
-        self.pos_freq = config.get('pos_freq', 1)
-        self.exit_min = config.get('exit_min', 2060 - self.freq * 2)
-        self.buy_trig = 0.0
-        self.sell_trig = 0.0
+        self.trading_mode = config.get('trading_mode', 'close')
      
-    def process_data(self, mdf):
+    def process_data(self, df):
         if self.freq == 1:
-            xdf = mdf
+            xdf = df
         else:
             freq_str = str(self.freq) + "min"
-            xdf = dh.conv_ohlc_freq(mdf, freq_str, extra_cols = ['contract'])
-        xdf['band_wth'] = self.band_func(xdf, n = self.boll_len) * self.band_ratio
+            xdf = dh.conv_ohlc_freq(df, freq_str, extra_cols = ['contract'])
+        xdf['band_wth'] = self.band_func(xdf, n = self.boll_len).fillna(method = 'bfill')
         xdf['band_mid'] = self.ma_func(xdf, n=self.boll_len)
-        xdf['band_up'] = xdf['band_mid'] + xdf['band_wth']
-        xdf['band_dn'] = xdf['band_mid'] - xdf['band_wth']
-        xdf['filter'] = self.filter_func(xdf, self.filter_args)
-        if (self.chan_len > 0):
-            xdf['chan_h'] = dh.DONCH_H(xdf, n = self.chan_len, field = 'high')
-            xdf['chan_l'] = dh.DONCH_L(xdf, n = self.chan_len, field = 'low')
-        else:
-            xdf['chan_h'] = -10000000
-            xdf['chan_l'] = 10000000
+        xdf['band_up'] = xdf['band_mid'] + xdf['band_wth'] * self.band_ratio
+        xdf['band_dn'] = xdf['band_mid'] - xdf['band_wth'] * self.band_ratio
+        xdf['filter_ind'] = self.filter_func(xdf, self.filter_len)
+        xdf['chan_h'] = dh.DONCH_H(xdf, self.channel)
+        xdf['chan_l'] = dh.DONCH_L(xdf, self.channel)
+        xdf['tr_stop_h'] = xdf['chan_h'] - (xdf['band_wth'] * self.SL / self.tick_base).astype('int') * self.tick_base
+        xdf['tr_stop_l'] = xdf['chan_l'] + (xdf['band_wth'] * self.SL / self.tick_base).astype('int') * self.tick_base
         xdata = pd.concat([xdf['band_up'].shift(1), xdf['band_dn'].shift(1), \
-                           xdf['band_mid'].shift(1), xdf['band_wth'].shift(1), \
-                           xdf['chan_h'].shift(1), xdf['chan_l'].shift(1)], axis=1, \
-                           keys=['band_up','band_dn', 'band_mid', 'band_wth', \
-                                 'chan_h', 'chan_l'])
-        self.df = mdf.join(xdata, how = 'left').fillna(method='ffill')
-        self.df['datetime'] = self.df.index
+                           xdf['tr_stop_h'].shift(1), xdf['tr_stop_l'].shift(1), xdf['filter_ind'].shift(1)], axis=1, \
+                           keys=['band_up','band_dn', 'tr_stop_h', 'tr_stop_l', 'filter_ind'])
+        self.df = df.join(xdata, how = 'left').fillna(method='ffill').dropna()
         self.df['cost'] = 0.0
         self.df['pos'] = 0.0
         self.df['closeout'] = 0.0
@@ -81,7 +72,67 @@ class BBTrailStop(StratSim):
         return gap
 
     def run_vec_sim(self):
-        pass
+        self.df['long_entry_pr'] = pd.concat([self.df['band_up'], self.df['open']], join='outer', axis=1).max(axis=1)
+        self.df['long_exit_pr'] = pd.concat([self.df['tr_stop_h'], self.df['open']], join='outer', axis=1).min(axis=1)
+        self.df['short_entry_pr'] = pd.concat([self.df['band_dn'], self.df['open']], join='outer', axis=1).min(axis=1)
+        self.df['short_exit_pr'] = pd.concat([self.df['tr_stop_l'], self.df['open']], join='outer', axis=1).max(axis=1)
+        if self.data_freq == 'm':
+            columns = ['open', 'close', 'contract', 'date', 'min_id']
+        else:
+            columns = ['open', 'close', 'contract']
+        long_df = self.df[columns].copy()
+        short_df = self.df[columns].copy()
+        if self.trading_mode in ['match']:
+            long_df['traded_price'] = long_df['open']
+            short_df['traded_price'] = short_df['open']
+        else:
+            long_df['traded_price'] = long_df['close']
+            short_df['traded_price'] = short_df['close']
+        long_df['pos'] = pd.Series(np.nan, index = self.df.index)
+        long_df.ix[(self.df['high'] > self.df['band_up']) & (self.df['filter_ind']>self.filter_thres[0]), 'pos'] = 1.0
+        long_df.ix[(self.df['low'] <= self.df['tr_stop_h']), 'pos'] = 0.0
+        long_df['pos'] = long_df['pos'].fillna(method='ffill').fillna(0.0)
+        if self.trading_mode == 'match':
+            flag = (self.df['high'] > self.df['band_up']) & (self.df['filter_ind']>self.filter_thres[0]) \
+                   & (self.df['open'] < self.df['band_up']) & (long_df['pos'] > long_df['pos'].shift(1).fillna(0.0))
+            long_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'long_entry_pr']
+            flag = (self.df['high'] > self.df['band_up']) & (self.df['filter_ind']>self.filter_thres[0]) \
+                   & (self.df['open'] >= self.df['band_up']) & (long_df['pos'] > long_df['pos'].shift(1).fillna(0.0))
+            long_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'open']
+            flag = (self.df['low'] <= self.df['tr_stop_h']) & (self.df['open'] > self.df['tr_stop_h']) \
+                   & (long_df['pos'] < long_df['pos'].shift(1).fillna(0.0))
+            long_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'long_exit_pr']
+            flag = (self.df['low'] <= self.df['tr_stop_h']) & (self.df['open'] <= self.df['tr_stop_h']) \
+                   & (long_df['pos'] < long_df['pos'].shift(1).fillna(0.0))
+            long_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'open']
+        long_df.ix[-1, 'pos'] = 0
+        long_df['cost'] = abs(long_df['pos'] - long_df['pos'].shift(1)) * (self.offset + long_df['close'] * self.tcost)
+        long_df['cost'].fillna(0.0, inplace = True)
+        long_trades = simdf_to_trades1(long_df, slippage=self.offset)
+
+        short_df['pos'] = pd.Series(np.nan, index = self.df.index)
+        short_df.ix[(self.df['low'] < self.df['band_dn']) & (self.df['filter_ind']<self.filter_thres[1]), 'pos'] = -1.0
+        short_df.ix[(self.df['high'] >= self.df['tr_stop_l']), 'pos'] = 0.0
+        short_df['pos'] = short_df['pos'].fillna(method='ffill').fillna(0.0)
+        if self.trading_mode == 'match':
+            flag = (self.df['low'] < self.df['band_dn']) & (self.df['filter_ind']<self.filter_thres[1]) \
+                   & (self.df['open'] > self.df['band_dn']) & (short_df['pos'] < short_df['pos'].shift(1).fillna(0.0))
+            short_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'short_entry_pr']
+            flag = (self.df['low'] < self.df['band_dn']) & (self.df['filter_ind']<self.filter_thres[1]) \
+                   & (self.df['open'] <= self.df['band_dn']) & (short_df['pos'] < short_df['pos'].shift(1).fillna(0.0))
+            short_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'open']
+            flag = (self.df['high'] >= self.df['tr_stop_l']) & (self.df['open'] < self.df['tr_stop_l']) \
+                   & (short_df['pos'] > short_df['pos'].shift(1).fillna(0.0))
+            short_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'short_exit_pr']
+            flag = (self.df['high'] >= self.df['tr_stop_l']) & (self.df['open'] >= self.df['tr_stop_l']) \
+                   & (short_df['pos'] > short_df['pos'].shift(1).fillna(0.0))
+            short_df.ix[flag, 'traded_price'] = self.df.ix[flag, 'open']
+        short_df.ix[-1, 'pos'] = 0
+        short_df['cost'] = abs(short_df['pos'] - short_df['pos'].shift(1)) * (self.offset + short_df['close'] * self.tcost)
+        short_df['cost'].fillna(0.0, inplace = True)
+        short_trades = simdf_to_trades1(short_df, slippage=self.offset)
+        closed_trades = long_trades + short_trades
+        return ([long_df, short_df], closed_trades)
 
     def on_bar(self, sim_data, n):
         self.pos_args = {'reset_margin': 0}
@@ -106,15 +157,15 @@ class BBTrailStop(StratSim):
 def gen_config_file(filename):
     sim_config = {}
     sim_config['sim_class']  = 'bktest.bktest_bband_trailstop.BBTrailStop'
-    sim_config['sim_func'] = 'run_loop_sim'
+    sim_config['sim_func'] = 'run_vec_sim'
     sim_config['scen_keys'] = ['boll_len', 'band_ratio', 'filter_args', 'stoploss']
-    sim_config['filter_args'] = [20, 40]
+    sim_config['filter_len'] = [20, 40, 60, 80]
     sim_config['sim_name']   = 'band_trailstop'
     sim_config['products']   = ['m', 'RM', 'y', 'p', 'a', 'rb', 'SR', 'TA', 'MA', 'i', 'ru', 'j' ]
-    sim_config['start_date'] = '20150201'
-    sim_config['end_date']   = '20180214'
-    sim_config['boll_len'] = [20, 40, 80, 100, 120, 160]
-    sim_config['band_ratio'] = [1.0, 1.5, 2.0]
+    sim_config['start_date'] = '20150701'
+    sim_config['end_date']   = '20181028'
+    sim_config['boll_len'] = [20, 30, 40, 50, 60]
+    sim_config['band_ratio'] = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
     sim_config['stoploss'] = [0.5, 1.0, 1.5, 2.0]
     sim_config['pos_class'] = 'trade_position.TargetTrailTradePos'
     sim_config['offset']    = 1
@@ -122,12 +173,14 @@ def gen_config_file(filename):
     config = {'capital': 10000,
               'trans_cost': 0.0,
               'close_daily': False,
-              'chan_ratio': 0.0,
+              'chan_ratio': 2.0,
               'filter_func': 'dh.CCI',
+              'ma_func': 'dh.MA',
+              'band_func': 'dh.ATR',
+              'filter_args': [0.0, 0.0],
               'unit': 1,                           
               'pos_args': {},
-              'freq': 3,
-              'pos_update': True,
+              'freq': 15,
               }
     sim_config['config'] = config
     with open(filename, 'w') as outfile:
