@@ -573,13 +573,13 @@ def get_opt_expiry(fut_inst, cont_mth, exch=''):
         else:
             expiry_month = datetime.date(cont_yr - 1, 12, 1)
         expiry = workdays.workday(expiry_month, -5, CHN_Holidays)
-    elif fut_inst[:1] == 'm' or exch == 'DCE':
+    elif fut_inst[:1] == 'm' or fut_inst[:1] == 'c' or exch == 'DCE':
         if cont_mth > 1:
             expiry_month = datetime.date(cont_yr, cont_mth - 1, 1) + datetime.timedelta(days=-1)
         else:
             expiry_month = datetime.date(cont_yr - 1, 11, 30)
         expiry = workdays.workday(expiry_month, 5, CHN_Holidays)
-    elif fut_inst[:2] == 'cu' or exch == 'SHFE':
+    elif fut_inst[:2] == 'cu' or fut_inst[:2] == 'ru' or exch == 'SHFE':
         expiry = workdays.workday(expiry_month, -5, CHN_Holidays)
     elif fut_inst[:3] == 'fef' or exch == 'SGX':
         if cont_mth < 12:
