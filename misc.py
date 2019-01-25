@@ -81,13 +81,22 @@ CHN_Holidays = [datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.d
                 datetime.date(2018, 4, 5), datetime.date(2018, 4, 6),  datetime.date(2018, 4, 30),
                 datetime.date(2018, 5, 1), datetime.date(2018, 6, 18),
                 datetime.date(2018, 9, 24), datetime.date(2018, 10, 1), datetime.date(2018, 10, 2),
-                datetime.date(2018, 10, 3), datetime.date(2018, 10, 4), datetime.date(2018, 10, 5)]
+                datetime.date(2018, 10, 3), datetime.date(2018, 10, 4), datetime.date(2018, 10, 5),
+                datetime.date(2018, 12, 31), datetime.date(2019, 1, 1), datetime.date(2019, 2, 4),
+                datetime.date(2019, 2, 5), datetime.date(2019, 2, 6), datetime.date(2019, 2, 7),
+                datetime.date(2019, 2, 8), datetime.date(2019, 4, 5), datetime.date(2019, 5, 1),
+                datetime.date(2019, 6, 7), datetime.date(2019, 9, 13),
+                datetime.date(2019, 10, 1), datetime.date(2019, 10, 2), datetime.date(2019, 10, 3),
+                datetime.date(2019, 10, 4), datetime.date(2019, 10, 7),
+                ]
 
 PLIO_Holidays = [datetime.date(2014, 1, 1),
                 datetime.date(2015, 1, 1),
                 datetime.date(2016, 1, 1),
                 datetime.date(2017, 1, 2),
-                datetime.date(2018, 1, 1), datetime.date(2019, 1, 1),]
+                datetime.date(2018, 1, 1), datetime.date(2018,12,24), datetime.date(2018,12,25), datetime.date(2018,12,31),
+                datetime.date(2019, 1, 1), datetime.date(2019,2,5), datetime.date(2019,2,6),
+                datetime.date(2019, 4,19), datetime.date(2019,12,25), ]
 
 WASDE_Dates = [datetime.date(2010, 1, 12), datetime.date(2010, 2, 9), datetime.date(2010, 3, 10), \
                datetime.date(2010, 4, 9), datetime.date(2010, 5, 11), datetime.date(2010, 6, 10), \
